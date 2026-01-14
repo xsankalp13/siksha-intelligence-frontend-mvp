@@ -1,117 +1,178 @@
-# 🎓 Siksha Intelligence — Frontend (MVP)
+# 🎓 Siksha Intelligence — Frontend
 
-Empowering Education through Intelligent Management.
+Siksha Intelligence is a multi-tenant School ERP frontend built with React + TypeScript + Vite + Tailwind. It is designed to communicate with a Spring Boot backend (Swagger available locally).
 
-Siksha Intelligence (formerly EduSync) is a high-performance, white-labelled, multi-tenant School ERP platform. This frontend is built using React 19, Vite, and Tailwind CSS, designed to communicate with a Spring Boot microservices backend.
+## Table of Contents
 
-## 🛠️ Tech Stack
+- Overview
+- Tech Stack
+- Local Setup (Frontend + Backend)
+- Environment Variables (`.env`)
+- API Base URL (important)
+- Auth Flow (Login + Refresh)
+- Multi-Tenancy (X-Tenant-ID)
+- Project Structure
+- Scripts
+- Troubleshooting
+
+## Overview
+
+- Frontend: React 19 + Vite + Tailwind
+- Backend: Spring Boot (local default `http://localhost:8080`)
+- API calls: Axios client with interceptors
+- Auth: Access token in `Authorization` header; refresh token stored in `localStorage`
+
+## Tech Stack
 
 - **Core:** React 19 + TypeScript
 - **Build Tool:** Vite (rolldown-vite)
-- **Styling:** Tailwind CSS (PostCSS pipeline)
-- **UI Components:** shadcn/ui (high-density enterprise UI)
-- **State Management:** Zustand
-- **Data Fetching:** TanStack Query v5
-- **Forms:** React Hook Form + Zod
-- **Networking:** Axios (with multi-tenant interceptors)
+- **Styling:** Tailwind CSS (PostCSS)
+- **UI Components:** shadcn/ui
+- **State:** Redux Toolkit (and Zustand is available as a dependency)
+- **Networking:** Axios
 
-> Note: This repository currently uses Tailwind CSS v3 for shadcn compatibility.
-
-## 📂 Project Structure
-
-We follow a Domain-Driven / Feature-Based architecture. This ensures that the code for Finance doesn't leak into Academics, keeping the bundle lean and the logic isolated.
-
-```text
-src/
-├── assets/             # Global static files (logos, brand icons)
-├── components/         # Shared UI components
-│   ├── ui/             # shadcn atoms (Button, Input, Table)
-│   ├── common/         # Molecules (DataTable, FormField, Modal)
-│   └── layout/         # App shells (Sidebar, Navbar, DashboardWrapper)
-├── config/             # Env variables & global constants
-├── features/           # Domain-Specific Modules (The "Heart")
-│   ├── auth/           # IAM: Login, MFA, Permissions
-│   ├── uis/            # User Info: Students, Staff, Guardians
-│   ├── academics/      # ADM: Classes, Schedules, Subjects
-│   └── finance/        # Billing, Invoices, Fees
-├── hooks/              # Global reusable hooks
-├── lib/                # 3rd party configs (Axios, QueryClient)
-├── pages/              # Route-level views (Lazy-loaded)
-├── routes/             # Route definitions & Guarded Routes
-├── services/           # Shared API services
-├── store/              # Global state (Zustand stores)
-├── types/              # TS Interfaces (Mirrored from Backend DTOs)
-└── utils/              # Helper functions (Date formatters, Currency)
-```
-
-## 🚀 Getting Started
+## Local Setup
 
 ### 1) Prerequisites
 
-- **Node.js:** v20+ (LTS recommended)
-- **Package Manager:** npm (or pnpm)
+- Node.js v20+
+- npm
+- Spring Boot backend running locally
 
-### 2) Installation
+### 2) Backend (Spring Boot)
+
+- Start your backend on `http://localhost:8080`
+- Swagger UI should load at:
+	- `http://localhost:8080/swagger-ui/index.html`
+
+### 3) Frontend Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/ashugolem/siksha-intelligence-frontend-mvp.git
-
-# Enter the project
-cd siksha-intelligence-frontend-mvp
-
-# Install dependencies
 npm install
 ```
 
-### 3) Environment Setup
+### 4) Configure Environment
 
-Create a `.env` file in the root directory (you can copy from `.env.example`):
+Copy `.env.example` to `.env` and set the base URL:
 
 ```bash
-VITE_API_BASE_URL=http://localhost:8080/api/v1
-VITE_APP_NAME="Siksha Intelligence"
+VITE_API_BASE_URL=http://localhost:8080
+VITE_API_PREFIX=/api
+VITE_API_VERSION=v1
 ```
 
-### 4) Development
+Important:
+
+- Vite reads `.env` at dev-server start. After changing `.env`, you must restart `npm run dev`.
+
+### 5) Run the Frontend
 
 ```bash
 npm run dev
 ```
 
-## 🛡️ Key Architectural Principles
+## Environment Variables
 
-### 1) Multi-Tenancy (White Labelling)
+### `VITE_API_BASE_URL`
 
-The application identifies the tenant via the URL (e.g., `school-a.siksha.ai`). The Axios Interceptor in `src/lib/axios.ts` should inject the `X-Tenant-ID` header into every request based on the current context.
+- Purpose: backend origin (scheme + host + port).
+- Example: `http://localhost:8080`
 
-### 2) Type Safety
+### `VITE_API_PREFIX` and `VITE_API_VERSION`
 
-We do not use `any`. All API responses must have a corresponding interface in `src/types/`. These types should strictly follow the schemas defined in the **UIS_Database_Schema_Document**.
+- Purpose: API path prefix + versioning.
+- Example: `/api` and `v1` compose requests under `/api/v1`.
 
-### 3) Form Handling
+## API Base URL (important)
 
-All forms must be validated using Zod schemas. This prevents invalid data from reaching our Spring Boot backend and provides immediate user feedback.
+This project uses an Axios instance in `src/lib/axios.ts`.
 
-### 4) Component Density
+- When `VITE_API_BASE_URL` is set, requests go to that host.
+- If it is missing in development, the app falls back to `http://localhost:8080` (and logs a warning).
 
-Since this is an ERP, keep components high-density. Avoid excessive whitespace; ensure that administrators can see maximum data (Students/Teachers/Invoices) without unnecessary scrolling.
+If you ever see API calls going to `http://localhost:5173/...`, it means Axios did not receive a base URL (or you didn’t restart Vite after editing `.env`).
 
-## 📜 Coding Conventions
+## Auth Flow
 
-- **Components:** PascalCase (e.g., `StudentTable.tsx`)
-- **Hooks:** camelCase starting with `use` (e.g., `useStudentData.ts`)
-- **Features:** folder-per-feature. Each feature should contain its own `api/`, `components/`, and `hooks/`.
-- **Imports:** use the `@/` alias for clean imports (e.g., `import { Button } from "@/components/ui/button"`).
+### Endpoints
 
-## 🛠️ Build & Deployment
+The frontend calls these endpoints relative to the composed API base URL:
 
-```bash
-# Production build
-npm run build
+- `POST /auth/login`
+- `POST /refresh`
 
-# Preview production build locally
-npm run preview
+If your backend uses different paths (e.g. `/auth/login`), update the frontend calls or set `VITE_API_BASE_URL` to include the prefix.
+
+### Tokens
+
+- **Access token**: stored in Redux state and attached as `Authorization: Bearer <token>`
+- **Refresh token**: stored in `localStorage`
+
+### Auto Refresh
+
+Axios intercepts `401` responses and attempts a single refresh flow, queues concurrent requests during refresh, then retries them with the new token.
+
+## Multi-Tenancy (X-Tenant-ID)
+
+The tenant is derived from the hostname and injected as a request header:
+
+- `X-Tenant-ID: <tenant>`
+
+Examples:
+
+- `school-a.siksha.ai` → `X-Tenant-ID: school-a`
+- `school-a.localhost` → `X-Tenant-ID: school-a`
+
+## Project Structure
+
+Feature-based structure under `src/`:
+
+```text
+src/
+├── assets/             # Global static files
+├── components/         # Shared UI
+│   ├── ui/             # shadcn atoms
+│   ├── common/         # Shared molecules
+│   └── layout/         # App shells
+├── features/           # Domain modules
+│   ├── auth/           # Login / auth screens
+│   ├── uis/            # User information
+│   ├── academics/
+│   └── finance/
+├── lib/                # Axios and utilities
+├── pages/              # Route-level pages
+├── routes/             # Routing
+├── services/           # API/service layer
+├── store/              # Redux store + slices
+├── types/              # Shared TS types
+└── utils/              # Helpers
 ```
 
-The build is optimized for cloud deployment (AWS/Vercel) and uses code-splitting to ensure each module (IAM, UIS, etc.) is only loaded when the user navigates to it.
+## Scripts
+
+```bash
+npm run dev      # start dev server
+npm run build    # typecheck + production build
+npm run preview  # preview production build
+npm run lint     # eslint
+```
+
+## Troubleshooting
+
+### API calls go to `localhost:5173` instead of `localhost:8080`
+
+- Ensure `.env` exists and contains `VITE_API_BASE_URL=http://localhost:8080`
+- Restart the dev server: stop `npm run dev` and run it again
+- Hard refresh the browser (Ctrl+Shift+R)
+
+### CORS / Cookie issues (Spring Boot)
+
+This frontend uses `withCredentials: true` on Axios.
+
+- Backend must allow credentials
+- Backend must allow the frontend origin (commonly `http://localhost:5173`)
+
+### 404 on `/login` or `/refresh`
+
+- Confirm exact endpoint paths in Swagger (`/swagger-ui/index.html`)
+- If backend uses a prefix like `/api` or `/auth`, set `VITE_API_BASE_URL` accordingly (e.g. `http://localhost:8080/auth`).
