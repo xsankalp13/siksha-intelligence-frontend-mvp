@@ -139,3 +139,52 @@ button:focus-visible {
     @apply bg-background text-foreground;
   }
 }
+
+/* AI Glowing Button Styles */
+@keyframes ai-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(139, 92, 246, 0.5), 0 0 10px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.8), 0 0 25px rgba(139, 92, 246, 0.5), 0 0 35px rgba(139, 92, 246, 0.3);
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.ai-glow-button {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #8b5cf6 100%);
+  background-size: 200% 200%;
+  animation: ai-glow 2s ease-in-out infinite, gradient-shift 3s ease-in-out infinite;
+  border: none !important;
+  color: white !important;
+}
+
+.ai-glow-button:hover {
+  background: linear-gradient(135deg, #9d74f7 0%, #7478f3 50%, #9d74f7 100%);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.9), 0 0 35px rgba(139, 92, 246, 0.6);
+}
+
+.ai-glow-button svg {
+  animation: sparkle 1.5s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Auto-fill animation for grid cells */
+@keyframes auto-fill-pulse {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.auto-fill-animation {
+  animation: auto-fill-pulse 0.4s ease-out forwards;
+}
+
