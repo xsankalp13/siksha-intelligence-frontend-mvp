@@ -10,6 +10,7 @@ import type {
   CreateGuardianRequestDTO,
   UpdateGuardianRequestDTO,
   LinkGuardianRequestDTO,
+  BulkAssignSubjectsRequestDTO,
 } from "./types/admin";
 import type { ComprehensiveUserProfileResponseDTO, StudentGuardianDTO } from "./types/profile";
 
@@ -50,6 +51,8 @@ export interface StaffSummaryDTO {
   hireDate?: string;
   officeLocation?: string;
   active: boolean;
+  // Optional: only present for TEACHER staffType when backend includes competency data
+  teachableSubjectIds?: string[];
 }
 
 export interface PageResponse<T> {
@@ -151,6 +154,11 @@ export const adminService = {
   /** GET /auth/admin/users/staff/{staffId}/details */
   getStaffFullDetails(uuid: string) {
     return api.get<ComprehensiveUserProfileResponseDTO>(`/auth/admin/users/staff/${uuid}/details`);
+  },
+
+  /** PUT /auth/teachers/bulk-subjects */
+  bulkAssignSubjects(data: BulkAssignSubjectsRequestDTO) {
+    return api.put<string>("/auth/teachers/bulk-subjects", data);
   },
 
   // ── Guardian Management ────────────────────────────────────────────────

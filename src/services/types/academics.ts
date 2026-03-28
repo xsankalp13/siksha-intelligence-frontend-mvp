@@ -53,6 +53,7 @@ export interface TimeslotRequestDto {
   endTime: string;
   slotLabel: string;
   isBreak: boolean;
+  isNonTeachingSlot: boolean;
 }
 
 export interface TimeslotResponseDto {
@@ -62,6 +63,7 @@ export interface TimeslotResponseDto {
   endTime: string;
   slotLabel: string;
   isBreak: boolean;
+  isNonTeachingSlot: boolean;
 }
 
 // Schedules
@@ -102,6 +104,7 @@ export interface NestedTimeslotResponseDto {
   startTime: string;
   endTime: string;
   slotLabel: string;
+  isNonTeachingSlot?: boolean;
 }
 
 export interface ScheduleResponseDto {

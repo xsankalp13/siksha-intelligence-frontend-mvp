@@ -13,7 +13,8 @@ import {
   User, 
   IdCard,
   Building,
-  GraduationCap
+  GraduationCap,
+  BookOpen
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -37,6 +38,7 @@ import {
 import { adminService } from "@/services/admin"
 import type { ComprehensiveUserProfileResponseDTO, AddressDTO, StudentGuardianDTO } from "@/services/types/profile"
 import { GuardianFormDialog, LinkGuardianDialog } from "./components/GuardianDialogs"
+import { EditTeachableSubjectsDialog } from "./components/EditTeachableSubjectsDialog"
 import { toast } from "sonner"
 
 export default function UserDetailsPage() {
@@ -53,6 +55,9 @@ export default function UserDetailsPage() {
   const [editingGuardian, setEditingGuardian] = useState<StudentGuardianDTO | null>(null)
   const [guardianToUnlink, setGuardianToUnlink] = useState<StudentGuardianDTO | null>(null)
   const [isUnlinking, setIsUnlinking] = useState(false)
+
+  // Teacher specific state
+  const [isEditSubjectsOpen, setIsEditSubjectsOpen] = useState(false)
 
   const fetchDetails = async () => {
     if (!id || !type) return
@@ -442,10 +447,19 @@ export default function UserDetailsPage() {
             {isStaff && staffDetails?.teacherDetails && (
                <motion.div variants={itemVariants}>
                 <Card className="shadow-sm border-none bg-card/50 backdrop-blur-sm mt-6">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-lg">Teacher Info</CardTitle>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8"
+                      onClick={() => setIsEditSubjectsOpen(true)}
+                    >
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      Manage Subjects
+                    </Button>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 pt-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                       <InfoItem label="Years of Experience" value={staffDetails.teacherDetails.yearsOfExperience} />
                       <InfoItem label="Education Level" value={staffDetails.teacherDetails.educationLevel} icon={<GraduationCap />} />
@@ -473,6 +487,33 @@ export default function UserDetailsPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Teachable Subjects */}
+                    <div className="pt-4 border-t">
+                      <p className="text-sm font-medium text-muted-foreground mb-3 flex items-center justify-between">
+                        Teachable Subjects
+                        <span className="text-xs font-normal opacity-60">
+                          {staffDetails.teacherDetails.teachableSubjects?.length || 0} mapped
+                        </span>
+                      </p>
+                      {staffDetails.teacherDetails.teachableSubjects && staffDetails.teacherDetails.teachableSubjects.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {staffDetails.teacherDetails.teachableSubjects.map((subject) => (
+                            <Badge key={subject.uuid} variant="secondary" className="pl-1.5 pr-2.5 py-1 gap-1.5 border border-border/50">
+                              <span 
+                                className="w-2.5 h-2.5 rounded-full" 
+                                style={{ backgroundColor: subject.color || "#6366f1" }} 
+                              />
+                              {subject.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground/80 bg-muted/30 p-3 rounded-md text-center border border-dashed">
+                          No subjects assigned. Use "Manage Subjects" to assign.
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -565,6 +606,17 @@ export default function UserDetailsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Teachable Subjects Dialog */}
+      {isStaff && profileData && (
+        <EditTeachableSubjectsDialog 
+          open={isEditSubjectsOpen}
+          onOpenChange={setIsEditSubjectsOpen}
+          staffId={id!}
+          profileData={profileData}
+          onSuccess={fetchDetails}
+        />
+      )}
     </div>
   )
 }

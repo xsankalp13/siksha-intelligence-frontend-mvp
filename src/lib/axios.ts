@@ -30,6 +30,10 @@ export const initializeAxiosAuth = (handlers: AxiosAuthHandlers) => {
   authHandlers = handlers
 }
 
+export const getApiAccessToken = (): string | null => {
+  return authHandlers?.getAccessToken() ?? null
+}
+
 const getTenantIdFromHostname = (hostname: string): string | null => {
   const cleanHost = hostname.split(':')[0]
   const parts = cleanHost.split('.').filter(Boolean)

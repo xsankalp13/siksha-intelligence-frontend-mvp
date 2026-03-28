@@ -19,7 +19,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { setSelectedClass, setSelectedSection } from '../store/timetableSlice';
-import { classes, sections } from '../data/mockData';
+import { useGetClasses, useGetSections } from '../hooks/useAcademicClassQueries';
+import { Loader2 } from 'lucide-react';
 
 interface SelectionDialogProps {
     open: boolean;
@@ -32,15 +33,18 @@ export function SelectionDialog({ open, onOpenChange }: SelectionDialogProps) {
     const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [selectedSectionId, setSelectedSectionId] = useState<string>('');
 
+    const { data: classes = [], isLoading: isClassesLoading } = useGetClasses();
+    const { data: sections = [], isLoading: isSectionsLoading } = useGetSections(selectedClassId);
+
     const handleProceed = () => {
-        const selectedClassData = classes.find(c => c._id === selectedClassId);
-        const selectedSectionData = sections.find(s => s._id === selectedSectionId);
+        const selectedClassData = classes.find(c => c.uuid === selectedClassId);
+        const selectedSectionData = sections.find(s => s.uuid === selectedSectionId);
 
         if (selectedClassData && selectedSectionData) {
-            dispatch(setSelectedClass(selectedClassData));
-            dispatch(setSelectedSection(selectedSectionData));
+            dispatch(setSelectedClass({ _id: selectedClassData.uuid, name: selectedClassData.name }));
+            dispatch(setSelectedSection({ _id: selectedSectionData.uuid, name: selectedSectionData.sectionName }));
             onOpenChange(false); // Close dialog
-            navigate('/dashboard/admin/timetable/editor');
+            navigate(`/dashboard/admin/timetable/editor/${selectedClassData.uuid}/${selectedSectionData.uuid}`);
         }
     };
 
@@ -63,8 +67,9 @@ export function SelectionDialog({ open, onOpenChange }: SelectionDialogProps) {
 
                 <div className="space-y-6 pt-4">
                     <div className="space-y-2">
-                        <Label htmlFor="class-select" className="text-sm font-medium">
+                        <Label htmlFor="class-select" className="text-sm font-medium flex items-center gap-2">
                             Academic Class
+                            {isClassesLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
                         </Label>
                         <Select value={selectedClassId} onValueChange={setSelectedClassId}>
                             <SelectTrigger id="class-select" className="w-full h-11">
@@ -72,7 +77,7 @@ export function SelectionDialog({ open, onOpenChange }: SelectionDialogProps) {
                             </SelectTrigger>
                             <SelectContent>
                                 {classes.map(classItem => (
-                                    <SelectItem key={classItem._id} value={classItem._id}>
+                                    <SelectItem key={classItem.uuid} value={classItem.uuid}>
                                         {classItem.name}
                                     </SelectItem>
                                 ))}
@@ -81,17 +86,22 @@ export function SelectionDialog({ open, onOpenChange }: SelectionDialogProps) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="section-select" className="text-sm font-medium">
+                        <Label htmlFor="section-select" className="text-sm font-medium flex items-center gap-2">
                             Section
+                            {isSectionsLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
                         </Label>
-                        <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
+                        <Select 
+                            value={selectedSectionId} 
+                            onValueChange={setSelectedSectionId}
+                            disabled={!selectedClassId || isSectionsLoading}
+                        >
                             <SelectTrigger id="section-select" className="w-full h-11">
-                                <SelectValue placeholder="Choose a section" />
+                                <SelectValue placeholder={!selectedClassId ? "Select a class first" : "Choose a section"} />
                             </SelectTrigger>
                             <SelectContent>
                                 {sections.map(section => (
-                                    <SelectItem key={section._id} value={section._id}>
-                                        {section.name}
+                                    <SelectItem key={section.uuid} value={section.uuid}>
+                                        {section.sectionName}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

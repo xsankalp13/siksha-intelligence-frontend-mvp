@@ -98,12 +98,20 @@ export type StaffType =
   | "SUPER_ADMIN"
   | "OTHER";
 
+export interface TeacherSubjectDTO {
+  uuid: string;
+  name: string;
+  subjectCode: string;
+  color?: string;
+}
+
 export interface TeacherDetailsDTO {
   certifications?: string;
   specializations?: string;
   yearsOfExperience?: number;
   educationLevel?: string;
   stateLicenseNumber?: string;
+  teachableSubjects?: TeacherSubjectDTO[];
 }
 
 export type SchoolLevel = "PRIMARY" | "MIDDLE" | "HIGH" | "ALL";

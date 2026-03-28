@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { GraduationCap, Info, LayoutGrid, BookOpen } from 'lucide-react';
+import { GraduationCap, Info, LayoutGrid, BookOpen, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/axios';
 import { OverviewHeader } from '@/features/academics/curriculum_mapping/components/OverviewHeader';
 import { ClassCurriculumPanel } from '@/features/academics/curriculum_mapping/components/ClassCurriculumPanel';
 import { AddSubjectDialog } from '@/features/academics/curriculum_mapping/components/AddSubjectDialog';
 import { SubjectLibraryPanel } from '@/features/academics/curriculum_mapping/components/SubjectLibraryPanel';
+import { TeacherSubjectMappingPanel } from '@/features/academics/curriculum_mapping/components/TeacherSubjectMappingPanel';
 import {
     useGetCurriculumOverview,
     useGetClassCurriculum,
@@ -22,7 +23,7 @@ interface AcademicClassDto {
     name: string;
 }
 
-type ActiveTab = 'curriculum' | 'subjects';
+type ActiveTab = 'curriculum' | 'subjects' | 'teachers';
 
 export default function CurriculumPage() {
     const [activeTab, setActiveTab] = useState<ActiveTab>('curriculum');
@@ -92,6 +93,12 @@ export default function CurriculumPage() {
             label: 'Subject Library',
             icon: BookOpen,
             description: 'Manage your institution\'s subject catalog',
+        },
+        {
+            id: 'teachers',
+            label: 'Teacher Mapping',
+            icon: Users,
+            description: 'Map subjects to capable teachers',
         },
     ];
 
@@ -197,6 +204,18 @@ export default function CurriculumPage() {
                     transition={{ duration: 0.2 }}
                 >
                     <SubjectLibraryPanel />
+                </motion.div>
+            )}
+
+            {activeTab === 'teachers' && (
+                <motion.div
+                    key="teachers"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="h-[800px] flex flex-col"
+                >
+                    <TeacherSubjectMappingPanel />
                 </motion.div>
             )}
 

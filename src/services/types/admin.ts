@@ -125,6 +125,7 @@ export interface UpdateStaffRequestDTO {
   officeLocation?: string;
   department?: Department;
   staffType?: StaffType;
+  teachableSubjectIds?: string[];
 }
 
 // ── Guardian DTOs ───────────────────────────────────────────────────
@@ -177,3 +178,11 @@ export interface LinkGuardianRequestDTO {
   financialContact?: boolean;
   canViewGrades?: boolean;
 }
+
+// ── Teacher/Subject Mapping DTOs ─────────────────────────────────────
+
+export interface BulkAssignSubjectsRequestDTO {
+  subjectId: string;
+  teacherIds: number[];
+}
+

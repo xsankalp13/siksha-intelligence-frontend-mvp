@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   User,
   MapPin,
@@ -21,9 +21,8 @@ import {
 
 import { profileService } from "@/services/profile";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileImageUploader } from "@/components/shared/ProfileImageUploader";
 import { AddressEditorDialog } from "@/features/student/profile/components/AddressEditorDialog";
@@ -35,7 +34,7 @@ const stagger = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
 };
-const fadeUp = {
+const fadeUp: any = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 26 } },
 };
@@ -174,11 +173,6 @@ export default function StudentProfilePage() {
                   <span className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full">
                     <Calendar className="w-3 h-3" />
                     {new Date(basicProfile.dateOfBirth).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                  </span>
-                )}
-                {basicProfile.gender && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-full capitalize">
-                    {basicProfile.gender.toLowerCase().replace(/_/g, " ")}
                   </span>
                 )}
               </div>
@@ -387,7 +381,7 @@ export default function StudentProfilePage() {
 
 /* ── Reusable Sub-components ────────────────────────────────────────── */
 
-function DataField({ label, value, rose }: { label: string; value: string; rose?: boolean }) {
+function DataField({ label, value, rose }: { label: string; value?: string; rose?: boolean }) {
   return (
     <div>
       <p className={`text-[11px] font-semibold uppercase tracking-[0.06em] mb-0.5 ${rose ? "text-rose-900/50 dark:text-rose-400/50" : "text-muted-foreground"}`}>

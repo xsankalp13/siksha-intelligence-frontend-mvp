@@ -1,11 +1,11 @@
 import { useCallback, useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
     DndContext,
     DragOverlay,
-    closestCenter,
+    pointerWithin,
     PointerSensor,
     useSensor,
     useSensors,
@@ -16,13 +16,29 @@ import { SidebarSubjects } from './SidebarSubjects';
 import { SidebarTeachers } from './SidebarTeachers';
 import { TimetableGrid } from './TimetableGrid';
 import { AutoGenerateModal } from './AutoGenerateModal';
-import { setSubjectToCell, setTeacherToCell, resetGrid } from '../store/timetableSlice';
+import { CellEditDialog } from './CellEditDialog';
+import { setSubjectToCell, setTeacherToCell, resetGrid, setSelectedClass, setSelectedSection } from '../store/timetableSlice';
 import { generateTimetable } from '../services/autoGenerateService';
 import type { RootState } from '@/store/store';
 import type { Subject, Teacher, LLMTeacher, GeneratedTimetable, ScheduleRequestDto } from '../types';
-import { useBulkUpdateSchedule, useUpdateScheduleStatus, useGetEditorContext } from '../queries/useTimetableQueries';
-import { ArrowLeft, Save, Send, RotateCcw, Sparkles } from 'lucide-react';
+import { 
+    useBulkUpdateSchedule, 
+    useUpdateScheduleStatus, 
+    useGetEditorContext, 
+    useGetRooms,
+    useDeleteSectionSchedule 
+} from '../queries/useTimetableQueries';
+import { ArrowLeft, Save, Send, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ConfirmDialog } from './ConfirmDialog';
+
+const normalizeTime = (time: string) => {
+    if (!time) return '';
+    const parts = time.split(':');
+    const hours = parts[0].trim().padStart(2, '0');
+    const minutes = (parts[1] || '0').trim().padStart(2, '0');
+    return `${hours}:${minutes}`;
+};
 
 export function TimetableEditor() {
     const navigate = useNavigate();
@@ -30,21 +46,29 @@ export function TimetableEditor() {
     const { selectedClass, selectedSection, grid } = useSelector(
         (state: RootState) => state.timetable
     );
+    const { sectionId, classId } = useParams();
+    const sectionIdToUse = selectedSection?._id || sectionId;
     const [activeDragItem, setActiveDragItem] = useState<{ type: string; item: Subject | Teacher } | null>(null);
 
-    // Auto Generate state
+    // Dialog state
     const [isAutoGenerateModalOpen, setIsAutoGenerateModalOpen] = useState(false);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [autoGenerateError, setAutoGenerateError] = useState<string | null>(null);
+    const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    
     // Track whether we've already hydrated the grid for this section (prevents duplicate hydration)
     const [hydratedSectionId, setHydratedSectionId] = useState<string | null>(null);
+    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
 
     // ─── Live API ─────────────────────────────────────────────────────────────
-    const { data: editorContext, isLoading: isContextLoading } = useGetEditorContext(selectedSection?._id);
+    const { data: editorContext, isLoading: isContextLoading } = useGetEditorContext(sectionIdToUse);
+    const { data: rooms = [] } = useGetRooms();
     const { mutate: bulkUpdate, isPending: isSavingData } = useBulkUpdateSchedule();
     const { mutate: updateStatus, isPending: isUpdatingStatus } = useUpdateScheduleStatus();
+    const deleteTimetable = useDeleteSectionSchedule();
 
-    const isSaving = isSavingData || isUpdatingStatus;
+    const isSaving = isSavingData || isUpdatingStatus || deleteTimetable.isPending;
 
     // ─── Map API data → local Subject/Teacher types for Sidebars ─────────────
     const liveSubjects: Subject[] = useMemo(() => {
@@ -66,41 +90,87 @@ export function TimetableEditor() {
         }));
     }, [editorContext?.teachers]);
 
+    // ─── Hydrate Redux selection from URL if missing ─────────────────────────
+    useEffect(() => {
+        if (editorContext?.section && (!selectedSection || !selectedClass)) {
+            dispatch(setSelectedClass({ _id: classId || '', name: editorContext.section.className }));
+            dispatch(setSelectedSection({ _id: sectionId || '', name: editorContext.section.sectionName }));
+        }
+    }, [editorContext?.section, selectedSection, selectedClass, dispatch, classId, sectionId]);
+
     // ─── Hydrate Grid from Existing Schedule ──────────────────────────────────
     useEffect(() => {
         if (
             editorContext &&
             editorContext.existingSchedule.length > 0 &&
-            selectedSection?._id &&
-            hydratedSectionId !== selectedSection._id
+            sectionIdToUse &&
+            hydratedSectionId !== sectionIdToUse
         ) {
             dispatch(resetGrid());
-            setHydratedSectionId(selectedSection._id);
+            setHydratedSectionId(sectionIdToUse);
 
             setTimeout(() => {
+                const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                
+                // 1. First, mark all BREAK and NON-TEACHING slots as locked in the grid
+                editorContext.timeslots.forEach(ts => {
+                    const isLabelBreak = ts.slotLabel?.toLowerCase().includes('lunch') || ts.slotLabel?.toLowerCase().includes('break');
+                    const isNonTeaching = ts.isNonTeachingSlot || ts.slotLabel?.toLowerCase().includes('assembly') || ts.slotLabel?.toLowerCase().includes('office');
+                    
+                    if (ts.isBreak || isLabelBreak || ts.isNonTeachingSlot || isNonTeaching) {
+                        const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
+                        const timeStr = normalizeTime(ts.startTime);
+                        const cellKey = `${dayName}_${timeStr}`;
+                        
+                        let label = ts.slotLabel;
+                        if (ts.isBreak || isLabelBreak) {
+                            label = ts.slotLabel?.toLowerCase().includes('lunch') ? 'Lunch' : 'Break';
+                        }
+                        
+                        const color = (ts.isBreak || isLabelBreak) 
+                            ? 'bg-orange-50 text-orange-600 border-orange-200' 
+                            : 'bg-slate-100 text-slate-500 border-slate-200';
+
+                        dispatch(setSubjectToCell({ 
+                            cellKey, 
+                            subject: { _id: 'break', name: label, code: 'LOCKED', color: color } as any 
+                        }));
+                        dispatch(setTeacherToCell({ cellKey, teacher: { _id: 'break-sys', name: label } as any }));
+                    }
+                });
+
+                // 2. Then, hydrate existing schedule entries
                 editorContext.existingSchedule.forEach((entry) => {
-                    const cellKey = entry.slotLabel; // e.g. "Monday_08:00"
+                    let cellKey = null;
+                    if (entry.timeslotId) {
+                        const ts = editorContext.timeslots.find(t => t.uuid === entry.timeslotId);
+                        if (ts) {
+                            const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
+                            const timeStr = normalizeTime(ts.startTime);
+                            cellKey = `${dayName}_${timeStr}`;
+                        }
+                    }
+
+                    if (!cellKey) cellKey = entry.slotLabel;
 
                     const subject = liveSubjects.find(s => s._id === entry.subjectId);
                     const teacher = liveTeachers.find(t => t._id === entry.teacherId);
 
-                    if (cellKey && subject) {
+                    if (cellKey && subject && teacher) {
                         dispatch(setSubjectToCell({ cellKey, subject }));
-                        if (teacher) {
-                            dispatch(setTeacherToCell({ cellKey, teacher }));
-                        }
+                        dispatch(setTeacherToCell({ cellKey, teacher }));
                     }
                 });
-            }, 50);
+            }, 100);
         }
-    }, [editorContext, liveSubjects, liveTeachers, selectedSection?._id, hydratedSectionId, dispatch]);
+    }, [editorContext, liveSubjects, liveTeachers, sectionIdToUse, hydratedSectionId, dispatch, rooms]);
 
     // Reset hydration tracking when section changes
     useEffect(() => {
-        if (selectedSection?._id && hydratedSectionId !== selectedSection._id) {
+        if (sectionIdToUse && hydratedSectionId !== sectionIdToUse) {
             dispatch(resetGrid());
         }
-    }, [selectedSection?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [sectionIdToUse]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -143,29 +213,60 @@ export function TimetableEditor() {
         }
     }, [dispatch]);
 
+    const handleEditCell = (cellKey: string) => {
+        setEditingCellKey(cellKey);
+        setIsEditModalOpen(true);
+    };
+
     // ─── Build Payload for Bulk Save ──────────────────────────────────────────
     const generatePayload = (): ScheduleRequestDto[] => {
         if (!selectedSection || !editorContext) return [];
 
-        // Build a lookup for slotLabel → timeslot UUID from the context
         const slotToTimeslotId: Record<string, string> = {};
+        const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
         editorContext.timeslots.forEach(ts => {
-            slotToTimeslotId[ts.slotLabel] = ts.uuid;
+            const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
+            const timeStr = normalizeTime(ts.startTime);
+            const fallbackKey = `${dayName}_${timeStr}`;
+            slotToTimeslotId[fallbackKey] = ts.uuid;
+            if (ts.slotLabel) {
+                slotToTimeslotId[ts.slotLabel] = ts.uuid;
+            }
         });
 
+        const timeslotIdLookup = (label: string) => {
+            if (slotToTimeslotId[label]) return slotToTimeslotId[label];
+            const [dayName, startTime] = label.split('_');
+            const normalizedT = normalizeTime(startTime);
+            return editorContext.timeslots.find(t => 
+                (DAYS_LIST[t.dayOfWeek - 1] === dayName) && 
+                normalizeTime(t.startTime) === normalizedT
+            )?.uuid;
+        };
+
         const payload: ScheduleRequestDto[] = [];
+        const seenTimeslots = new Set<string>();
+
         Object.entries(grid).forEach(([slotLabel, value]) => {
-            if (value.status === 'LOCKED' && value.subject && value.teacher) {
-                const timeslotId = slotToTimeslotId[slotLabel];
-                if (!timeslotId) return; // Skip if timeslot not found
+            if (value.status === 'LOCKED' && value.subject && value.teacher && value.subject._id !== 'break') {
+                const timeslotId = timeslotIdLookup(slotLabel);
+
+                if (!timeslotId || seenTimeslots.has(timeslotId)) return;
+
+                // Priority: Use per-cell roomId from the grid. 
+                // We send null for roomId if it's not set, letting the backend intelligently auto-assign.
+                const roomId = value.roomId || null;
 
                 payload.push({
                     sectionId: selectedSection._id,
                     subjectId: value.subject._id,
                     teacherId: value.teacher._id,
-                    roomId: 'default-lab', // Room selection is a future feature
+                    roomId: roomId,
                     timeslotId,
                 });
+                
+                seenTimeslots.add(timeslotId);
             }
         });
         return payload;
@@ -175,7 +276,7 @@ export function TimetableEditor() {
         if (!selectedSection) return;
         const payload = generatePayload();
         if (payload.length === 0) {
-            toast.warning('No completed periods to save. Assign both a subject and teacher to at least one cell.');
+            toast.warning('No completed periods to save.');
             return;
         }
         bulkUpdate(
@@ -183,33 +284,58 @@ export function TimetableEditor() {
             {
                 onSuccess: () => {
                     updateStatus({ sectionId: selectedSection._id, statusType: 'draft' });
+                },
+                onError: (error: any) => {
+                    const errorMsg = error?.response?.data?.message || "Failed to save.";
+                    toast.error(errorMsg);
                 }
             }
         );
     };
 
     const handlePublish = () => {
+        setIsPublishConfirmOpen(true);
+    };
+
+    const confirmPublish = () => {
         if (!selectedSection) return;
         const payload = generatePayload();
         if (payload.length === 0) {
-            toast.warning('No completed periods to publish. Assign both a subject and teacher to at least one cell.');
+            toast.warning('Nothing to publish.');
+            setIsPublishConfirmOpen(false);
             return;
         }
         bulkUpdate(
             { sectionId: selectedSection._id, payload },
             {
                 onSuccess: () => {
-                    updateStatus({ sectionId: selectedSection._id, statusType: 'publish' });
+                    updateStatus(
+                        { sectionId: selectedSection._id, statusType: 'publish' },
+                        {
+                            onSuccess: () => {
+                                setIsPublishConfirmOpen(false);
+                                toast.success("Published!");
+                                navigate(`/dashboard/admin/timetable/reader/${classId}/${sectionId}`);
+                            }
+                        }
+                    );
+                },
+                onError: (error: any) => {
+                    setIsPublishConfirmOpen(false);
+                    toast.error(error?.response?.data?.message || "Failed to publish.");
                 }
             }
         );
     };
 
     const handleReset = () => {
-        if (window.confirm('Are you sure you want to reset the timetable? All changes will be lost.')) {
-            dispatch(resetGrid());
-            setHydratedSectionId(null); // Allow re-hydration if user doesn't save
-        }
+        setIsResetConfirmOpen(true);
+    };
+
+    const confirmReset = () => {
+        dispatch(resetGrid());
+        setHydratedSectionId(null);
+        setIsResetConfirmOpen(false);
     };
 
     // ─── Auto Generate ─────────────────────────────────────────────────────────
@@ -220,21 +346,29 @@ export function TimetableEditor() {
         liveTeachers.find(t => t.name.toLowerCase() === name.toLowerCase());
 
     const animateFillGrid = async (timetable: GeneratedTimetable) => {
-        const days: (keyof GeneratedTimetable)[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const timeSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00'];
+        if (!editorContext) return;
+
+        const daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const uniqueDays = Array.from(new Set(editorContext.timeslots.map(ts => 
+            daysOrder[ts.dayOfWeek - 1] || 'Monday'
+        ))).sort((a, b) => daysOrder.indexOf(a) - daysOrder.indexOf(b));
+
+        const uniqueTimes = Array.from(new Set(editorContext.timeslots.map(ts => 
+            ts.startTime.substring(0, 5)
+        ))).sort();
 
         dispatch(resetGrid());
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        for (const day of days) {
-            const periods = timetable[day];
+        for (const day of uniqueDays) {
+            const periods = timetable[day as keyof GeneratedTimetable];
             if (!periods) continue;
 
             for (const periodData of periods) {
                 const timeSlotIndex = periodData.period - 1;
-                if (timeSlotIndex < 0 || timeSlotIndex >= timeSlots.length) continue;
+                if (timeSlotIndex < 0 || timeSlotIndex >= uniqueTimes.length) continue;
 
-                const timeSlot = timeSlots[timeSlotIndex];
+                const timeSlot = uniqueTimes[timeSlotIndex];
                 const cellKey = `${day}_${timeSlot}`;
 
                 const subject = findSubjectByName(periodData.subject);
@@ -242,64 +376,21 @@ export function TimetableEditor() {
 
                 if (subject) {
                     dispatch(setSubjectToCell({ cellKey, subject }));
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => setTimeout(resolve, 80));
 
                     if (teacher) {
                         dispatch(setTeacherToCell({ cellKey, teacher }));
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        await new Promise(resolve => setTimeout(resolve, 80));
                     }
                 }
             }
         }
     };
 
-    const handleAutoGenerate = async (query: string) => {
-        setIsGenerating(true);
-        setAutoGenerateError(null);
-
-        try {
-            const subjects = liveSubjects.map(s => s.name);
-            const teachers: LLMTeacher[] = liveTeachers.map(t => ({
-                name: t.name,
-                subjects: t.teachableSubjects.map(subId => {
-                    const sub = liveSubjects.find(s => s._id === subId);
-                    return sub?.name || '';
-                }).filter(Boolean),
-            }));
-
-            const response = await generateTimetable({
-                subjects,
-                teachers,
-                subjects_per_day: 6,
-                user_query: query,
-            });
-
-            if (response.success) {
-                setIsAutoGenerateModalOpen(false);
-                await animateFillGrid(response.timetable);
-            } else {
-                if (response.error.includes('constraint') || response.error.includes('cannot be satisfied')) {
-                    setAutoGenerateError(`Timetable cannot be created with these constraints: ${response.error}. Please try with different constraints or create the timetable manually.`);
-                } else {
-                    setAutoGenerateError(response.error);
-                }
-            }
-        } catch {
-            setAutoGenerateError('Cannot generate timetable due to some error. Please try again later.');
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    const openAutoGenerateModal = () => {
-        setAutoGenerateError(null);
-        setIsAutoGenerateModalOpen(true);
-    };
-
     return (
         <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
         >
@@ -308,128 +399,153 @@ export function TimetableEditor() {
                 <motion.header
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="z-10 bg-card rounded-xl border border-border shadow-sm"
+                    className="z-10 bg-card rounded-xl border border-border shadow-sm p-4"
                 >
-                    <div className="px-6 py-4">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => navigate('/dashboard/admin/timetable')}
-                                    className="shrink-0"
-                                >
-                                    <ArrowLeft className="w-5 h-5" />
-                                </Button>
-                                <div>
-                                    <h1 className="text-lg font-semibold text-foreground">
-                                        Timetable Editor
-                                    </h1>
-                                    <p className="text-sm text-muted-foreground">
-                                        {selectedClass?.name || 'Class'} — {selectedSection?.name || 'Section'}
-                                        {editorContext && (
-                                            <span className="ml-2 text-xs text-primary font-medium">
-                                                ({editorContext.existingSchedule.length} periods loaded)
-                                            </span>
-                                        )}
-                                    </p>
-                                </div>
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => navigate('/dashboard/admin/timetable')}
+                                className="shrink-0"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                            </Button>
+                            <div>
+                                <h1 className="text-lg font-semibold">Timetable Editor</h1>
+                                <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">
+                                    {selectedClass?.name || '...'} | {selectedSection?.name || '...'}
+                                </p>
                             </div>
-
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    size="sm"
-                                    onClick={openAutoGenerateModal}
-                                    disabled={isContextLoading || !editorContext}
-                                    className="ai-glow-button gap-2"
-                                >
-                                    <Sparkles className="w-4 h-4" />
-                                    Auto Generate
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleReset}
-                                    className="gap-2"
-                                >
-                                    <RotateCcw className="w-4 h-4" />
-                                    Reset
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleSaveDraft}
-                                    disabled={!selectedSection || isSaving || isContextLoading}
-                                    className="gap-2"
-                                >
-                                    <Save className="w-4 h-4" />
-                                    {isSaving ? 'Saving...' : 'Save Draft'}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={handlePublish}
-                                    disabled={!selectedSection || isSaving || isContextLoading}
-                                    className="gap-2"
-                                >
-                                    <Send className="w-4 h-4" />
-                                    {isSaving ? 'Publishing...' : 'Publish'}
-                                </Button>
-                            </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                onClick={() => setIsAutoGenerateModalOpen(true)}
+                                disabled={isContextLoading || !editorContext}
+                                className="ai-glow-button gap-2 text-xs h-8"
+                            >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                AI Generate
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleReset}
+                                className="gap-2 text-xs h-8"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Reset
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleSaveDraft}
+                                disabled={!selectedSection || isSaving || isContextLoading}
+                                className="gap-2 text-xs h-8"
+                            >
+                                <Save className="w-3.5 h-3.5" />
+                                {isSaving ? '...' : 'Save Draft'}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsDeleteConfirmOpen(true)}
+                                disabled={!selectedSection || isSaving || isContextLoading}
+                                className="gap-2 text-xs h-8 text-destructive border-destructive/10"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handlePublish}
+                                disabled={!selectedSection || isSaving || isContextLoading}
+                                className="gap-2 text-xs h-8"
+                            >
+                                <Send className="w-3.5 h-3.5" />
+                                Publish
+                            </Button>
                         </div>
                     </div>
                 </motion.header>
 
-                {/* Main Content - 3 Column Layout */}
-                <div className="w-full">
-                    <div className="grid xl:grid-cols-[260px_1fr_260px] lg:grid-cols-[220px_1fr_220px] grid-cols-1 gap-6">
-                        {/* Left Sidebar - Subjects (live from API) */}
-                        <motion.aside
-                            initial={{ opacity: 0, x: -30 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.1 }}
-                        >
-                            <SidebarSubjects subjects={liveSubjects} isLoading={isContextLoading} />
-                        </motion.aside>
+                {/* Content */}
+                <div className="grid xl:grid-cols-[220px_1fr_220px] lg:grid-cols-[180px_1fr_180px] grid-cols-1 gap-4">
+                    <SidebarSubjects subjects={liveSubjects} isLoading={isContextLoading} />
 
-                        {/* Center - Timetable Grid */}
-                        <motion.main
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                            className="bg-card/30 rounded-xl p-4 border border-border/50"
-                        >
-                            <TimetableGrid />
-                        </motion.main>
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-card/50 rounded-xl p-4 border shadow-sm backdrop-blur-sm"
+                    >
+                        <TimetableGrid 
+                            sectionId={sectionIdToUse} 
+                            onEditCell={handleEditCell} 
+                            rooms={rooms}
+                        />
+                    </motion.div>
 
-                        {/* Right Sidebar - Teachers (live from API) */}
-                        <motion.aside
-                            initial={{ opacity: 0, x: 30 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.1 }}
-                        >
-                            <SidebarTeachers teachers={liveTeachers} isLoading={isContextLoading} />
-                        </motion.aside>
-                    </div>
+                    <SidebarTeachers teachers={liveTeachers} isLoading={isContextLoading} />
                 </div>
 
-                {/* Drag Overlay */}
+                {/* Overlays */}
                 <DragOverlay>
                     {activeDragItem && (
-                        <div className="p-3 rounded-lg bg-card border border-primary shadow-2xl">
-                            <span className="text-sm font-medium">
+                        <div className="p-3 rounded-lg bg-card border-2 border-primary shadow-2xl scale-105">
+                            <span className="text-xs font-bold font-mono">
                                 {(activeDragItem.item as Subject).name || (activeDragItem.item as Teacher).name}
                             </span>
                         </div>
                     )}
                 </DragOverlay>
 
-                {/* Auto Generate Modal */}
                 <AutoGenerateModal
                     open={isAutoGenerateModalOpen}
                     onOpenChange={setIsAutoGenerateModalOpen}
-                    onGenerate={handleAutoGenerate}
-                    isGenerating={isGenerating}
-                    error={autoGenerateError}
+                    sectionId={sectionIdToUse || ''}
+                    timeslots={editorContext?.timeslots || []}
+                />
+
+                <CellEditDialog
+                    open={isEditModalOpen}
+                    onOpenChange={setIsEditModalOpen}
+                    cellKey={editingCellKey || ''}
+                    cellData={editingCellKey ? grid[editingCellKey] : { subject: null, teacher: null, status: 'EMPTY' }}
+                    subjects={liveSubjects}
+                    teachers={liveTeachers}
+                    rooms={rooms}
+                />
+
+                <ConfirmDialog 
+                    isOpen={isResetConfirmOpen}
+                    onClose={() => setIsResetConfirmOpen(false)}
+                    onConfirm={confirmReset}
+                    title="Reset Grid?"
+                    description="This will clear all unsaved changes and revert the grid to its last saved state."
+                />
+
+                <ConfirmDialog 
+                    isOpen={isDeleteConfirmOpen}
+                    onClose={() => setIsDeleteConfirmOpen(false)}
+                    onConfirm={async () => {
+                        if (sectionIdToUse) {
+                            await deleteTimetable.mutateAsync(sectionIdToUse);
+                            setIsDeleteConfirmOpen(false);
+                            dispatch(resetGrid());
+                        }
+                    }}
+                    title="Delete Timetable?"
+                    description="Are you sure you want to permanently delete the entire schedule for this section? This action cannot be undone."
+                />
+
+                <ConfirmDialog 
+                    isOpen={isPublishConfirmOpen}
+                    onClose={() => setIsPublishConfirmOpen(false)}
+                    onConfirm={confirmPublish}
+                    title="Publish Changes?"
+                    description="This will make your latest timetable changes live and visible to students and teachers."
                 />
             </div>
         </DndContext>

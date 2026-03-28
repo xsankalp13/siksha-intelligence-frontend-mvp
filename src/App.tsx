@@ -11,8 +11,11 @@ import StaffPage from '@/pages/dashboard/admin/staff/page'
 import SettingsPage from '@/pages/dashboard/admin/settings/page'
 import AdminTimetablePage from '@/pages/dashboard/admin/timetable/page'
 import AdminTimetableEditorPage from '@/pages/dashboard/admin/timetable/editor/page'
+import AdminTimetableReaderPage from '@/pages/dashboard/admin/timetable/reader/page'
+import AdminTimeslotsPage from '@/pages/dashboard/admin/timeslots/page'
 import UserDetailsPage from '@/pages/dashboard/admin/users/[id]/page'
 import CurriculumPage from '@/pages/dashboard/admin/curriculum/page'
+import AdminRoomsPage from '@/pages/dashboard/admin/rooms/page'
 import TeacherDashboard from '@/pages/dashboard/teacher/page'
 import StudentDashboard from '@/pages/dashboard/student/page'
 import StudentProfilePage from '@/pages/dashboard/student/profile/page'
@@ -75,7 +78,12 @@ export default function App() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="timetable" element={<AdminTimetablePage />} />
           <Route path="timetable/editor" element={<AdminTimetableEditorPage />} />
+          <Route path="timetable/editor/:classId/:sectionId" element={<AdminTimetableEditorPage />} />
+          <Route path="timetable/reader" element={<AdminTimetableReaderPage />} />
+          <Route path="timetable/reader/:classId/:sectionId" element={<AdminTimetableReaderPage />} />
+          <Route path="timeslots" element={<AdminTimeslotsPage />} />
           <Route path="curriculum" element={<CurriculumPage />} />
+          <Route path="rooms" element={<AdminRoomsPage />} />
           <Route path="users/:type/:id" element={<UserDetailsPage />} />
           {/* Catch-all for unknown admin sub-routes */}
           <Route path="*" element={<Navigate to="/dashboard/admin" replace />} />
