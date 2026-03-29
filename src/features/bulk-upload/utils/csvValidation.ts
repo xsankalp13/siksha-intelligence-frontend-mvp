@@ -151,3 +151,119 @@ export function validateCsvData(
 
   return null;
 }
+
+// ── Guardian CSV validation ───────────────────────────────────────────────────
+
+export const GUARDIAN_HEADERS: string[] = [
+  "studentEnrollmentNumber",
+  "firstName",
+  "lastName",
+  "middleName",
+  "email",
+  "phoneNumber",
+  "relationshipType",
+  "occupation",
+  "employer",
+  "primaryContact",
+  "canPickup",
+  "financialContact",
+  "canViewGrades",
+];
+
+const PHONE_PATTERN = /^\+?[0-9]{10,15}$/;
+const BOOL_VALUES = ["true", "false", "1", "0", "yes", "no"];
+
+function validateBool(val: string | undefined | null): boolean {
+  if (!validateString(val)) return false;
+  return BOOL_VALUES.includes(String(val).trim().toLowerCase());
+}
+
+function validatePhone(val: string | undefined | null): boolean {
+  if (!validateString(val)) return false;
+  
+  const str = String(val).trim();
+  // Safe unpacking of scientific notation (e.g., 9.19123E+11)
+  let cleanPhone = str;
+  if (/^[+-]?\d*(?:\.\d*)?[eE][+-]?\d+$/.test(str)) {
+    const num = Number(str);
+    if (!isNaN(num) && Number.isSafeInteger(num)) {
+      cleanPhone = num.toLocaleString("fullwide", { useGrouping: false });
+    }
+  }
+
+  // Allow optional leading +, remove spaces/dashes/parentheses
+  cleanPhone = cleanPhone.replace(/[\s\-.()]+/g, "");
+  return PHONE_PATTERN.test(cleanPhone);
+}
+
+/**
+ * Validates the optional guardians CSV.
+ * Returns an error string if invalid, or null if fully valid.
+ *
+ * Rules:
+ *  - Headers must match GUARDIAN_HEADERS exactly (order-insensitive)
+ *  - studentEnrollmentNumber, phoneNumber, email are mandatory per row
+ *  - boolean columns accept true/false/1/0/yes/no (case-insensitive)
+ */
+export function validateGuardianCsvData(data: ParsedSheetData): string | null {
+  // Empty file (header-only) is valid — backend will skip guardians
+  if (data.rows.length === 0) return null;
+
+  const uploadedHeaders = data.headers.map((h) => h.trim());
+  const missingHeaders = GUARDIAN_HEADERS.filter((h) => !uploadedHeaders.includes(h));
+
+  if (missingHeaders.length > 0) {
+    return `Invalid guardian CSV header. Missing columns: [${missingHeaders.join(", ")}]. Download the guardian template and try again.`;
+  }
+
+  const idx: Record<string, number> = {};
+  uploadedHeaders.forEach((h, i) => { idx[h] = i; });
+
+  const boolCols = ["primaryContact", "canPickup", "financialContact", "canViewGrades"];
+
+  for (let i = 0; i < data.rows.length; i++) {
+    const row = data.rows[i];
+    const rowNum = i + 2; // 1-indexed, row 1 is header
+
+    const enrollmentNum = row[idx["studentEnrollmentNumber"]];
+    if (!validateString(enrollmentNum)) {
+      return `Guardian row ${rowNum}: studentEnrollmentNumber cannot be empty.`;
+    }
+
+    const phone = row[idx["phoneNumber"]];
+    if (!validateString(phone)) {
+      return `Guardian row ${rowNum}: phoneNumber is required (used as guardian username).`;
+    }
+    if (!validatePhone(phone)) {
+      return `Guardian row ${rowNum}: phoneNumber '${phone}' is not a valid phone number.`;
+    }
+
+    const email = row[idx["email"]];
+    if (!validateString(email)) {
+      return `Guardian row ${rowNum}: email is required.`;
+    }
+    if (!validateEmail(email)) {
+      return `Guardian row ${rowNum}: Invalid email format '${email}'.`;
+    }
+
+    const firstName = row[idx["firstName"]];
+    if (!validateString(firstName)) {
+      return `Guardian row ${rowNum}: firstName cannot be empty.`;
+    }
+
+    const lastName = row[idx["lastName"]];
+    if (!validateString(lastName)) {
+      return `Guardian row ${rowNum}: lastName cannot be empty.`;
+    }
+
+    // Validate boolean columns (if provided)
+    for (const col of boolCols) {
+      const val = row[idx[col]];
+      if (validateString(val) && !validateBool(val)) {
+        return `Guardian row ${rowNum}: '${col}' must be true/false/1/0 (got '${val}').`;
+      }
+    }
+  }
+
+  return null;
+}

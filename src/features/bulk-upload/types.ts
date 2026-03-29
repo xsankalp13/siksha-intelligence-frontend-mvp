@@ -13,6 +13,36 @@ export interface BulkImportReportDTO {
   successCount: number;
   failureCount: number;
   errorMessages: string[];
+  // Guardian-specific (students-with-guardians endpoint only)
+  guardiansCreated?: number;
+  guardiansLinked?: number;
+}
+
+// ── SSE event payloads for students-with-guardians endpoint ──────────
+export interface SseRowSuccessPayload {
+  rowNumber: number;
+  identifier: string;
+  userType?: string;
+  studentEnrollmentNumber?: string;
+  guardianUsernames?: string[];
+  guardiansCreated?: number;
+  guardiansLinked?: number;
+}
+
+export interface SseRowFailurePayload {
+  rowNumber: number;
+  identifier: string;
+  errorMessage: string;
+  userType?: string;
+  studentEnrollmentNumber?: string;
+}
+
+export interface SseJobCompletePayload {
+  successCount: number;
+  failureCount: number;
+  totalRows: number;
+  guardiansCreated?: number;
+  guardiansLinked?: number;
 }
 
 // ── User type for bulk import ────────────────────────────────────────
@@ -20,6 +50,9 @@ export interface BulkImportReportDTO {
 //   POST /api/v1/auth/bulk-import/{userType}
 //   Backend accepts: "students" | "staff"
 export type BulkImportUserType = "students" | "staff";
+
+/** Mode of bulk import — single file (legacy) vs dual-file students+guardians */
+export type BulkImportMode = "single" | "students-with-guardians";
 
 export const USER_TYPE_OPTIONS: { value: BulkImportUserType; label: string }[] = [
   { value: "students", label: "Students" },

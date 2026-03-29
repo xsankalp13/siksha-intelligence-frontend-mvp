@@ -49,6 +49,7 @@ import {
 } from "@/services/classes";
 
 import BulkDataUpload from "@/features/bulk-upload/BulkDataUpload";
+import StudentsWithGuardiansUpload from "@/features/bulk-upload/StudentsWithGuardiansUpload";
 
 // ── Zod Schema ──────────────────────────────────────────────────────
 const studentSchema = z.object({
@@ -90,6 +91,7 @@ export default function StudentsPage() {
   // ── Dialog state ──────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkTab, setBulkTab] = useState<"with-guardians" | "guardians-only" | "students-only">("with-guardians");
   const [editingStudent, setEditingStudent] = useState<StudentSummaryDTO | null>(null);
   const [pendingEditData, setPendingEditData] = useState<StudentFormData | null>(null);
   const [actionTarget, setActionTarget] = useState<{ student: StudentSummaryDTO; action: 'activate' | 'block' } | null>(null);
@@ -622,18 +624,65 @@ export default function StudentsPage() {
 
       {/* Bulk Upload Dialog */}
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Bulk Student Upload</DialogTitle>
+            <DialogTitle>Bulk Student Import</DialogTitle>
             <DialogDescription>
-              Upload an Excel or CSV file to import multiple students at once.
+              Import students, guardians, or both from CSV files.
             </DialogDescription>
           </DialogHeader>
-          <BulkDataUpload
-            defaultUserType="students"
-            hideTypeSelector
-            onUploadComplete={handleBulkUploadComplete}
-          />
+
+          {/* Tab switcher */}
+          <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setBulkTab("with-guardians")}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+                bulkTab === "with-guardians"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Students + Guardians
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkTab("guardians-only")}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+                bulkTab === "guardians-only"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Guardians Only
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkTab("students-only")}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+                bulkTab === "students-only"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Students Only
+            </button>
+          </div>
+
+          {/* Tab content */}
+          {bulkTab === "with-guardians" && (
+            <StudentsWithGuardiansUpload mode="students-with-guardians" onUploadComplete={handleBulkUploadComplete} />
+          )}
+          {bulkTab === "guardians-only" && (
+            <StudentsWithGuardiansUpload mode="guardians-only" onUploadComplete={handleBulkUploadComplete} />
+          )}
+          {bulkTab === "students-only" && (
+            <BulkDataUpload
+              defaultUserType="students"
+              hideTypeSelector
+              onUploadComplete={handleBulkUploadComplete}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
