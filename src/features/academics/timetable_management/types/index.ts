@@ -21,6 +21,7 @@ export interface ClassData {
 export interface Section {
     _id: string;
     name: string;
+    defaultRoom?: { uuid: string; name: string };
 }
 
 export type CellStatus = 'EMPTY' | 'AWAITING_TEACHER' | 'LOCKED';
@@ -29,6 +30,8 @@ export interface GridCellData {
     subject: Subject | null;
     teacher: Teacher | null;
     status: CellStatus;
+    roomId?: string | null;
+    isNew?: boolean; // For triggering entrance animations
 }
 
 export type GridState = Record<string, GridCellData>;
@@ -38,6 +41,7 @@ export interface TimetableState {
     selectedSection: Section | null;
     grid: GridState;
     activeCell: string | null;
+    isGenerating?: boolean; // True when GA is running
 }
 
 export type DraggableType = 'SUBJECT' | 'TEACHER';
@@ -72,6 +76,7 @@ export interface GeneratedTimetable {
     Thursday: TimetablePeriod[];
     Friday: TimetablePeriod[];
     Saturday: TimetablePeriod[];
+    Sunday: TimetablePeriod[];
 }
 
 export interface AutoGenerateRequest {
@@ -110,8 +115,8 @@ export interface TimetableOverviewDto {
 export interface ScheduleRequestDto {
     sectionId: string;
     subjectId: string;
-    teacherId: string; // Serialized as String from backend (Long via @JsonSerialize)
-    roomId: string;
+    teacherId: string; 
+    roomId: string | null;
     timeslotId: string;
 }
 
@@ -142,6 +147,8 @@ export interface ScheduleResponseDto {
         startTime: string;
         endTime: string;
         slotLabel: string; // e.g. "Monday_08:00" — added by backend team
+        isBreak: boolean;
+        isNonTeachingSlot: boolean;
     };
 }
 
@@ -151,6 +158,7 @@ export interface EditorContextDto {
         uuid: string;
         sectionName: string;
         className: string;
+        defaultRoom?: { uuid: string; name: string };
     };
     timeslots: Array<{
         uuid: string;
@@ -159,6 +167,7 @@ export interface EditorContextDto {
         endTime: string;
         slotLabel: string;
         isBreak: boolean;
+        isNonTeachingSlot: boolean;
     }>;
     availableSubjects: Array<{
         uuid: string;
@@ -181,3 +190,22 @@ export interface EditorContextDto {
     }>;
 }
 
+// Timeslot CRUD DTOs
+export interface TimeslotRequestDto {
+    dayOfWeek: number;
+    startTime: string; // "HH:mm" or "HH:mm:ss"
+    endTime: string;
+    slotLabel: string;
+    isBreak: boolean;
+    isNonTeachingSlot: boolean;
+}
+
+export interface TimeslotResponseDto {
+    uuid: string;
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+    slotLabel: string;
+    isBreak: boolean;
+    isNonTeachingSlot: boolean;
+}

@@ -1,6 +1,6 @@
 import { api } from "@/lib/axios";
 
-// ── DTOs ──────────────────────────────────────────────────────────────
+import type { NestedRoomResponseDto } from "./types/academics";
 
 export interface AcademicClassResponseDto {
   classId: string;
@@ -11,6 +11,7 @@ export interface AcademicClassResponseDto {
 export interface SectionResponseDto {
   uuid: string;
   sectionName: string;
+  defaultRoom?: NestedRoomResponseDto;
 }
 
 // ── Service ──────────────────────────────────────────────────────────

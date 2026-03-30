@@ -29,19 +29,34 @@ function validateFile(file: File): void {
 /**
  * Format a cell value for display in the preview table.
  * Handles Date objects (from cellDates:true) and Excel serial numbers.
+ *
+ * IMPORTANT: xlsx with cellDates:true parses dates as midnight UTC.
+ * Using local-time getters (getFullYear etc.) would shift the date by the
+ * timezone offset — e.g. "2010-05-15" becomes "2010-05-14" in IST (+5:30).
+ * We always use UTC getters so the date matches what was written in the cell.
  */
 function formatCell(cell: unknown): string {
   if (cell == null || cell === "") return "";
 
   // Date object produced by cellDates: true
   if (cell instanceof Date) {
-    const y = cell.getFullYear();
-    const m = String(cell.getMonth() + 1).padStart(2, "0");
-    const d = String(cell.getDate()).padStart(2, "0");
+    const y = cell.getUTCFullYear();
+    const m = String(cell.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(cell.getUTCDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
 
-  return String(cell);
+  const str = String(cell).trim();
+  
+  // Safe unpacking of scientific notation (e.g., 9.19123E+11) commonly produced by Excel
+  if (/^[+-]?\d*(?:\.\d*)?[eE][+-]?\d+$/.test(str)) {
+    const num = Number(str);
+    if (!isNaN(num) && Number.isSafeInteger(num)) {
+      return num.toLocaleString("fullwide", { useGrouping: false });
+    }
+  }
+
+  return str;
 }
 
 /**

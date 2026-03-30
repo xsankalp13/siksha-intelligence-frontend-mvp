@@ -18,7 +18,8 @@ const createEmptyGrid = (): GridState => {
             grid[`${day}_${time}`] = {
                 subject: null,
                 teacher: null,
-                status: 'EMPTY'
+                status: 'EMPTY',
+                roomId: null,
             };
         });
     });
@@ -45,26 +46,51 @@ const timetableSlice = createSlice({
         setActiveCell: (state, action: PayloadAction<string | null>) => {
             state.activeCell = action.payload;
         },
-        setSubjectToCell: (state, action: PayloadAction<{ cellKey: string; subject: Subject }>) => {
-            const { cellKey, subject } = action.payload;
-            if (state.grid[cellKey] && state.grid[cellKey].status === 'EMPTY') {
+        setSubjectToCell: (state, action: PayloadAction<{ cellKey: string; subject: Subject; roomId?: string | null }>) => {
+            const { cellKey, subject, roomId = null } = action.payload;
+            const current = state.grid[cellKey];
+            if (!current || current.status === 'EMPTY') {
                 state.grid[cellKey] = {
                     subject,
                     teacher: null,
-                    status: 'AWAITING_TEACHER'
+                    status: 'AWAITING_TEACHER',
+                    roomId,
                 };
                 state.activeCell = cellKey;
             }
         },
         setTeacherToCell: (state, action: PayloadAction<{ cellKey: string; teacher: Teacher }>) => {
             const { cellKey, teacher } = action.payload;
-            if (state.grid[cellKey] && state.grid[cellKey].status === 'AWAITING_TEACHER') {
+            const current = state.grid[cellKey];
+            if (current && current.status === 'AWAITING_TEACHER') {
                 state.grid[cellKey] = {
-                    ...state.grid[cellKey],
+                    ...current,
                     teacher,
                     status: 'LOCKED'
                 };
                 state.activeCell = null;
+            }
+        },
+        /** Directly edit a LOCKED cell's subject, teacher, and/or room */
+        editCell: (state, action: PayloadAction<{
+            cellKey: string;
+            subject: Subject;
+            teacher: Teacher;
+            roomId: string | null;
+        }>) => {
+            const { cellKey, subject, teacher, roomId } = action.payload;
+            state.grid[cellKey] = {
+                subject,
+                teacher,
+                status: 'LOCKED',
+                roomId,
+            };
+        },
+        /** Set room for a specific cell */
+        setCellRoom: (state, action: PayloadAction<{ cellKey: string; roomId: string | null }>) => {
+            const { cellKey, roomId } = action.payload;
+            if (state.grid[cellKey]) {
+                state.grid[cellKey] = { ...state.grid[cellKey], roomId };
             }
         },
         clearCell: (state, action: PayloadAction<string>) => {
@@ -73,7 +99,8 @@ const timetableSlice = createSlice({
                 state.grid[cellKey] = {
                     subject: null,
                     teacher: null,
-                    status: 'EMPTY'
+                    status: 'EMPTY',
+                    roomId: null,
                 };
                 if (state.activeCell === cellKey) {
                     state.activeCell = null;
@@ -84,6 +111,63 @@ const timetableSlice = createSlice({
             state.grid = createEmptyGrid();
             state.activeCell = null;
         },
+        overwriteCell: (state, action: PayloadAction<{ cellKey: string; data: any }>) => {
+            state.grid[action.payload.cellKey] = action.payload.data;
+        },
+        setIsGenerating: (state, action: PayloadAction<boolean>) => {
+            state.isGenerating = action.payload;
+        },
+        applyGeneratedSchedule: (state, action: PayloadAction<{ 
+            schedules: any[]; 
+            timeslots: any[];
+        }>) => {
+            const { schedules, timeslots } = action.payload;
+            const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            
+            schedules.forEach(s => {
+                const ts = timeslots.find(t => t.uuid === s.timeslot.uuid);
+                if (ts) {
+                    const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
+                    const timeStr = ts.startTime.substring(0, 5);
+                    const cellKey = `${dayName}_${timeStr}`;
+                    
+                    state.grid[cellKey] = {
+                        subject: { 
+                            _id: s.subject.uuid, 
+                            name: s.subject.name, 
+                            code: s.subject.subjectCode,
+                            color: s.subject.color 
+                        },
+                        teacher: { 
+                            _id: s.teacher.id, 
+                            name: s.teacher.name 
+                        } as any,
+                        status: 'LOCKED',
+                        roomId: s.room?.uuid || null,
+                        isNew: true // For animation
+                    };
+                }
+            });
+        },
+        cloneDay: (state, action: PayloadAction<{ sourceDay: string; targetDay: string }>) => {
+            const { sourceDay, targetDay } = action.payload;
+            Object.keys(state.grid).forEach(key => {
+                if (key.startsWith(`${sourceDay}_`)) {
+                    const parts = key.split('_');
+                    if (parts.length < 2) return;
+
+                    const time = parts.slice(1).join('_');
+                    const targetKey = `${targetDay}_${time}`;
+                    const sourceCell = state.grid[key];
+
+                    if (sourceCell && sourceCell.status !== 'EMPTY') {
+                        if (sourceCell.subject?._id !== 'break') {
+                            state.grid[targetKey] = { ...sourceCell };
+                        }
+                    }
+                }
+            });
+        }
     },
 });
 
@@ -93,8 +177,14 @@ export const {
     setActiveCell,
     setSubjectToCell,
     setTeacherToCell,
+    editCell,
+    setCellRoom,
     clearCell,
     resetGrid,
+    overwriteCell,
+    cloneDay,
+    setIsGenerating,
+    applyGeneratedSchedule
 } = timetableSlice.actions;
 
 export const timetableReducer = timetableSlice.reducer;

@@ -8,6 +8,8 @@ import type {
   SubjectResponseDto,
   RoomRequestDto,
   RoomResponseDto,
+  BuildingRequestDto,
+  BuildingResponseDto,
   TimeslotRequestDto,
   TimeslotResponseDto,
   ScheduleRequestDto,
@@ -173,5 +175,26 @@ export const academicsService = {
   /** PATCH /auth/schedules/:sectionId/status/:statusType */
   updateScheduleStatus(sectionId: string, statusType: string) {
     return api.patch<string>(`/auth/schedules/${sectionId}/status/${statusType}`);
+  },
+
+  // ── Buildings ──────────────────────────────────────────────────────
+  /** GET /auth/buildings */
+  getAllBuildings() {
+    return api.get<BuildingResponseDto[]>("/auth/buildings");
+  },
+
+  /** POST /auth/buildings */
+  createBuilding(data: BuildingRequestDto) {
+    return api.post<BuildingResponseDto>("/auth/buildings", data);
+  },
+
+  /** PUT /auth/buildings/:buildingId */
+  updateBuilding(buildingId: string, data: BuildingRequestDto) {
+    return api.put<BuildingResponseDto>(`/auth/buildings/${buildingId}`, data);
+  },
+
+  /** DELETE /auth/buildings/:buildingId */
+  deleteBuilding(buildingId: string) {
+    return api.delete(`/auth/buildings/${buildingId}`);
   },
 };

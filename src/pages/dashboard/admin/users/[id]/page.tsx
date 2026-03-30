@@ -13,7 +13,8 @@ import {
   User, 
   IdCard,
   Building,
-  GraduationCap
+  GraduationCap,
+  BookOpen
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -35,8 +36,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { adminService } from "@/services/admin"
-import type { ComprehensiveUserProfileResponseDTO, AddressDTO, StudentGuardianDTO } from "@/services/types/profile"
+import type { 
+  ComprehensiveUserProfileResponseDTO, 
+  AddressDTO, 
+  StudentGuardianDTO,
+  StudentKpiMetricsDTO,
+  StaffKpiMetricsDTO
+} from "@/services/types/profile"
 import { GuardianFormDialog, LinkGuardianDialog } from "./components/GuardianDialogs"
+import { EditTeachableSubjectsDialog } from "./components/EditTeachableSubjectsDialog"
 import { toast } from "sonner"
 
 export default function UserDetailsPage() {
@@ -44,6 +52,8 @@ export default function UserDetailsPage() {
   const navigate = useNavigate()
   
   const [profileData, setProfileData] = useState<ComprehensiveUserProfileResponseDTO | null>(null)
+  const [studentKpi, setStudentKpi] = useState<StudentKpiMetricsDTO | null>(null)
+  const [staffKpi, setStaffKpi] = useState<StaffKpiMetricsDTO | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -54,6 +64,9 @@ export default function UserDetailsPage() {
   const [guardianToUnlink, setGuardianToUnlink] = useState<StudentGuardianDTO | null>(null)
   const [isUnlinking, setIsUnlinking] = useState(false)
 
+  // Teacher specific state
+  const [isEditSubjectsOpen, setIsEditSubjectsOpen] = useState(false)
+
   const fetchDetails = async () => {
     if (!id || !type) return
     
@@ -61,15 +74,25 @@ export default function UserDetailsPage() {
     setError(null)
     try {
       if (type === "student") {
-        const [detailsResp, guardiansResp] = await Promise.all([
+        const [detailsResp, guardiansResp, kpiResp] = await Promise.all([
           adminService.getStudentFullDetails(id),
-          adminService.getStudentGuardians(id)
+          adminService.getStudentGuardians(id),
+          adminService.getStudentKpiMetrics(id).catch(() => null) // Fallback silently
         ])
         setProfileData(detailsResp.data)
         setGuardians(guardiansResp.data)
+        if (kpiResp?.data) {
+          setStudentKpi(kpiResp.data)
+        }
       } else if (type === "staff") {
-        const response = await adminService.getStaffFullDetails(id)
-        setProfileData(response.data)
+        const [detailsResp, kpiResp] = await Promise.all([
+          adminService.getStaffFullDetails(id),
+          adminService.getStaffKpiMetrics(id).catch(() => null)
+        ])
+        setProfileData(detailsResp.data)
+        if (kpiResp?.data) {
+          setStaffKpi(kpiResp.data)
+        }
       } else {
         throw new Error("Invalid user type specified in URL")
       }
@@ -128,14 +151,11 @@ export default function UserDetailsPage() {
 
   // Determine active status nicely
   let isActive = false
-  let statusColor = "bg-green-500"
   
   if (isStaff && staffDetails) {
     isActive = staffDetails.active
-    statusColor = isActive ? "bg-green-500" : "bg-destructive"
   } else if (isStudent && studentDetails) {
     isActive = studentDetails.enrollmentStatus === "ACTIVE"
-    statusColor = isActive ? "bg-green-500" : "bg-destructive"
   }
 
   // Animation variants
@@ -182,32 +202,125 @@ export default function UserDetailsPage() {
         animate="show"
         className="space-y-6"
       >
-        {/* Profile Header Card */}
+        {/* Profile Header Card — Side-by-side layout */}
         <motion.div variants={itemVariants}>
-          <Card className="overflow-hidden border-none shadow-md bg-gradient-to-br from-background to-muted/30">
-            <div className="h-32 w-full bg-gradient-to-r from-primary/80 to-primary/40" />
-            <CardContent className="relative pt-0 px-6 pb-6 sm:px-10">
-              <div className="flex flex-col sm:flex-row gap-6 sm:items-end -mt-12 sm:-mt-16 mb-4">
-                <UserAvatar 
-                  name={fullName} 
-                  profileUrl={profileData.basicProfile.profileUrl} 
-                  className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-background shadow-lg"
-                  fallbackClassName="text-3xl font-bold"
-                />
+          <Card className="overflow-hidden border border-border/60 shadow-sm bg-card">
+            <div className="flex flex-col md:flex-row">
+              
+              {/* ── Left column: Avatar + contact info ── */}
+              <div className="relative md:w-[280px] lg:w-[320px] shrink-0 flex flex-col items-center md:items-start p-8 pb-6 md:border-r border-border/40">
+                {/* Subtle decorative gradient behind avatar area */}
+                <div className="absolute inset-0 bg-gradient-to-b from-muted/40 via-transparent to-transparent pointer-events-none" />
                 
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h1 className="text-3xl font-bold tracking-tight">{fullName}</h1>
-                    <Badge variant={isActive ? "default" : "destructive"} className="uppercase">
-                      <span className={`w-2 h-2 rounded-full mr-2 ${statusColor}`} />
-                      {isActive ? "Active" : "Inactive"}
-                    </Badge>
+                {/* Avatar */}
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
+                  className="relative z-10"
+                >
+                  <div className="relative group">
+                    <UserAvatar 
+                      name={fullName} 
+                      profileUrl={profileData.basicProfile.profileUrl} 
+                      className="h-36 w-36 lg:h-44 lg:w-44 border-4 border-background shadow-xl ring-1 ring-border/30"
+                      fallbackClassName="text-4xl lg:text-5xl font-bold"
+                    />
+                    {/* Active indicator */}
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.4, type: "spring", stiffness: 300 }}
+                      className={`absolute bottom-2 right-2 h-5 w-5 rounded-full border-[3px] border-background shadow-sm ${
+                        isActive ? "bg-green-500" : "bg-red-400"
+                      }`}
+                    />
+                  </div>
+                </motion.div>
+
+                {/* Contact details listed vertically — below avatar */}
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25, duration: 0.4 }}
+                  className="relative z-10 mt-6 w-full space-y-3"
+                >
+                  <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                    <Mail className="w-4 h-4 shrink-0 text-muted-foreground/60" />
+                    <span className="truncate">{basicProfile.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                    <User className="w-4 h-4 shrink-0 text-muted-foreground/60" />
+                    <span>@{basicProfile.username}</span>
+                  </div>
+                  {isStudent && studentDetails?.enrollmentNo && (
+                    <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                      <IdCard className="w-4 h-4 shrink-0 text-muted-foreground/60" />
+                      <span>{studentDetails.enrollmentNo}</span>
+                    </div>
+                  )}
+                  {isStaff && staffDetails && (
+                    <>
+                      <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                        <Briefcase className="w-4 h-4 shrink-0 text-muted-foreground/60" />
+                        <span>{staffDetails.jobTitle || "—"}</span>
+                      </div>
+                      {staffDetails.department && (
+                        <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                          <Building className="w-4 h-4 shrink-0 text-muted-foreground/60" />
+                          <span>{staffDetails.department}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </motion.div>
+              </div>
+
+              {/* ── Right column: Name, role, bio, action ── */}
+              <div className="flex-1 p-8 flex flex-col justify-between min-w-0">
+                {/* Top section: Name + badge + action */}
+                <div>
+                  <motion.div
+                    initial={{ opacity: 0, x: -16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.15, duration: 0.4 }}
+                    className="flex items-start justify-between gap-4 flex-wrap mb-3"
+                  >
+                    <div className="space-y-1.5">
+                      <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                        {fullName}
+                      </h1>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        {/* Role tag */}
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {isStudent ? (
+                            <><GraduationCap className="w-3.5 h-3.5" /> Student</>
+                          ) : (
+                            <><Briefcase className="w-3.5 h-3.5" /> {staffDetails?.staffType?.replace(/_/g, " ") || "Staff"}</>
+                          )}
+                        </span>
+                        {/* Status badge */}
+                        <Badge 
+                          variant="outline" 
+                          className={`text-[10px] tracking-widest font-semibold px-2.5 py-1 border-0 ${
+                            isActive 
+                              ? "bg-green-500/10 text-green-700 dark:text-green-400" 
+                              : "bg-red-500/10 text-red-700 dark:text-red-400"
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${isActive ? "bg-green-500" : "bg-red-400"}`} />
+                          {isActive ? "ACTIVE" : "INACTIVE"}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Action button */}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button 
                           variant={isActive ? "destructive" : "outline"} 
                           size="sm"
-                          className="ml-auto"
+                          className="shrink-0"
                         >
                           {isActive ? "Block User" : "Activate User"}
                         </Button>
@@ -234,7 +347,6 @@ export default function UserDetailsPage() {
                                 }
                                 toast.success(`User ${newStatus ? 'activated' : 'blocked'} successfully`)
                                 
-                                // Optimistic or real reload
                                 setProfileData({
                                   ...profileData,
                                   staffDetails: profileData.staffDetails ? { ...profileData.staffDetails, active: newStatus } : undefined,
@@ -251,25 +363,87 @@ export default function UserDetailsPage() {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
-                  </div>
-                  <div className="text-muted-foreground flex flex-wrap gap-4 pt-1">
-                    <span className="flex items-center gap-1.5"><Mail className="w-4 h-4" /> {basicProfile.email}</span>
-                    <span className="flex items-center gap-1.5"><User className="w-4 h-4" /> @{basicProfile.username}</span>
-                    {basicProfile.preferredName && (
-                      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-sm">
-                        Prefers: {basicProfile.preferredName}
-                      </span>
+                  </motion.div>
+
+                  {/* Horizontal divider */}
+                  <Separator className="my-5" />
+
+                  {/* Quick stats row — KPI Dashboard */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.4 }}
+                    className="grid grid-cols-2 sm:grid-cols-4 gap-4"
+                  >
+                    {isStudent && studentKpi && (
+                      <>
+                        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Current Class</p>
+                          <p className="text-sm font-bold text-foreground">{studentKpi.currentGrade} {studentKpi.currentSection}</p>
+                        </div>
+                        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Academic Standing</p>
+                          <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                            {studentKpi.gpa} GPA ({studentKpi.academicStanding})
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Attendance Rate</p>
+                          <p className="text-sm font-bold text-foreground">{studentKpi.attendanceRatePercentage}%</p>
+                        </div>
+                        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Disciplinary</p>
+                          <p className="text-sm font-bold text-foreground">{studentKpi.openDisciplinaryIncidents} Open</p>
+                        </div>
+                      </>
                     )}
-                  </div>
+                    {isStaff && staffKpi && (
+                      <>
+                        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Performance Rating</p>
+                          <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{staffKpi.performanceRating} / 5.0</p>
+                        </div>
+                        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Active Workload</p>
+                          <p className="text-sm font-bold text-foreground">{staffKpi.totalClassesAssigned} Classes</p>
+                        </div>
+                        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Weekly Hours</p>
+                          <p className="text-sm font-bold text-foreground">{staffKpi.weeklyHoursAssigned} hrs</p>
+                        </div>
+                        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Attendance Rate</p>
+                          <p className="text-sm font-bold text-foreground">{staffKpi.attendanceRatePercentage}%</p>
+                        </div>
+                      </>
+                    )}
+                  </motion.div>
                 </div>
+
+                {/* Bio section — at bottom */}
+                {basicProfile.bio && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="mt-6 rounded-lg bg-muted/20 border border-border/30 px-5 py-4"
+                  >
+                    <p className="text-sm text-muted-foreground italic leading-relaxed">"{basicProfile.bio}"</p>
+                  </motion.div>
+                )}
+
+                {basicProfile.preferredName && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.45 }}
+                    className="mt-3 text-xs text-muted-foreground"
+                  >
+                    ✨ Goes by <span className="font-semibold text-foreground">{basicProfile.preferredName}</span>
+                  </motion.p>
+                )}
               </div>
-              
-              {basicProfile.bio && (
-                <div className="mt-6 bg-muted/40 rounded-lg p-4 border border-border/50">
-                  <p className="text-sm text-foreground/90 italic">"{basicProfile.bio}"</p>
-                </div>
-              )}
-            </CardContent>
+            </div>
           </Card>
         </motion.div>
 
@@ -305,6 +479,9 @@ export default function UserDetailsPage() {
                     <>
                       <InfoItem label="Enrollment Number" value={studentDetails.enrollmentNo || "Pending"} icon={<IdCard />} />
                       <InfoItem label="Enrollment Status" value={studentDetails.enrollmentStatus} />
+                      <InfoItem label="Admission Date" value={formatDate(studentDetails.admissionDate)} icon={<Calendar />} />
+                      <InfoItem label="Graduation Year" value={studentDetails.expectedGraduationYear} icon={<GraduationCap />} />
+                      <InfoItem label="Assigned Counselor" value={studentDetails.counselorName || "Unassigned"} icon={<User />} />
                     </>
                   )}
                 </CardContent>
@@ -442,10 +619,19 @@ export default function UserDetailsPage() {
             {isStaff && staffDetails?.teacherDetails && (
                <motion.div variants={itemVariants}>
                 <Card className="shadow-sm border-none bg-card/50 backdrop-blur-sm mt-6">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-lg">Teacher Info</CardTitle>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8"
+                      onClick={() => setIsEditSubjectsOpen(true)}
+                    >
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      Manage Subjects
+                    </Button>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 pt-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                       <InfoItem label="Years of Experience" value={staffDetails.teacherDetails.yearsOfExperience} />
                       <InfoItem label="Education Level" value={staffDetails.teacherDetails.educationLevel} icon={<GraduationCap />} />
@@ -473,6 +659,33 @@ export default function UserDetailsPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Teachable Subjects */}
+                    <div className="pt-4 border-t">
+                      <p className="text-sm font-medium text-muted-foreground mb-3 flex items-center justify-between">
+                        Teachable Subjects
+                        <span className="text-xs font-normal opacity-60">
+                          {staffDetails.teacherDetails.teachableSubjects?.length || 0} mapped
+                        </span>
+                      </p>
+                      {staffDetails.teacherDetails.teachableSubjects && staffDetails.teacherDetails.teachableSubjects.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {staffDetails.teacherDetails.teachableSubjects.map((subject) => (
+                            <Badge key={subject.uuid} variant="secondary" className="pl-1.5 pr-2.5 py-1 gap-1.5 border border-border/50">
+                              <span 
+                                className="w-2.5 h-2.5 rounded-full" 
+                                style={{ backgroundColor: subject.color || "#6366f1" }} 
+                              />
+                              {subject.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground/80 bg-muted/30 p-3 rounded-md text-center border border-dashed">
+                          No subjects assigned. Use "Manage Subjects" to assign.
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -489,7 +702,12 @@ export default function UserDetailsPage() {
                   <CardTitle className="text-lg">Personal Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <InfoItem label="Date of Birth" value={formatDate(basicProfile.dateOfBirth)} icon={<Calendar />} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                    <InfoItem label="Date of Birth" value={formatDate(basicProfile.dateOfBirth)} icon={<Calendar />} />
+                    <InfoItem label="Gender" value={basicProfile.gender} icon={<User />} />
+                    <InfoItem label="Primary Language" value={basicProfile.primaryLanguage || "English"} />
+                    <InfoItem label="Blood Group" value={basicProfile.bloodGroup || "Unknown"} />
+                  </div>
                   <Separator />
                   <InfoItem label="Account Created" value={formatDate(basicProfile.createdAt)} isSmall />
                   <InfoItem label="Last Updated" value={formatDate(basicProfile.updatedAt)} isSmall />
@@ -565,6 +783,17 @@ export default function UserDetailsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Teachable Subjects Dialog */}
+      {isStaff && profileData && (
+        <EditTeachableSubjectsDialog 
+          open={isEditSubjectsOpen}
+          onOpenChange={setIsEditSubjectsOpen}
+          staffId={id!}
+          profileData={profileData}
+          onSuccess={fetchDetails}
+        />
+      )}
     </div>
   )
 }
@@ -626,21 +855,30 @@ function UserDetailsSkeleton() {
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 w-full">
       <Skeleton className="h-8 w-32 mb-4" />
       
-      <Card className="overflow-hidden border-none shadow-md">
-        <div className="h-32 w-full bg-muted" />
-        <CardContent className="relative pt-0 px-6 pb-6 sm:px-10">
-          <div className="flex flex-col sm:flex-row gap-6 sm:items-end -mt-16 mb-4">
-            <Skeleton className="h-32 w-32 rounded-full border-4 border-background" />
-            <div className="flex-1 space-y-3">
-              <Skeleton className="h-8 w-64" />
-              <div className="flex gap-4">
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-5 w-32" />
-              </div>
+      <Card className="overflow-hidden border border-border/60 shadow-sm">
+        <div className="flex flex-col md:flex-row">
+          <div className="md:w-[280px] lg:w-[320px] shrink-0 flex flex-col items-center md:items-start p-8 pb-6 md:border-r border-border/40">
+            <Skeleton className="h-36 w-36 lg:h-44 lg:w-44 rounded-full" />
+            <div className="mt-6 w-full space-y-3">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
             </div>
           </div>
-          <Skeleton className="h-20 w-full mt-6" />
-        </CardContent>
+          <div className="flex-1 p-8 space-y-5">
+            <Skeleton className="h-10 w-72" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-24 rounded-md" />
+              <Skeleton className="h-6 w-20 rounded-md" />
+            </div>
+            <Skeleton className="h-px w-full" />
+            <div className="grid grid-cols-3 gap-4">
+              <Skeleton className="h-16 rounded-xl" />
+              <Skeleton className="h-16 rounded-xl" />
+              <Skeleton className="h-16 rounded-xl" />
+            </div>
+          </div>
+        </div>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

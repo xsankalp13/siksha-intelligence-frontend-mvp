@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { GraduationCap, Info, LayoutGrid, BookOpen } from 'lucide-react';
+import { GraduationCap, Info, LayoutGrid, BookOpen, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/axios';
 import { OverviewHeader } from '@/features/academics/curriculum_mapping/components/OverviewHeader';
 import { ClassCurriculumPanel } from '@/features/academics/curriculum_mapping/components/ClassCurriculumPanel';
 import { AddSubjectDialog } from '@/features/academics/curriculum_mapping/components/AddSubjectDialog';
+import type { SelectedSubjectEntry } from '@/features/academics/curriculum_mapping/components/AddSubjectDialog';
 import { SubjectLibraryPanel } from '@/features/academics/curriculum_mapping/components/SubjectLibraryPanel';
+import { TeacherSubjectMappingPanel } from '@/features/academics/curriculum_mapping/components/TeacherSubjectMappingPanel';
 import {
     useGetCurriculumOverview,
     useGetClassCurriculum,
@@ -22,7 +24,7 @@ interface AcademicClassDto {
     name: string;
 }
 
-type ActiveTab = 'curriculum' | 'subjects';
+type ActiveTab = 'curriculum' | 'subjects' | 'teachers';
 
 export default function CurriculumPage() {
     const [activeTab, setActiveTab] = useState<ActiveTab>('curriculum');
@@ -60,12 +62,15 @@ export default function CurriculumPage() {
         setSelectedClass({ id: classId, name: className });
     };
 
-    const handleAddSubject = (subjectId: string, periodsPerWeek: number) => {
-        if (!selectedClass) return;
-        addSubject(
-            { classId: selectedClass.id, body: { subjectId, periodsPerWeek } },
-            { onSuccess: () => setAddDialogOpen(false) }
-        );
+    const handleAddSubject = (entries: SelectedSubjectEntry[]) => {
+        if (!selectedClass || entries.length === 0) return;
+        // Fire one mutation per subject; close dialog after the last one
+        entries.forEach((entry, idx) => {
+            addSubject(
+                { classId: selectedClass.id, body: { subjectId: entry.subjectId, periodsPerWeek: entry.periodsPerWeek } },
+                { onSuccess: () => { if (idx === entries.length - 1) setAddDialogOpen(false); } }
+            );
+        });
     };
 
     const handleUpdatePeriods = (curriculumMapId: string, periodsPerWeek: number) => {
@@ -92,6 +97,12 @@ export default function CurriculumPage() {
             label: 'Subject Library',
             icon: BookOpen,
             description: 'Manage your institution\'s subject catalog',
+        },
+        {
+            id: 'teachers',
+            label: 'Teacher Mapping',
+            icon: Users,
+            description: 'Map subjects to capable teachers',
         },
     ];
 
@@ -197,6 +208,18 @@ export default function CurriculumPage() {
                     transition={{ duration: 0.2 }}
                 >
                     <SubjectLibraryPanel />
+                </motion.div>
+            )}
+
+            {activeTab === 'teachers' && (
+                <motion.div
+                    key="teachers"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="h-[800px] flex flex-col"
+                >
+                    <TeacherSubjectMappingPanel />
                 </motion.div>
             )}
 

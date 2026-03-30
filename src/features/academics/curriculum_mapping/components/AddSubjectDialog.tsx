@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Plus, BookOpen } from 'lucide-react';
+import { Search, Plus, BookOpen, Check, X } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -10,8 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/axios';
 
@@ -22,18 +22,23 @@ interface SubjectOption {
     color?: string;
 }
 
+export interface SelectedSubjectEntry {
+    subjectId: string;
+    subjectName: string;
+    periodsPerWeek: number;
+}
+
 interface AddSubjectDialogProps {
     open: boolean;
     onOpenChange: (v: boolean) => void;
     existingSubjectIds: string[];
-    onAdd: (subjectId: string, periodsPerWeek: number) => void;
+    onAdd: (entries: SelectedSubjectEntry[]) => void;
     isAdding: boolean;
 }
 
 export function AddSubjectDialog({ open, onOpenChange, existingSubjectIds, onAdd, isAdding }: AddSubjectDialogProps) {
     const [search, setSearch] = useState('');
-    const [selected, setSelected] = useState<SubjectOption | null>(null);
-    const [periods, setPeriods] = useState(5);
+    const [selections, setSelections] = useState<Map<string, SelectedSubjectEntry>>(new Map());
 
     const { data: allSubjects = [], isLoading } = useQuery<SubjectOption[]>({
         queryKey: ['subjects', 'all'],
@@ -54,24 +59,54 @@ export function AddSubjectDialog({ open, onOpenChange, existingSubjectIds, onAdd
         [allSubjects, existingSubjectIds, search]
     );
 
-    const handleSubmit = () => {
-        if (!selected) return;
-        onAdd(selected.uuid, periods);
-        setSelected(null);
-        setSearch('');
-        setPeriods(5);
+    const handleToggle = (subject: SubjectOption) => {
+        setSelections(prev => {
+            const next = new Map(prev);
+            if (next.has(subject.uuid)) {
+                next.delete(subject.uuid);
+            } else {
+                next.set(subject.uuid, { subjectId: subject.uuid, subjectName: subject.name, periodsPerWeek: 5 });
+            }
+            return next;
+        });
     };
 
+    const handlePeriodChange = (subjectId: string, value: number) => {
+        setSelections(prev => {
+            const next = new Map(prev);
+            const entry = next.get(subjectId);
+            if (entry) next.set(subjectId, { ...entry, periodsPerWeek: value });
+            return next;
+        });
+    };
+
+    const handleSubmit = () => {
+        if (selections.size === 0) return;
+        onAdd(Array.from(selections.values()));
+        setSelections(new Map());
+        setSearch('');
+    };
+
+    const handleClose = (v: boolean) => {
+        if (!v) {
+            setSelections(new Map());
+            setSearch('');
+        }
+        onOpenChange(v);
+    };
+
+    const selectedList = Array.from(selections.values());
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+        <Dialog open={open} onOpenChange={handleClose}>
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <BookOpen className="w-5 h-5 text-primary" />
                         Add Subject to Curriculum
                     </DialogTitle>
                     <DialogDescription>
-                        Search and select a subject, then set its weekly period count.
+                        Select one or more subjects and set their weekly period count.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -87,8 +122,24 @@ export function AddSubjectDialog({ open, onOpenChange, existingSubjectIds, onAdd
                         />
                     </div>
 
+                    {/* Selection count badge */}
+                    {selections.size > 0 && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Badge className="rounded-full px-2 py-0.5 text-xs bg-primary/10 text-primary border-0">
+                                {selections.size} selected
+                            </Badge>
+                            <button
+                                type="button"
+                                onClick={() => setSelections(new Map())}
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                            >
+                                Clear all
+                            </button>
+                        </div>
+                    )}
+
                     {/* Subject List */}
-                    <div className="max-h-52 overflow-y-auto space-y-1 rounded-lg border border-border/60 p-1">
+                    <div className="max-h-52 overflow-y-auto space-y-0.5 rounded-lg border border-border/60 p-1">
                         {isLoading ? (
                             Array.from({ length: 4 }).map((_, i) => (
                                 <Skeleton key={i} className="h-10 w-full rounded-lg" />
@@ -100,18 +151,26 @@ export function AddSubjectDialog({ open, onOpenChange, existingSubjectIds, onAdd
                         ) : (
                             available.map(s => {
                                 const dotColor = s.color?.startsWith('#') ? s.color : '#6366f1';
+                                const isSelected = selections.has(s.uuid);
+
                                 return (
                                     <button
                                         key={s.uuid}
-                                        onClick={() => setSelected(prev => prev?.uuid === s.uuid ? null : s)}
+                                        onClick={() => handleToggle(s)}
                                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
-                                            selected?.uuid === s.uuid
+                                            isSelected
                                                 ? 'bg-primary/10 text-primary border border-primary/30'
                                                 : 'hover:bg-muted text-foreground border border-transparent'
                                         }`}
                                     >
+                                        {/* Checkbox indicator */}
+                                        <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-all ${
+                                            isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/40'
+                                        }`}>
+                                            {isSelected && <Check className="h-2.5 w-2.5 text-primary-foreground stroke-[3]" />}
+                                        </span>
                                         <span
-                                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                                            className="w-2 h-2 rounded-full shrink-0"
                                             style={{ backgroundColor: dotColor }}
                                         />
                                         <span className="font-medium flex-1 text-left">{s.name}</span>
@@ -122,30 +181,58 @@ export function AddSubjectDialog({ open, onOpenChange, existingSubjectIds, onAdd
                         )}
                     </div>
 
-                    {/* Periods input */}
-                    {selected && (
+                    {/* Per-subject periods configuration */}
+                    {selectedList.length > 0 && (
                         <div className="space-y-2 pt-1">
-                            <Label>Periods per week</Label>
-                            <div className="flex items-center gap-3">
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    max={40}
-                                    value={periods}
-                                    onChange={e => setPeriods(Number(e.target.value))}
-                                    className="w-28"
-                                />
-                                <p className="text-xs text-muted-foreground">Recommended: 4–6 for core subjects</p>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                Periods per week
+                            </p>
+                            <div className="rounded-lg border border-border/60 divide-y divide-border/60 max-h-44 overflow-y-auto">
+                                {selectedList.map(entry => (
+                                    <div key={entry.subjectId} className="flex items-center gap-3 px-3 py-2.5">
+                                        <span className="text-sm font-medium flex-1 truncate">{entry.subjectName}</span>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePeriodChange(entry.subjectId, Math.max(0, entry.periodsPerWeek - 1))}
+                                                className="h-6 w-6 rounded border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors text-base leading-none"
+                                            >
+                                                −
+                                            </button>
+                                            <span className="w-7 text-center text-sm font-semibold tabular-nums">
+                                                {entry.periodsPerWeek}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePeriodChange(entry.subjectId, Math.min(40, entry.periodsPerWeek + 1))}
+                                                className="h-6 w-6 rounded border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors text-base leading-none"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggle({ uuid: entry.subjectId, name: entry.subjectName, subjectCode: '' })}
+                                            className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button onClick={handleSubmit} disabled={!selected || isAdding} className="gap-2">
+                    <Button variant="outline" onClick={() => handleClose(false)}>Cancel</Button>
+                    <Button onClick={handleSubmit} disabled={selections.size === 0 || isAdding} className="gap-2">
                         <Plus className="w-4 h-4" />
-                        {isAdding ? 'Adding...' : 'Add to Curriculum'}
+                        {isAdding
+                            ? 'Adding…'
+                            : selections.size > 1
+                            ? `Add ${selections.size} Subjects`
+                            : 'Add to Curriculum'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

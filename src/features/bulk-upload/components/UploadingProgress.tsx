@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, UserCheck, AlertTriangle } from "lucide-react";
+import { Loader2, UserCheck, AlertTriangle, Minimize2 } from "lucide-react";
 import type { ParsedSheetData } from "../types";
 
 // ── Types shared with BulkDataUpload ────────────────────────────────
@@ -24,6 +24,8 @@ interface UploadingProgressProps {
   rowProgress: Map<number, RowStatus>;
   /** The 1-based index of the row currently being processed */
   activeRowNumber: number;
+  /** Optional callback — when provided, a Minimize button is shown */
+  onMinimize?: () => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -55,6 +57,7 @@ export default function UploadingProgress({
   typeLabel,
   rowProgress,
   activeRowNumber,
+  onMinimize,
 }: UploadingProgressProps) {
   const { headers, rows } = data;
   const total = rows.length;
@@ -114,6 +117,16 @@ export default function UploadingProgress({
         <span className="ml-auto rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
           {doneCount} / {total}
         </span>
+        {onMinimize && (
+          <button
+            type="button"
+            onClick={onMinimize}
+            title="Minimize to toast"
+            className="ml-1 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Minimize2 className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Progress bar — split green / red */}

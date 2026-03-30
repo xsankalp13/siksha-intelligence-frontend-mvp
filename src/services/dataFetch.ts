@@ -8,10 +8,10 @@ import type {
 // ── Data Fetch Service ───────────────────────────────────────────────
 
 export const dataFetchService = {
-  /** GET /auth/data-fetch/teachers/available?subjectId=... */
-  getAvailableTeachers(subjectId: string) {
+  /** GET /auth/data-fetch/teachers/available?subjectId=...&sectionId=...&timeslotId=... */
+  getAvailableTeachers(subjectId: string, sectionId?: string, timeslotId?: string) {
     return api.get<AvailableTeacherDto[]>("/auth/data-fetch/teachers/available", {
-      params: { subjectId },
+      params: { subjectId, sectionId, timeslotId },
     });
   },
 

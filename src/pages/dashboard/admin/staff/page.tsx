@@ -102,7 +102,7 @@ export default function StaffPage() {
   const [actionTarget, setActionTarget] = useState<{ staff: StaffSummaryDTO; action: 'activate' | 'block' } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedStaffType, setSelectedStaffType] = useState<StaffType>("TEACHER");
-
+  
   const form = useForm<StaffFormData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(staffSchema) as any,
@@ -311,7 +311,6 @@ export default function StaffPage() {
     }
   };
 
-  // ── Bulk upload complete ──────────────────────────────────────────
   const handleBulkUploadComplete = async () => {
     setBulkOpen(false);
     setPage(0);

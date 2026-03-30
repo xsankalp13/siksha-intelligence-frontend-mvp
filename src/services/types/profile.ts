@@ -37,6 +37,9 @@ export interface UserProfileResponseDTO {
   username: string;
   email: string;
   profileUrl?: string;
+  gender?: Gender;
+  primaryLanguage?: string;
+  bloodGroup?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -82,8 +85,31 @@ export interface StudentProfileDTO {
   studentId: number;
   enrollmentNo?: string;
   enrollmentStatus?: string;
+  admissionDate?: string;
+  expectedGraduationYear?: number;
+  counselorName?: string;
   medicalRecord?: StudentMedicalRecordDTO;
   profileUrl?: string;
+}
+
+// ── KPI Metrics ───────────────────────────────────────────────────────
+
+export interface StudentKpiMetricsDTO {
+  studentId: number;
+  academicStanding: "EXCELLENT" | "GOOD" | "AVERAGE" | "AT_RISK";
+  gpa: number;
+  currentGrade: string;
+  currentSection: string;
+  attendanceRatePercentage: number;
+  openDisciplinaryIncidents: number;
+}
+
+export interface StaffKpiMetricsDTO {
+  staffId: number;
+  performanceRating: number;
+  totalClassesAssigned: number;
+  weeklyHoursAssigned: number;
+  attendanceRatePercentage: number;
 }
 
 // ── Staff-specific ───────────────────────────────────────────────────
@@ -98,12 +124,20 @@ export type StaffType =
   | "SUPER_ADMIN"
   | "OTHER";
 
+export interface TeacherSubjectDTO {
+  uuid: string;
+  name: string;
+  subjectCode: string;
+  color?: string;
+}
+
 export interface TeacherDetailsDTO {
   certifications?: string;
   specializations?: string;
   yearsOfExperience?: number;
   educationLevel?: string;
   stateLicenseNumber?: string;
+  teachableSubjects?: TeacherSubjectDTO[];
 }
 
 export type SchoolLevel = "PRIMARY" | "MIDDLE" | "HIGH" | "ALL";

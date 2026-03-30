@@ -11,7 +11,12 @@ import {
   User,
   CalendarDays,
   Map,
+
   ClipboardCheck,
+
+  Clock,
+  DoorOpen
+main
 } from "lucide-react";
 
 export type NavItem = {
@@ -35,8 +40,13 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   },
   { label: "Staff", path: "/dashboard/admin/staff", icon: Users },
   { label: "Timetable", path: "/dashboard/admin/timetable", icon: CalendarDays },
+  { label: "Timeslots", path: "/dashboard/admin/timeslots", icon: Clock },
   { label: "Curriculum", path: "/dashboard/admin/curriculum", icon: Map },
+
   { label: "Examinations", path: "/dashboard/admin/examinations", icon: ClipboardCheck },
+
+  { label: "Rooms", path: "/dashboard/admin/rooms", icon: DoorOpen },
+
   { label: "Settings", path: "/dashboard/admin/settings", icon: Settings },
 ];
 

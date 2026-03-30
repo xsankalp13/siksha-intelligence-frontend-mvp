@@ -11,6 +11,7 @@ export { GridCell } from './components/GridCell';
 export { DraggableSubject } from './components/DraggableSubject';
 export { DraggableTeacher } from './components/DraggableTeacher';
 export { AutoGenerateModal } from './components/AutoGenerateModal';
+export { TimeslotManagement } from './components/TimeslotManagement';
 
 // Services
 export { generateTimetable } from './services/autoGenerateService';

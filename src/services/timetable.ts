@@ -46,5 +46,12 @@ export const timetableService = {
     updateScheduleStatus: async (sectionId: string, statusType: 'draft' | 'publish'): Promise<string> => {
         const response = await api.patch(`/auth/schedules/${sectionId}/status/${statusType}`);
         return response.data;
+    },
+
+    /**
+     * Delete the entire schedule for a given section.
+     */
+    deleteSectionSchedule: async (sectionId: string): Promise<void> => {
+        await api.delete(`/auth/sections/${sectionId}/schedule`);
     }
 };

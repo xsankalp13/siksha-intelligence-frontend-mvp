@@ -61,7 +61,12 @@ export function TimetableDashboard() {
         // Here we hook into the Redux store seamlessly
         // We simulate having the detailed Class/Section objects or bypass to editor
         selectScope(row.classId, row.sectionId, row.className, row.sectionName);
-        navigate('/dashboard/admin/timetable/editor');
+        navigate(`/dashboard/admin/timetable/editor/${row.classId}/${row.sectionId}`);
+    };
+
+    const handleViewReader = (row: TimetableOverviewDto) => {
+        selectScope(row.classId, row.sectionId, row.className, row.sectionName);
+        navigate(`/dashboard/admin/timetable/reader/${row.classId}/${row.sectionId}`);
     };
 
     const getStatusBadge = (status: TimetableOverviewDto['scheduleStatus']) => {
@@ -226,7 +231,7 @@ export function TimetableDashboard() {
                                                             Open Editor
                                                         </DropdownMenuItem>
                                                         {row.scheduleStatus !== "MISSING" && (
-                                                            <DropdownMenuItem className="cursor-pointer">
+                                                            <DropdownMenuItem onClick={() => handleViewReader(row)} className="cursor-pointer">
                                                                 <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
                                                                 View Reader
                                                             </DropdownMenuItem>

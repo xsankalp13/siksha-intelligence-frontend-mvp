@@ -10,8 +10,14 @@ import type {
   CreateGuardianRequestDTO,
   UpdateGuardianRequestDTO,
   LinkGuardianRequestDTO,
+  BulkAssignSubjectsRequestDTO,
 } from "./types/admin";
-import type { ComprehensiveUserProfileResponseDTO, StudentGuardianDTO } from "./types/profile";
+import type { 
+  ComprehensiveUserProfileResponseDTO, 
+  StudentGuardianDTO,
+  StudentKpiMetricsDTO,
+  StaffKpiMetricsDTO
+} from "./types/profile";
 
 // ── DTOs returned by the new list endpoints ───────────────────────────
 
@@ -50,6 +56,8 @@ export interface StaffSummaryDTO {
   hireDate?: string;
   officeLocation?: string;
   active: boolean;
+  // Optional: only present for TEACHER staffType when backend includes competency data
+  teachableSubjectIds?: string[];
 }
 
 export interface PageResponse<T> {
@@ -151,6 +159,21 @@ export const adminService = {
   /** GET /auth/admin/users/staff/{staffId}/details */
   getStaffFullDetails(uuid: string) {
     return api.get<ComprehensiveUserProfileResponseDTO>(`/auth/admin/users/staff/${uuid}/details`);
+  },
+
+  /** GET /auth/admin/users/student/{studentId}/kpi-metrics */
+  getStudentKpiMetrics(uuid: string) {
+    return api.get<StudentKpiMetricsDTO>(`/auth/admin/users/student/${uuid}/kpi-metrics`);
+  },
+
+  /** GET /auth/admin/users/staff/{staffId}/kpi-metrics */
+  getStaffKpiMetrics(uuid: string) {
+    return api.get<StaffKpiMetricsDTO>(`/auth/admin/users/staff/${uuid}/kpi-metrics`);
+  },
+
+  /** PUT /auth/teachers/bulk-subjects */
+  bulkAssignSubjects(data: BulkAssignSubjectsRequestDTO) {
+    return api.put<string>("/auth/teachers/bulk-subjects", data);
   },
 
   // ── Guardian Management ────────────────────────────────────────────────
