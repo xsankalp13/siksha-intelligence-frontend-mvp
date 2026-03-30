@@ -74,35 +74,25 @@ export default function UserDetailsPage() {
     setError(null)
     try {
       if (type === "student") {
-        const [detailsResp, guardiansResp] = await Promise.all([
+        const [detailsResp, guardiansResp, kpiResp] = await Promise.all([
           adminService.getStudentFullDetails(id),
-          adminService.getStudentGuardians(id)
+          adminService.getStudentGuardians(id),
+          adminService.getStudentKpiMetrics(id).catch(() => null) // Fallback silently
         ])
         setProfileData(detailsResp.data)
         setGuardians(guardiansResp.data)
-        
-        // MOCKED KPI FETCH
-        setStudentKpi({
-          studentId: detailsResp.data.studentDetails?.studentId || 0,
-          academicStanding: "GOOD",
-          gpa: 3.8,
-          currentGrade: "Grade 10",
-          currentSection: "Section A",
-          attendanceRatePercentage: 95.4,
-          openDisciplinaryIncidents: 0
-        })
+        if (kpiResp?.data) {
+          setStudentKpi(kpiResp.data)
+        }
       } else if (type === "staff") {
-        const response = await adminService.getStaffFullDetails(id)
-        setProfileData(response.data)
-
-        // MOCKED KPI FETCH
-        setStaffKpi({
-          staffId: response.data.staffDetails?.staffId || 0,
-          performanceRating: 4.8,
-          totalClassesAssigned: 4,
-          weeklyHoursAssigned: 24,
-          attendanceRatePercentage: 98.0
-        })
+        const [detailsResp, kpiResp] = await Promise.all([
+          adminService.getStaffFullDetails(id),
+          adminService.getStaffKpiMetrics(id).catch(() => null)
+        ])
+        setProfileData(detailsResp.data)
+        if (kpiResp?.data) {
+          setStaffKpi(kpiResp.data)
+        }
       } else {
         throw new Error("Invalid user type specified in URL")
       }
