@@ -5,7 +5,7 @@ export type InvigilationRole = "PRIMARY" | "SECONDARY";
 
 export interface InvigilationRequestDTO {
   examScheduleId: number;
-  staffId: number;
+  staffId: string;
   role: InvigilationRole;
 }
 
@@ -19,7 +19,7 @@ export interface InvigilationResponseDTO {
 // Seating Plan
 export interface SittingPlanRequestDTO {
   examScheduleId: number;
-  studentId: number;
+  studentId: string;
   roomId: string;
   seatNumber: string;
 }

@@ -59,11 +59,10 @@ import { toast } from "sonner";
 
 // ── Lightweight DTOs for selectors ──────────────────────────────────
 interface StudentSummary {
-  studentId: string;
+  uuid: string;
   firstName: string;
   lastName: string;
   enrollmentNumber?: string;
-  userId: number;
 }
 
 interface StudentPage {
@@ -170,7 +169,7 @@ export default function SeatingPlanPanel() {
     assignMutation.mutate(
       {
         examScheduleId: selectedScheduleId,
-        studentId: Number(formStudentId),
+        studentId: formStudentId,
         roomId: formRoomId,
         seatNumber: formSeatNumber.trim(),
       },
@@ -433,9 +432,9 @@ export default function SeatingPlanPanel() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select student" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="max-h-[250px] overflow-y-auto">
                   {studentList.map((s) => (
-                    <SelectItem key={s.userId} value={String(s.userId)}>
+                    <SelectItem key={s.uuid} value={s.uuid}>
                       {s.firstName} {s.lastName}
                       {s.enrollmentNumber && (
                         <span className="text-muted-foreground text-xs ml-1">
@@ -456,7 +455,7 @@ export default function SeatingPlanPanel() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select room" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
                     {rooms.map((r) => (
                       <SelectItem key={r.uuid} value={r.uuid}>
                         <span className="flex items-center gap-2">

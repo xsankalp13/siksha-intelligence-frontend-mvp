@@ -60,12 +60,11 @@ import { toast } from "sonner";
 
 // ── Lightweight staff DTO for the selector ──────────────────────────
 interface StaffSummary {
-  staffId: string;
+  uuid: string;
   firstName: string;
   lastName: string;
   jobTitle?: string;
   employeeId?: string;
-  userId: number;
 }
 
 interface StaffPage {
@@ -150,7 +149,7 @@ export default function InvigilationPanel() {
     assignMutation.mutate(
       {
         examScheduleId: selectedScheduleId,
-        staffId: Number(formStaffId),
+        staffId: formStaffId,
         role: formRole,
       },
       {
@@ -417,9 +416,9 @@ export default function InvigilationPanel() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select staff member" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="max-h-[250px] overflow-y-auto">
                   {staffList.map((s) => (
-                    <SelectItem key={s.userId} value={String(s.userId)}>
+                    <SelectItem key={s.uuid} value={s.uuid}>
                       <span className="flex items-center gap-2">
                         <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
                         {s.firstName} {s.lastName}
