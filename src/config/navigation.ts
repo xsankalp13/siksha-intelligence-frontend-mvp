@@ -12,7 +12,13 @@ import {
   CalendarDays,
   Map,
   Clock,
-  DoorOpen
+  DoorOpen,
+  Shield,
+  Activity,
+  ClipboardList,
+  Terminal,
+  Settings2,
+  Lock,
 } from "lucide-react";
 
 export type NavItem = {
@@ -80,4 +86,20 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
     path: "/dashboard/student/notices",
     icon: Bell,
   },
+];
+
+export const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
+  {
+    label: "Overview",
+    path: "/dashboard/super-admin",
+    icon: LayoutDashboard,
+    end: true,
+  },
+  { label: "Users",         path: "/dashboard/super-admin/users",          icon: Users },
+  { label: "Roles & RBAC",  path: "/dashboard/super-admin/rbac",           icon: Shield },
+  { label: "System Health", path: "/dashboard/super-admin/health",         icon: Activity },
+  { label: "Audit Logs",    path: "/dashboard/super-admin/audit-logs",     icon: ClipboardList },
+  { label: "App Logs",      path: "/dashboard/super-admin/logs",           icon: Terminal },
+  { label: "Configuration", path: "/dashboard/super-admin/configuration",  icon: Settings2 },
+  { label: "Security",      path: "/dashboard/super-admin/security",       icon: Lock },
 ];

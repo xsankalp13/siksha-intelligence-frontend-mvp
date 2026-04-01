@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -62,6 +62,19 @@ export function TeacherSubjectMappingPanel() {
   // Assignment dialogs
   const [assignTeachersOpen, setAssignTeachersOpen] = useState(false)
   const [assignSubjectsOpen, setAssignSubjectsOpen] = useState(false)
+
+  // Auto-select first item when data loads and nothing is selected
+  useEffect(() => {
+    if (viewMode === "by-subject") {
+      if (!selectedSubject && allSubjects.length > 0) {
+        setSelectedSubject(allSubjects[0])
+      }
+    } else {
+      if (!selectedTeacher && teachers.length > 0) {
+        setSelectedTeacher(teachers[0])
+      }
+    }
+  }, [viewMode, allSubjects, teachers, selectedSubject, selectedTeacher])
 
   // Confirm-remove dialog
   const [pendingUnmap, setPendingUnmap] = useState<{
