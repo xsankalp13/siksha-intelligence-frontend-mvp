@@ -87,7 +87,6 @@ interface ScheduleFormState {
   examDate: string;
   startTime: string;
   endTime: string;
-  roomNumber: string;
 }
 
 const emptyForm: ScheduleFormState = {
@@ -97,7 +96,6 @@ const emptyForm: ScheduleFormState = {
   examDate: "",
   startTime: "",
   endTime: "",
-  roomNumber: "",
 };
 
 function calcDuration(start: string, end: string): number {
@@ -156,7 +154,6 @@ export default function ExamSchedulePanel({
       examDate: s.examDate,
       startTime: s.startTime ? s.startTime.substring(0, 5) : "",
       endTime: s.endTime ? s.endTime.substring(0, 5) : "",
-      roomNumber: s.roomNumber || "",
     });
     setDialogOpen(true);
   };
@@ -193,7 +190,6 @@ export default function ExamSchedulePanel({
       duration,
       maxMarks: 100,
       passingMarks: 33,
-      roomNumber: form.roomNumber || undefined,
     };
 
     console.log("[DEBUG] Schedule form state:", JSON.stringify(form));
@@ -294,7 +290,6 @@ export default function ExamSchedulePanel({
                 <TableHead>Class / Section</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Time</TableHead>
-                <TableHead>Room</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -341,16 +336,6 @@ export default function ExamSchedulePanel({
                           ? `${s.startTime.substring(0, 5)} – ${s.endTime.substring(0, 5)}`
                           : "—"}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      {s.roomNumber ? (
-                        <Badge variant="outline" className="gap-1 border-border/50">
-                          <DoorOpen className="w-3 h-3" />
-                          {s.roomNumber}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -489,16 +474,6 @@ export default function ExamSchedulePanel({
                   }
                 />
               </div>
-            </div>
-            <div className="grid gap-1.5">
-              <label className="text-sm font-medium">Room</label>
-              <Input
-                value={form.roomNumber || ""}
-                onChange={(e) =>
-                  setForm({ ...form, roomNumber: e.target.value })
-                }
-                placeholder="e.g. R-201"
-              />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>

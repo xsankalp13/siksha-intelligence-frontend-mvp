@@ -4,6 +4,7 @@ import type {
   InvigilationResponseDTO,
   SittingPlanRequestDTO,
   SittingPlanResponseDTO,
+  AutoAllocationRequestDTO,
 } from "./types/invigilation";
 
 // ── Invigilation Service ────────────────────────────────────────────
@@ -59,5 +60,18 @@ export const invigilationService = {
   /** DELETE /auth/examination/sitting-plans/:id — remove a seat assignment */
   removeSeat(id: number) {
     return api.delete(`/auth/examination/sitting-plans/${id}`);
+  },
+
+  /** DELETE /auth/examination/sitting-plans/bulk — remove multiple seat assignments */
+  bulkRemoveSeats(ids: number[]) {
+    return api.delete("/auth/examination/sitting-plans/bulk", { data: ids });
+  },
+
+  /** POST /auth/examination/sitting-plans/auto-allocate — auto-allocate seats */
+  autoAllocate(data: AutoAllocationRequestDTO) {
+    return api.post<SittingPlanResponseDTO[]>(
+      "/auth/examination/sitting-plans/auto-allocate",
+      data
+    );
   },
 };
