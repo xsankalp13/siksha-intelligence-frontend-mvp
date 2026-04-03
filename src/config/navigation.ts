@@ -19,6 +19,7 @@ import {
   Terminal,
   Settings2,
   Lock,
+  CreditCard,
 } from "lucide-react";
 
 export type NavItem = {
@@ -46,6 +47,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "Curriculum", path: "/dashboard/admin/curriculum", icon: Map },
   { label: "Rooms", path: "/dashboard/admin/rooms", icon: DoorOpen },
   { label: "Settings", path: "/dashboard/admin/settings", icon: Settings },
+  { label: "ID Cards", path: "/dashboard/admin/id-cards", icon: CreditCard },
 ];
 
 export const STUDENT_NAV_ITEMS: NavItem[] = [

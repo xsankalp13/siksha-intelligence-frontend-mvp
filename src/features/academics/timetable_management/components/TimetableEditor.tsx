@@ -21,7 +21,7 @@ import { SectionSettingsModal } from './SectionSettingsModal';
 import { setSubjectToCell, setTeacherToCell, setCellRoom, resetGrid, setSelectedClass, setSelectedSection } from '../store/timetableSlice';
 
 import type { RootState } from '@/store/store';
-import type { Subject, Teacher, GeneratedTimetable, ScheduleRequestDto } from '../types';
+import type { Subject, Teacher, ScheduleRequestDto } from '../types';
 import { 
     useBulkUpdateSchedule, 
     useUpdateScheduleStatus, 
@@ -348,53 +348,9 @@ export function TimetableEditor() {
     };
 
     // ─── Auto Generate ─────────────────────────────────────────────────────────
-    const findSubjectByName = (name: string): Subject | undefined =>
-        liveSubjects.find(s => s.name.toLowerCase() === name.toLowerCase());
 
-    const findTeacherByName = (name: string): Teacher | undefined =>
-        liveTeachers.find(t => t.name.toLowerCase() === name.toLowerCase());
 
-    const animateFillGrid = async (timetable: GeneratedTimetable) => {
-        if (!editorContext) return;
 
-        const daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        const uniqueDays = Array.from(new Set(editorContext.timeslots.map(ts => 
-            daysOrder[ts.dayOfWeek - 1] || 'Monday'
-        ))).sort((a, b) => daysOrder.indexOf(a) - daysOrder.indexOf(b));
-
-        const uniqueTimes = Array.from(new Set(editorContext.timeslots.map(ts => 
-            ts.startTime.substring(0, 5)
-        ))).sort();
-
-        dispatch(resetGrid());
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        for (const day of uniqueDays) {
-            const periods = timetable[day as keyof GeneratedTimetable];
-            if (!periods) continue;
-
-            for (const periodData of periods) {
-                const timeSlotIndex = periodData.period - 1;
-                if (timeSlotIndex < 0 || timeSlotIndex >= uniqueTimes.length) continue;
-
-                const timeSlot = uniqueTimes[timeSlotIndex];
-                const cellKey = `${day}_${timeSlot}`;
-
-                const subject = findSubjectByName(periodData.subject);
-                const teacher = findTeacherByName(periodData.teacher);
-
-                if (subject) {
-                    dispatch(setSubjectToCell({ cellKey, subject }));
-                    await new Promise(resolve => setTimeout(resolve, 80));
-
-                    if (teacher) {
-                        dispatch(setTeacherToCell({ cellKey, teacher }));
-                        await new Promise(resolve => setTimeout(resolve, 80));
-                    }
-                }
-            }
-        }
-    };
 
     return (
         <DndContext

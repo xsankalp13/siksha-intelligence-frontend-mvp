@@ -43,8 +43,8 @@ export const useAddSubjectToClass = () => {
 export const useUpdateCurriculumPeriods = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ curriculumMapId, classId, body }: { curriculumMapId: string; classId: string; body: CurriculumPeriodsUpdateDto }) =>
-            curriculumService.updatePeriods(curriculumMapId, body),
+        mutationFn: (vars: { curriculumMapId: string; classId: string; body: CurriculumPeriodsUpdateDto }) =>
+            curriculumService.updatePeriods(vars.curriculumMapId, vars.body),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.classCurriculum(variables.classId) });
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.overview });
@@ -58,8 +58,8 @@ export const useUpdateCurriculumPeriods = () => {
 export const useRemoveSubjectFromCurriculum = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ curriculumMapId }: { curriculumMapId: string; classId: string }) =>
-            curriculumService.removeSubject(curriculumMapId),
+        mutationFn: (vars: { curriculumMapId: string; classId: string }) =>
+            curriculumService.removeSubject(vars.curriculumMapId),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.classCurriculum(variables.classId) });
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.overview });
