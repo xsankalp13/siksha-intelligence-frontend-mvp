@@ -37,14 +37,14 @@ export function SelectionDialog({ open, onOpenChange }: SelectionDialogProps) {
     const { data: sections = [], isLoading: isSectionsLoading } = useGetSections(selectedClassId);
 
     const handleProceed = () => {
-        const selectedClassData = classes.find(c => c.uuid === selectedClassId);
+        const selectedClassData = classes.find(c => c.classId === selectedClassId);
         const selectedSectionData = sections.find(s => s.uuid === selectedSectionId);
 
         if (selectedClassData && selectedSectionData) {
-            dispatch(setSelectedClass({ _id: selectedClassData.uuid, name: selectedClassData.name }));
+            dispatch(setSelectedClass({ _id: selectedClassData.classId, name: selectedClassData.name }));
             dispatch(setSelectedSection({ _id: selectedSectionData.uuid, name: selectedSectionData.sectionName, defaultRoom: selectedSectionData.defaultRoom }));
             onOpenChange(false); // Close dialog
-            navigate(`/dashboard/admin/timetable/editor/${selectedClassData.uuid}/${selectedSectionData.uuid}`);
+            navigate(`/dashboard/admin/timetable/editor/${selectedClassData.classId}/${selectedSectionData.uuid}`);
         }
     };
 
@@ -77,7 +77,7 @@ export function SelectionDialog({ open, onOpenChange }: SelectionDialogProps) {
                             </SelectTrigger>
                             <SelectContent>
                                 {classes.map(classItem => (
-                                    <SelectItem key={classItem.uuid} value={classItem.uuid}>
+                                    <SelectItem key={classItem.classId} value={classItem.classId}>
                                         {classItem.name}
                                     </SelectItem>
                                 ))}

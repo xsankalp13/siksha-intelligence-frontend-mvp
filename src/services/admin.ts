@@ -12,8 +12,8 @@ import type {
   LinkGuardianRequestDTO,
   BulkAssignSubjectsRequestDTO,
 } from "./types/admin";
-import type { 
-  ComprehensiveUserProfileResponseDTO, 
+import type {
+  ComprehensiveUserProfileResponseDTO,
   StudentGuardianDTO,
   StudentKpiMetricsDTO,
   StaffKpiMetricsDTO

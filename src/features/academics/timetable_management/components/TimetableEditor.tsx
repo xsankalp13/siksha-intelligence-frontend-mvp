@@ -347,6 +347,7 @@ export function TimetableEditor() {
         setIsResetConfirmOpen(false);
     };
 
+    // animateFillGrid removed (unused)
     // ─── Auto Generate ─────────────────────────────────────────────────────────
 
 

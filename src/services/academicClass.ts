@@ -8,7 +8,7 @@ export interface SectionResponseDto {
 }
 
 export interface AcademicClassResponseDto {
-    uuid: string;
+    classId: string;
     name: string;
 }
 

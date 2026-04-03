@@ -18,6 +18,7 @@ import CurriculumPage from '@/pages/dashboard/admin/curriculum/page'
 import ExaminationsPage from '@/pages/dashboard/admin/examinations/page'
 
 import AdminRoomsPage from '@/pages/dashboard/admin/rooms/page'
+import AdminFinancePage from './pages/dashboard/admin/finance/page'
 
 import IdCardsPage from '@/pages/dashboard/admin/id-cards/page'
 import TeacherDashboard from '@/pages/dashboard/teacher/page'
@@ -52,7 +53,7 @@ export default function App() {
             </GuestOnly>
           }
         />
-        
+
         {/* Protected routes: require authentication */}
         <Route
           path="/"
@@ -110,6 +111,7 @@ export default function App() {
           <Route path="examinations" element={<ExaminationsPage />} />
 
           <Route path="rooms" element={<AdminRoomsPage />} />
+          <Route path="finance" element={<AdminFinancePage />} />
 
           <Route path="id-cards" element={<IdCardsPage />} />
           <Route path="users/:type/:id" element={<UserDetailsPage />} />

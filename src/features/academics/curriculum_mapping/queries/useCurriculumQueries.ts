@@ -43,6 +43,8 @@ export const useAddSubjectToClass = () => {
 export const useUpdateCurriculumPeriods = () => {
     const queryClient = useQueryClient();
     return useMutation({
+        mutationFn: ({ curriculumMapId, body }: { curriculumMapId: string; classId: string; body: CurriculumPeriodsUpdateDto }) =>
+            curriculumService.updatePeriods(curriculumMapId, body),
         mutationFn: (vars: { curriculumMapId: string; classId: string; body: CurriculumPeriodsUpdateDto }) =>
             curriculumService.updatePeriods(vars.curriculumMapId, vars.body),
         onSuccess: (_, variables) => {
