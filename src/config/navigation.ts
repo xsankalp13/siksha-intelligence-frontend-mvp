@@ -11,6 +11,9 @@ import {
   User,
   CalendarDays,
   Map,
+
+  ClipboardCheck,
+
   Clock,
   DoorOpen,
   Shield,
@@ -45,7 +48,11 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "Timetable", path: "/dashboard/admin/timetable", icon: CalendarDays },
   { label: "Timeslots", path: "/dashboard/admin/timeslots", icon: Clock },
   { label: "Curriculum", path: "/dashboard/admin/curriculum", icon: Map },
+
+  { label: "Examinations", path: "/dashboard/admin/examinations", icon: ClipboardCheck },
+
   { label: "Rooms", path: "/dashboard/admin/rooms", icon: DoorOpen },
+
   { label: "Settings", path: "/dashboard/admin/settings", icon: Settings },
   { label: "ID Cards", path: "/dashboard/admin/id-cards", icon: CreditCard },
 ];

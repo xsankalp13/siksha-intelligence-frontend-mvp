@@ -188,6 +188,7 @@ export function RoomManagement() {
             rowCount: formData.rowCount,
             columnsPerRow: formData.columnsPerRow,
             seatsPerUnit: formData.seatsPerUnit,
+            capacity: calculatedCapacity,
             floorNumber: formData.floorNumber,
             buildingId: formData.buildingId,
             hasProjector: formData.hasProjector,

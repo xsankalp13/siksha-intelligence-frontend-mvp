@@ -57,6 +57,7 @@ export interface RoomRequestDto {
   rowCount: number;
   columnsPerRow: number;
   seatsPerUnit: number;
+  capacity: number;
   floorNumber: number;
   buildingId: string;
   hasProjector?: boolean;

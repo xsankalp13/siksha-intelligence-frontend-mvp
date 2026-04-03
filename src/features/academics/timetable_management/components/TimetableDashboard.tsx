@@ -51,6 +51,31 @@ export function TimetableDashboard() {
 
     const data = serverData || [];
 
+    // Natural sort: "Class 1" < "Class 2" < "Class 10" < "Class 11"
+    const naturalCompare = (a: string, b: string): number => {
+        const aParts = a.split(/(\d+)/);
+        const bParts = b.split(/(\d+)/);
+        for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+            const aP = aParts[i] || '';
+            const bP = bParts[i] || '';
+            const aNum = Number(aP);
+            const bNum = Number(bP);
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+                if (aNum !== bNum) return aNum - bNum;
+            } else {
+                const cmp = aP.localeCompare(bP);
+                if (cmp !== 0) return cmp;
+            }
+        }
+        return 0;
+    };
+
+    const sortedData = [...data].sort((a, b) => {
+        const classCmp = naturalCompare(a.className, b.className);
+        if (classCmp !== 0) return classCmp;
+        return naturalCompare(a.sectionName, b.sectionName);
+    });
+
     // Derived KPIs
     const totalClasses = data.length;
     const publishedCount = data.filter(d => d.scheduleStatus === "PUBLISHED").length;
@@ -193,14 +218,14 @@ export function TimetableDashboard() {
                                             <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                         </TableRow>
                                     ))
-                                ) : data.length === 0 ? (
+                                ) : sortedData.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                                             No timetables found in the system.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    data.map((row) => (
+                                    sortedData.map((row) => (
                                         <TableRow key={`${row.classId}-${row.sectionId}`} className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="font-medium">{row.className}</TableCell>
                                             <TableCell>

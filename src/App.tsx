@@ -14,7 +14,11 @@ import AdminTimetableReaderPage from '@/pages/dashboard/admin/timetable/reader/p
 import AdminTimeslotsPage from '@/pages/dashboard/admin/timeslots/page'
 import UserDetailsPage from '@/pages/dashboard/admin/users/[id]/page'
 import CurriculumPage from '@/pages/dashboard/admin/curriculum/page'
+
+import ExaminationsPage from '@/pages/dashboard/admin/examinations/page'
+
 import AdminRoomsPage from '@/pages/dashboard/admin/rooms/page'
+
 import IdCardsPage from '@/pages/dashboard/admin/id-cards/page'
 import TeacherDashboard from '@/pages/dashboard/teacher/page'
 import StudentDashboard from '@/pages/dashboard/student/page'
@@ -103,7 +107,10 @@ export default function App() {
           <Route path="timetable/reader/:classId/:sectionId" element={<AdminTimetableReaderPage />} />
           <Route path="timeslots" element={<AdminTimeslotsPage />} />
           <Route path="curriculum" element={<CurriculumPage />} />
+          <Route path="examinations" element={<ExaminationsPage />} />
+
           <Route path="rooms" element={<AdminRoomsPage />} />
+
           <Route path="id-cards" element={<IdCardsPage />} />
           <Route path="users/:type/:id" element={<UserDetailsPage />} />
           {/* Catch-all for unknown admin sub-routes */}
