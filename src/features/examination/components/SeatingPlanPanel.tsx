@@ -137,7 +137,8 @@ export default function SeatingPlanPanel() {
         s.studentName.toLowerCase().includes(q) ||
         s.roomName.toLowerCase().includes(q) ||
         s.seatLabel.toLowerCase().includes(q) ||
-        (s.enrollmentNumber && s.enrollmentNumber.toLowerCase().includes(q))
+        (s.enrollmentNumber && s.enrollmentNumber.toLowerCase().includes(q)) ||
+        (s.rollNo != null && String(s.rollNo).includes(q))
     );
   }, [allocations, searchTerm]);
 
@@ -152,37 +153,38 @@ export default function SeatingPlanPanel() {
     }, {} as Record<string, typeof allocations>);
 
     const rows = Object.entries(roomGroups).map(([roomName, allocs]) => {
-      const enrollments = allocs.map(a => a.enrollmentNumber).filter(Boolean);
-      let enrollmentRange = "ALL";
-      let minEnrollment = "";
+      const rollNos = allocs.map(a => a.rollNo).filter(r => r != null).sort((a, b) => a - b);
+      let rollRange = "ALL";
+      let minRollNo = Infinity;
       
-      if (enrollments.length > 0) {
-        // Natural sort (so "S9" comes before "S10")
-        enrollments.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-        minEnrollment = enrollments[0];
+      if (rollNos.length > 0) {
+        minRollNo = rollNos[0];
         
-        if (enrollments.length === 1) {
-             enrollmentRange = enrollments[0] || "ALL";
+        if (rollNos.length === 1) {
+             rollRange = String(rollNos[0]).padStart(2, '0');
         } else {
-             enrollmentRange = `${enrollments[0]} -\n${enrollments[enrollments.length - 1]}`;
+             rollRange = `${String(rollNos[0]).padStart(2, '0')} -\n${String(rollNos[rollNos.length - 1]).padStart(2, '0')}`;
         }
       }
 
+      const roomInfo = availableRooms.find(r => r.roomName === roomName);
+      
       return {
         batch: selectedExam?.academicYear || "-",
         programme: `${selectedSchedule?.className || ""} ${selectedSchedule?.sectionName ? `(${selectedSchedule.sectionName})` : ""}`.trim(),
-        enrollmentRange,
-        minEnrollment, // we use this for sorting the table rows
+        rollRange,
+        minRollNo, // we use this for sorting the table rows
         count: allocs.length,
         room: roomName,
-        area: "Main Campus" // Placeholder as area is not in DB
+        area: "Main Campus", // Placeholder as area is not in DB
+        floor: roomInfo?.floorNumber != null ? `Floor ${roomInfo.floorNumber}` : "-"
       };
     });
 
-    // Sort the table rows logically by lowest enrollment number first, then by room
+    // Sort the table rows logically by lowest roll number first, then by room
     rows.sort((a, b) => {
-       if (a.minEnrollment && b.minEnrollment) {
-           return a.minEnrollment.localeCompare(b.minEnrollment, undefined, { numeric: true, sensitivity: 'base' });
+       if (a.minRollNo !== Infinity && b.minRollNo !== Infinity) {
+           return a.minRollNo - b.minRollNo;
        }
        return a.room.localeCompare(b.room);
     });
@@ -192,7 +194,43 @@ export default function SeatingPlanPanel() {
       ...r,
       sno: index + 1
     }));
-  }, [allocations, selectedSchedule, selectedExam]);
+  }, [allocations, selectedSchedule, selectedExam, availableRooms]);
+
+  const printRoomGrids = useMemo(() => {
+    const roomGroups: Record<string, SeatAllocationResponseDTO[]> = {};
+    allocations.forEach((a) => {
+      if (!roomGroups[a.roomName]) roomGroups[a.roomName] = [];
+      roomGroups[a.roomName].push(a);
+    });
+
+    return Object.entries(roomGroups).map(([roomName, allocs]) => {
+      const roomInfo = availableRooms.find(r => r.roomName === roomName);
+      const floorNumber = roomInfo?.floorNumber ?? null;
+
+      const maxRow = Math.max(...allocs.map(a => a.rowNumber));
+      const maxCol = Math.max(...allocs.map(a => a.columnNumber));
+
+      const grid: Record<number, Record<number, { left?: number; right?: number; single?: number }>> = {};
+      
+      for (let r = 1; r <= maxRow; r++) {
+        grid[r] = {};
+        for (let c = 1; c <= maxCol; c++) {
+          grid[r][c] = {};
+        }
+      }
+
+      allocs.forEach(a => {
+        if (!grid[a.rowNumber]) grid[a.rowNumber] = {};
+        if (!grid[a.rowNumber][a.columnNumber]) grid[a.rowNumber][a.columnNumber] = {};
+        
+        if (a.position === "LEFT") grid[a.rowNumber][a.columnNumber].left = a.rollNo;
+        else if (a.position === "RIGHT") grid[a.rowNumber][a.columnNumber].right = a.rollNo;
+        else grid[a.rowNumber][a.columnNumber].single = a.rollNo;
+      });
+
+      return { roomName, floorNumber, maxRow, maxCol, grid, studentCount: allocs.length };
+    }).sort((a, b) => a.roomName.localeCompare(b.roomName));
+  }, [allocations, availableRooms]);
 
   const totalStudents = availableRooms.length > 0 ? availableRooms[0].totalStudentsToSeat : (selectedSchedule?.totalStudents ?? 0);
   const seatedCount = allocations.length;
@@ -387,9 +425,10 @@ export default function SeatingPlanPanel() {
               <th className="border border-black p-2 w-12 text-center text-black">S.No</th>
               <th className="border border-black p-2 w-20 text-center text-black">Batch</th>
               <th className="border border-black p-2 w-32 text-center text-black">Programme/<br/>Branch</th>
-              <th className="border border-black p-2 text-center text-black">Enrollment No</th>
+              <th className="border border-black p-2 text-center text-black">Roll No Range</th>
               <th className="border border-black p-2 w-24 text-center text-black">No of<br/>Students</th>
               <th className="border border-black p-2 w-28 text-center text-black">Room No.</th>
+              <th className="border border-black p-2 w-24 text-center text-black">Floor</th>
               <th className="border border-black p-2 w-32 text-center text-black">Area</th>
             </tr>
           </thead>
@@ -399,9 +438,10 @@ export default function SeatingPlanPanel() {
                 <td className="border border-black font-bold p-1.5 text-center text-black">{row.sno}</td>
                 <td className="border border-black p-1.5 font-bold text-center text-black">{row.batch}</td>
                 <td className="border border-black font-bold p-1.5 text-center text-black">{row.programme}</td>
-                <td className="border border-black p-1.5 font-bold text-center text-black">{row.enrollmentRange}</td>
+                <td className="border border-black p-1.5 font-bold text-center text-black">{row.rollRange}</td>
                 <td className="border border-black p-1.5 text-center font-bold text-black">{row.count}</td>
                 <td className="border border-black p-1.5 text-center font-bold text-black">{row.room}</td>
+                <td className="border border-black p-1.5 font-bold text-center text-black uppercase">{row.floor}</td>
                 <td className="border border-black p-1.5 font-bold text-center text-black uppercase">{row.area}</td>
               </tr>
             ))}
@@ -417,6 +457,80 @@ export default function SeatingPlanPanel() {
            <span>* Auto-generated by Siksha Intelligence Seating Engine</span>
            <span>Date Printed: {new Date().toLocaleDateString("en-IN")}</span>
         </div>
+      </div>
+      
+      {/* ── Print Room Grids (Level 2) ───────────────────────────── */}
+      <div className="hidden print:block font-serif text-black printable-grids" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+        {printRoomGrids.map((room) => (
+          <div key={room.roomName} style={{ pageBreakBefore: 'always', paddingTop: '20px' }}>
+            {/* Room Header */}
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>
+                Room: {room.roomName}
+                {room.floorNumber != null && ` — Floor : ${room.floorNumber}`}
+              </h2>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                {selectedSchedule?.subjectName} | {room.studentCount} Students
+              </div>
+            </div>
+
+            {/* Grid Engine */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9' }}>
+                  <th style={{ border: '1px solid black', padding: '6px', width: '50px' }}>Row</th>
+                  {Array.from({ length: room.maxCol }, (_, i) => (
+                    <th key={i} style={{ border: '1px solid black', padding: '6px', textAlign: 'center' }}>
+                      Bench {i + 1}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: room.maxRow }, (_, ri) => {
+                  const row = ri + 1;
+                  return (
+                    <tr key={row}>
+                      <td style={{ border: '1px solid black', padding: '6px', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#fafafa' }}>
+                        Row {row}
+                      </td>
+                      {Array.from({ length: room.maxCol }, (_, ci) => {
+                        const col = ci + 1;
+                        const cell = room.grid[row]?.[col] || {};
+                        const left = cell.left != null ? String(cell.left).padStart(2, '0') : '—';
+                        const right = cell.right != null ? String(cell.right).padStart(2, '0') : '—';
+                        const single = cell.single != null ? String(cell.single).padStart(2, '0') : null;
+                        
+                        return (
+                          <td key={col} style={{
+                            border: '1px solid black',
+                            padding: '8px',
+                            textAlign: 'center',
+                            fontFamily: 'monospace',
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            letterSpacing: '2px'
+                          }}>
+                            {single != null
+                              ? single
+                              : `${left} | ${right}`
+                            }
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            
+            {/* Grid Footer Signature */}
+            <div style={{ marginTop: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', fontStyle: 'italic' }}>
+              <span>* Numbers represent Roll Numbers</span>
+              <span>Format: [ LEFT | RIGHT ] sharing alignment per bench</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── Floating Bulk Action Bar ─────────────────────────────── */}
@@ -655,7 +769,7 @@ export default function SeatingPlanPanel() {
                           </div>
                           <div className="flex flex-col">
                             <span className="font-medium">{alloc.studentName}</span>
-                            <span className="text-[10px] text-muted-foreground">{alloc.enrollmentNumber}</span>
+                            <span className="text-[10px] text-muted-foreground font-medium">Roll No: {alloc.rollNo ?? '-'}</span>
                           </div>
                         </div>
                       </TableCell>

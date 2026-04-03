@@ -15,6 +15,7 @@ export interface RoomAvailabilityDTO {
   /** How many students each seat holds for this schedule */
   maxStudentsPerSeat: number;
   totalStudentsToSeat: number;
+  floorNumber: number | null;
 
   // ── Backward-compatible aliases (serialized from backend) ──
   /** @deprecated Use occupiedCapacity */
@@ -41,13 +42,18 @@ export interface SeatAvailabilityDTO {
   /** Backward compat: true if seat has capacity left */
   available: boolean;
   occupiedByStudentName?: string;
+  occupiedPositions: ("LEFT" | "RIGHT" | "SINGLE")[];
 }
 
 export interface SeatAllocationResponseDTO {
   allocationId: number;
   studentName: string;
   enrollmentNumber: string;
+  rollNo: number;
   seatLabel: string;
+  position: "LEFT" | "RIGHT" | "SINGLE";
+  seatId: number;
+  studentId: string;
   roomName: string;
   rowNumber: number;
   columnNumber: number;
