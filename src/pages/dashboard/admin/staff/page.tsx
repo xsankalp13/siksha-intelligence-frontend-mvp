@@ -9,10 +9,12 @@ import {
   Loader2,
   Users,
   Upload,
-  Search,
-  ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Search,
+  ChevronLeft,
+  CreditCard,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,6 +46,8 @@ import {
 } from "@/services/admin";
 
 import BulkDataUpload from "@/features/bulk-upload/BulkDataUpload";
+import { BulkPhotoUploadDialog } from "@/features/uis/id-card/BulkPhotoUploadDialog";
+import { idCardService, triggerBlobDownload } from "@/services/idCard";
 
 // ── Types ───────────────────────────────────────────────────────────
 type StaffType = "TEACHER" | "PRINCIPAL" | "LIBRARIAN";
@@ -102,6 +106,7 @@ export default function StaffPage() {
   const [actionTarget, setActionTarget] = useState<{ staff: StaffSummaryDTO; action: 'activate' | 'block' } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedStaffType, setSelectedStaffType] = useState<StaffType>("TEACHER");
+  const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
   
   const form = useForm<StaffFormData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -340,11 +345,21 @@ export default function StaffPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              variant="outline"
+              onClick={() => setPhotoUploadOpen(true)}
+              className="gap-2 border-primary/20 hover:bg-primary/5"
+            >
+              <Camera className="h-4 w-4" />
+              Upload Photos
+            </Button>
+          </motion.div>
           <Button variant="outline" onClick={() => setBulkOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" />
-            Bulk Upload
+            Bulk Import
           </Button>
-          <Button onClick={openCreate} className="gap-2">
+          <Button onClick={openCreate} className="gap-2 shadow-lg shadow-primary/20">
             <Plus className="h-4 w-4" />
             Add Staff
           </Button>
@@ -450,6 +465,25 @@ export default function StaffPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
+                          title="Download ID Card"
+                          onClick={async () => {
+                            try {
+                              const res = await idCardService.downloadStaffIdCard(s.staffId);
+                              triggerBlobDownload(res.data, `staff-id-${s.staffId}.pdf`);
+                              toast.success("ID Card downloaded");
+                            } catch (e) {
+                              toast.error("Failed to download ID Card");
+                            }
+                          }}
+                        >
+                          <CreditCard className="h-3.5 w-3.5" />
+                        </Button>
+                      </motion.div>
                       <Link to={`/dashboard/admin/users/staff/${s.uuid}`}>
                         <Button
                           variant="ghost"
@@ -540,6 +574,12 @@ export default function StaffPage() {
           />
         </DialogContent>
       </Dialog>
+      
+      <BulkPhotoUploadDialog 
+        open={photoUploadOpen} 
+        onClose={() => setPhotoUploadOpen(false)} 
+        userType="staff"
+      />
 
       {/* Create / Edit Dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>

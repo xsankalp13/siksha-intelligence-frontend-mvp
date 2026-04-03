@@ -13,6 +13,9 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Printer,
+  CreditCard,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,6 +53,9 @@ import {
 
 import BulkDataUpload from "@/features/bulk-upload/BulkDataUpload";
 import StudentsWithGuardiansUpload from "@/features/bulk-upload/StudentsWithGuardiansUpload";
+import { IdCardBatchDialog } from "@/features/uis/id-card/IdCardBatchDialog";
+import { BulkPhotoUploadDialog } from "@/features/uis/id-card/BulkPhotoUploadDialog";
+import { idCardService, triggerBlobDownload } from "@/services/idCard";
 
 // ── Zod Schema ──────────────────────────────────────────────────────
 const studentSchema = z.object({
@@ -96,6 +102,8 @@ export default function StudentsPage() {
   const [pendingEditData, setPendingEditData] = useState<StudentFormData | null>(null);
   const [actionTarget, setActionTarget] = useState<{ student: StudentSummaryDTO; action: 'activate' | 'block' } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
 
   // ── Cascading class → section dropdowns ──────────────────────────
   const [classes, setClasses] = useState<AcademicClassResponseDto[]>([]);
@@ -400,11 +408,27 @@ export default function StudentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button variant="outline" onClick={() => setBatchOpen(true)} className="gap-2 border-primary/20 hover:bg-primary/5">
+              <Printer className="h-4 w-4" />
+              Batch IDs
+            </Button>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              variant="outline"
+              onClick={() => setPhotoUploadOpen(true)}
+              className="gap-2 border-primary/20 hover:bg-primary/5"
+            >
+              <Camera className="h-4 w-4" />
+              Upload Photos
+            </Button>
+          </motion.div>
           <Button variant="outline" onClick={() => setBulkOpen(true)} className="gap-2">
             <Upload className="h-4 w-4" />
-            Bulk Upload
+            Bulk Import
           </Button>
-          <Button onClick={openCreate} className="gap-2">
+          <Button onClick={openCreate} className="gap-2 shadow-lg shadow-primary/20">
             <Plus className="h-4 w-4" />
             Add Student
           </Button>
@@ -548,6 +572,25 @@ export default function StudentsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
+                          title="Download ID Card"
+                          onClick={async () => {
+                            try {
+                              const res = await idCardService.downloadStudentIdCard(s.studentId);
+                              triggerBlobDownload(res.data, `student-id-${s.studentId}.pdf`);
+                              toast.success("ID Card downloaded");
+                            } catch (e) {
+                              toast.error("Failed to download ID Card");
+                            }
+                          }}
+                        >
+                          <CreditCard className="h-3.5 w-3.5" />
+                        </Button>
+                      </motion.div>
                       <Link to={`/dashboard/admin/users/student/${s.uuid}`}>
                         <Button
                           variant="ghost"
@@ -685,6 +728,16 @@ export default function StudentsPage() {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* ID Card Batch Print Dialog */}
+      <IdCardBatchDialog open={batchOpen} onClose={() => setBatchOpen(false)} />
+      
+      {/* Bulk Photo Upload Dialog */}
+      <BulkPhotoUploadDialog 
+        open={photoUploadOpen} 
+        onClose={() => setPhotoUploadOpen(false)} 
+        userType="students"
+      />
 
       {/* Create / Edit Dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
