@@ -484,6 +484,9 @@ export function TimetableEditor() {
                     onOpenChange={setIsAutoGenerateModalOpen}
                     sectionId={sectionIdToUse || ''}
                     timeslots={editorContext?.timeslots || []}
+                    subjects={liveSubjects}
+                    teachers={liveTeachers}
+                    editorContext={editorContext}
                 />
 
                 <CellEditDialog

@@ -167,7 +167,39 @@ const timetableSlice = createSlice({
                     }
                 }
             });
-        }
+        },
+        /** Place subject into a cell (first step of animated fill) */
+        fillCellSubject: (state, action: PayloadAction<{ cellKey: string; subject: Subject }>) => {
+            const { cellKey, subject } = action.payload;
+            state.grid[cellKey] = {
+                subject,
+                teacher: null,
+                status: 'AWAITING_TEACHER',
+                roomId: null,
+                isNew: true,
+            };
+        },
+        /** Place teacher into a cell that already has a subject (second step of animated fill) */
+        fillCellTeacher: (state, action: PayloadAction<{ cellKey: string; teacher: Teacher }>) => {
+            const { cellKey, teacher } = action.payload;
+            const current = state.grid[cellKey];
+            if (current && current.subject) {
+                state.grid[cellKey] = {
+                    ...current,
+                    teacher,
+                    status: 'LOCKED',
+                    isNew: true,
+                };
+            }
+        },
+        /** Clear all isNew flags after animation completes */
+        clearIsNewFlags: (state) => {
+            Object.keys(state.grid).forEach(key => {
+                if (state.grid[key]?.isNew) {
+                    state.grid[key] = { ...state.grid[key], isNew: false };
+                }
+            });
+        },
     },
 });
 
@@ -184,7 +216,10 @@ export const {
     overwriteCell,
     cloneDay,
     setIsGenerating,
-    applyGeneratedSchedule
+    applyGeneratedSchedule,
+    fillCellSubject,
+    fillCellTeacher,
+    clearIsNewFlags,
 } = timetableSlice.actions;
 
 export const timetableReducer = timetableSlice.reducer;
