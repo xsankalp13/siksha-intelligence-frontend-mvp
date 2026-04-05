@@ -87,11 +87,11 @@ function AnimationToast({ current, total, isComplete }: { current: number; total
 export function AutoGenerateModal({
     open,
     onOpenChange,
-    sectionId,
+    sectionId: _sectionId,
     timeslots,
     subjects,
     teachers,
-    editorContext,
+    editorContext: _editorContext,
 }: AutoGenerateModalProps) {
     const dispatch = useDispatch();
     const [query, setQuery] = useState('');
@@ -204,7 +204,7 @@ export function AutoGenerateModal({
                 return;
             }
 
-            const successResponse = response as { timetable: Record<string, TimetablePeriod[]>; notes?: string };
+            const successResponse = response as unknown as { timetable: Record<string, TimetablePeriod[]>; notes?: string };
             const timetable = successResponse.timetable;
 
             // Reset grid and breaks

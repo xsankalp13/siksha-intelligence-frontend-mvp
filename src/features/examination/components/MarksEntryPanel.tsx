@@ -130,7 +130,7 @@ export default function MarksEntryPanel({ exam, schedule, onBack }: Props) {
     (r) =>
       r.attendanceStatus === "PRESENT" &&
       r.marksObtained !== undefined &&
-      r.marksObtained >= schedule.passingMarks
+      r.marksObtained >= (schedule.passingMarks ?? 0)
   ).length;
   const absentCount = rows.filter(
     (r) => r.attendanceStatus === "ABSENT"
