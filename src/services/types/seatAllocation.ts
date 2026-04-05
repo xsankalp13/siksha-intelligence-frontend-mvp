@@ -1,3 +1,9 @@
+export interface OccupiedByDTO {
+  subjectName: string;
+  className: string;
+  count: number;
+}
+
 export interface RoomAvailabilityDTO {
   roomId: number;
   roomUuid: string;
@@ -16,6 +22,8 @@ export interface RoomAvailabilityDTO {
   maxStudentsPerSeat: number;
   totalStudentsToSeat: number;
   floorNumber: number | null;
+  mode?: "SINGLE" | "DOUBLE" | "SHARED";
+  occupiedBy?: OccupiedByDTO[];
 
   // ── Backward-compatible aliases (serialized from backend) ──
   /** @deprecated Use occupiedCapacity */

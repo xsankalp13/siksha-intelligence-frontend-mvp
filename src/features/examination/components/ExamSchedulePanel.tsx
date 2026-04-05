@@ -87,6 +87,7 @@ interface ScheduleFormState {
   startTime: string;
   endTime: string;
   maxStudentsPerSeat: number;
+  seatSide: "LEFT" | "RIGHT" | "";
 }
 
 const emptyForm: ScheduleFormState = {
@@ -97,6 +98,7 @@ const emptyForm: ScheduleFormState = {
   startTime: "",
   endTime: "",
   maxStudentsPerSeat: 1,
+  seatSide: "",
 };
 
 function calcDuration(start: string, end: string): number {
@@ -219,7 +221,7 @@ export default function ExamSchedulePanel({
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, examDate: exam.startDate, startTime: "10:00", endTime: "13:00", maxStudentsPerSeat: 1 });
+    setForm({ ...emptyForm, examDate: exam.startDate, startTime: "10:00", endTime: "13:00", maxStudentsPerSeat: 1, seatSide: "" });
     setDialogOpen(true);
   };
 
@@ -233,6 +235,7 @@ export default function ExamSchedulePanel({
       startTime: s.startTime ? s.startTime.substring(0, 5) : "",
       endTime: s.endTime ? s.endTime.substring(0, 5) : "",
       maxStudentsPerSeat: s.maxStudentsPerSeat ?? 1,
+      seatSide: s.seatSide ?? "",
     });
     setDialogOpen(true);
   };
@@ -248,6 +251,11 @@ export default function ExamSchedulePanel({
       !form.endTime
     ) {
       toast.error("Please fill all required fields");
+      return;
+    }
+
+    if (form.maxStudentsPerSeat === 2 && !form.seatSide) {
+      toast.error("Please select a seat side (LEFT/RIGHT) for double seating.");
       return;
     }
 
@@ -270,6 +278,7 @@ export default function ExamSchedulePanel({
       maxMarks: 100,
       passingMarks: 33,
       maxStudentsPerSeat: form.maxStudentsPerSeat,
+      ...(form.maxStudentsPerSeat === 2 && { seatSide: form.seatSide as "LEFT" | "RIGHT" }),
     };
 
     console.log("[DEBUG] Schedule form state:", JSON.stringify(form));
@@ -548,33 +557,58 @@ export default function ExamSchedulePanel({
                 />
               </div>
 
-              {/* Seating Type */}
-              <div className="grid gap-1.5">
-                <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
-                  Seating Type
-                </label>
-                <Select
-                  value={String(form.maxStudentsPerSeat)}
-                  onValueChange={(v) => setForm({ ...form, maxStudentsPerSeat: Number(v) })}
-                >
-                  <SelectTrigger className="h-11 border-transparent bg-background shadow-inner focus-visible:ring-primary/20 rounded-xl">
-                    <SelectValue placeholder="Select seating type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">
-                      <span className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-green-500" />
-                        Single Seating (1 per seat)
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="2">
-                      <span className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-500" />
-                        Double Seating (2 per seat)
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Seating Type & Side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-1.5">
+                  <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
+                    Seating Type
+                  </label>
+                  <Select
+                    value={String(form.maxStudentsPerSeat)}
+                    onValueChange={(v) => {
+                      const max = Number(v);
+                      setForm({ ...form, maxStudentsPerSeat: max, seatSide: max === 1 ? "" : form.seatSide });
+                    }}
+                  >
+                    <SelectTrigger className="h-11 border-transparent bg-background shadow-inner focus-visible:ring-primary/20 rounded-xl">
+                      <SelectValue placeholder="Select seating type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          Single Seating (1 per seat)
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="2">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                          Double Seating (2 per seat)
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.maxStudentsPerSeat === 2 && (
+                  <div className="grid gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                    <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
+                      Seat Side <span className="text-destructive">*</span>
+                    </label>
+                    <Select
+                      value={form.seatSide}
+                      onValueChange={(v) => setForm({ ...form, seatSide: v as "LEFT" | "RIGHT" })}
+                    >
+                      <SelectTrigger className="h-11 border-transparent bg-background shadow-inner focus-visible:ring-primary/20 rounded-xl">
+                        <SelectValue placeholder="Select side" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LEFT">Left Side</SelectItem>
+                        <SelectItem value="RIGHT">Right Side</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">

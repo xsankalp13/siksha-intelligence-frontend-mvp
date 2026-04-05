@@ -674,6 +674,7 @@ export default function SeatingPlanPanel() {
           <Badge variant="outline" className="gap-1.5 px-3 py-1 border-primary/20 text-primary bg-primary/5">
             <Armchair className="w-3.5 h-3.5" />
             Config: {selectedSchedule?.maxStudentsPerSeat || 1} per seat
+            {selectedSchedule?.seatSide && ` (${selectedSchedule.seatSide})`}
           </Badge>
           {selectedExam && (
             <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
@@ -853,18 +854,36 @@ export default function SeatingPlanPanel() {
                         
                         return (
                           <SelectItem key={r.roomUuid} value={r.roomUuid} disabled={r.totalSeats === 0 || r.isFull}>
-                            <span className="flex items-center gap-2">
-                              {r.roomName} 
-                              {r.totalSeats === 0 ? (
-                                <Badge variant="destructive" className="text-[10px] ml-2 font-mono">
-                                  No Seating Configured
-                                </Badge>
-                              ) : (
-                                <Badge variant={r.isFull ? "destructive" : "secondary"} className="text-[10px] ml-2 font-mono">
-                                  {r.availableCapacity ?? (r.availableSeats * currentMaxPerSeat)} / {r.totalCapacity ?? (r.totalSeats * currentMaxPerSeat)} free
-                                </Badge>
+                            <div className="flex flex-col">
+                              <span className="flex items-center gap-2">
+                                {r.roomName} 
+                                {r.totalSeats === 0 ? (
+                                  <Badge variant="destructive" className="text-[10px] ml-2 font-mono">
+                                    No Seating Configured
+                                  </Badge>
+                                ) : (
+                                  <div className="flex gap-2 items-center">
+                                    <Badge variant={r.isFull ? "destructive" : "secondary"} className="text-[10px] ml-2 font-mono">
+                                      {r.availableCapacity ?? (r.availableSeats * currentMaxPerSeat)} / {r.totalCapacity ?? (r.totalSeats * currentMaxPerSeat)} free
+                                    </Badge>
+                                    {r.mode && (
+                                      <Badge variant={r.mode === "SHARED" ? "default" : "outline"} className="text-[10px] font-mono">
+                                        {r.mode}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                )}
+                              </span>
+                              {r.occupiedBy && r.occupiedBy.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1 pl-1">
+                                  {r.occupiedBy.map((o, idx) => (
+                                    <span key={idx} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground whitespace-nowrap">
+                                      {o.subjectName} ({o.className}): {o.count}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
-                            </span>
+                            </div>
                           </SelectItem>
                         );
                       })}
@@ -901,7 +920,12 @@ export default function SeatingPlanPanel() {
                         const seatCapacity = seat.capacity ?? currentMaxPerSeat;
                         const defaultOccupancy = seat.available ? 0 : 1; 
                         const occupiedCount = seat.occupiedCount ?? defaultOccupancy;
-                        const isFull = seat.isFull ?? (occupiedCount >= seatCapacity);
+                        
+                        const examSeatSide = selectedSchedule?.seatSide;
+                        const occupiedPositions = seat.occupiedPositions || [];
+                        const sideOccupied = examSeatSide ? occupiedPositions.includes(examSeatSide) : false;
+                        
+                        const isFull = (seat.isFull ?? (occupiedCount >= seatCapacity)) || sideOccupied;
 
                         const isEmpty = occupiedCount === 0;
                         const isPartiallyFilled = occupiedCount > 0 && !isFull;
@@ -1020,10 +1044,24 @@ export default function SeatingPlanPanel() {
                               <span className="font-medium flex items-center gap-2">
                                 {r.roomName}
                                 {r.totalSeats === 0 && <span className="text-[10px] uppercase text-destructive font-bold bg-destructive/10 px-1 rounded">No Config</span>}
+                                {r.mode && r.totalSeats > 0 && (
+                                   <Badge variant={r.mode === "SHARED" ? "default" : "outline"} className="text-[9px] h-4 font-mono ml-auto">
+                                     {r.mode}
+                                   </Badge>
+                                )}
                               </span>
                               <span className="text-xs text-muted-foreground mt-0.5">
                                 {r.totalSeats === 0 ? "Generate seats in infrastructure first" : `${r.occupiedCapacity ?? (r.occupiedSeats * currentMaxPerSeat)} in-use • ${r.availableCapacity ?? (r.availableSeats * currentMaxPerSeat)} available slots`}
                               </span>
+                              {r.occupiedBy && r.occupiedBy.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {r.occupiedBy.map((o, idx) => (
+                                    <span key={idx} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground whitespace-nowrap">
+                                      {o.subjectName} ({o.className}): {o.count}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </SelectItem>
                         );
