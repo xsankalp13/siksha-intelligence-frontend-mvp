@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App.tsx'
 import { store } from './store/store'
+import { scheduleCriticalRoutePreload } from './lib/preloadCriticalRoutes'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,3 +25,5 @@ createRoot(document.getElementById('root')!).render(
     </Provider>
   </StrictMode>,
 )
+
+scheduleCriticalRoutePreload()

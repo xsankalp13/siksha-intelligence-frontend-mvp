@@ -10,7 +10,6 @@ import {
   Loader2,
   ClipboardList,
   Calendar,
-  DoorOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,7 +86,8 @@ interface ScheduleFormState {
   examDate: string;
   startTime: string;
   endTime: string;
-  roomNumber: string;
+  maxStudentsPerSeat: number;
+  seatSide: "LEFT" | "RIGHT" | "";
 }
 
 const emptyForm: ScheduleFormState = {
@@ -97,7 +97,8 @@ const emptyForm: ScheduleFormState = {
   examDate: "",
   startTime: "",
   endTime: "",
-  roomNumber: "",
+  maxStudentsPerSeat: 1,
+  seatSide: "",
 };
 
 function calcDuration(start: string, end: string): number {
@@ -108,10 +109,87 @@ function calcDuration(start: string, end: string): number {
   return diff > 0 ? diff : 0;
 }
 
+// ── Time helper for 12h-24h conversion ───────────────────────────
+const parse24To12 = (time24: string) => {
+  if (!time24) return { hr: "10", min: "00", period: "AM" };
+  const [h, m] = time24.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  let hr = h % 12;
+  if (hr === 0) hr = 12;
+  return {
+    hr: String(hr).padStart(2, "0"),
+    min: String(m || 0).padStart(2, "0"),
+    period
+  };
+};
+
+const format12To24 = (hr: string, min: string, period: string) => {
+  let h = parseInt(hr, 10);
+  if (period === "PM" && h < 12) h += 12;
+  if (period === "AM" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${min.padStart(2, "0")}`;
+};
+
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+
+function TimePicker12h({ 
+  value, 
+  onChange, 
+  label 
+}: { 
+  value: string; 
+  onChange: (val: string) => void;
+  label: string;
+}) {
+  const { hr, min, period } = parse24To12(value);
+
+  const update = (newHr: string, newMin: string, newPeriod: string) => {
+    onChange(format12To24(newHr, newMin, newPeriod));
+  };
+
+  return (
+    <div className="grid gap-1.5 flex-1">
+      <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</label>
+      <div className="flex items-center gap-1">
+        <Select value={hr} onValueChange={(v) => update(v, min, period)}>
+          <SelectTrigger className="h-9 px-2 text-sm font-medium bg-muted/30 border-transparent hover:bg-muted/50 transition-colors">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="min-w-[70px]">
+            {HOURS.map((h) => (
+              <SelectItem key={h} value={h}>{h}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-muted-foreground font-bold">:</span>
+        <Select value={min} onValueChange={(v) => update(hr, v, period)}>
+          <SelectTrigger className="h-9 px-2 text-sm font-medium bg-muted/30 border-transparent hover:bg-muted/50 transition-colors">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="min-w-[70px]">
+            {MINUTES.map((m) => (
+              <SelectItem key={m} value={m}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={period} onValueChange={(v) => update(hr, min, v)}>
+          <SelectTrigger className="h-9 px-2 text-xs font-bold bg-primary/5 text-primary border-transparent hover:bg-primary/10 transition-colors">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="min-w-[70px]">
+            <SelectItem value="AM">AM</SelectItem>
+            <SelectItem value="PM">PM</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 export default function ExamSchedulePanel({
   exam,
   onBack,
-  onEnterMarks,
 }: Props) {
   const { data: schedules = [], isLoading } = useGetSchedulesByExam(exam.uuid);
   const createSchedule = useCreateSchedule();
@@ -143,7 +221,7 @@ export default function ExamSchedulePanel({
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, examDate: exam.startDate });
+    setForm({ ...emptyForm, examDate: exam.startDate, startTime: "10:00", endTime: "13:00", maxStudentsPerSeat: 1, seatSide: "" });
     setDialogOpen(true);
   };
 
@@ -156,7 +234,8 @@ export default function ExamSchedulePanel({
       examDate: s.examDate,
       startTime: s.startTime ? s.startTime.substring(0, 5) : "",
       endTime: s.endTime ? s.endTime.substring(0, 5) : "",
-      roomNumber: s.roomNumber || "",
+      maxStudentsPerSeat: s.maxStudentsPerSeat ?? 1,
+      seatSide: s.seatSide ?? "",
     });
     setDialogOpen(true);
   };
@@ -172,6 +251,11 @@ export default function ExamSchedulePanel({
       !form.endTime
     ) {
       toast.error("Please fill all required fields");
+      return;
+    }
+
+    if (form.maxStudentsPerSeat === 2 && !form.seatSide) {
+      toast.error("Please select a seat side (LEFT/RIGHT) for double seating.");
       return;
     }
 
@@ -193,7 +277,8 @@ export default function ExamSchedulePanel({
       duration,
       maxMarks: 100,
       passingMarks: 33,
-      roomNumber: form.roomNumber || undefined,
+      maxStudentsPerSeat: form.maxStudentsPerSeat,
+      ...(form.maxStudentsPerSeat === 2 && { seatSide: form.seatSide as "LEFT" | "RIGHT" }),
     };
 
     console.log("[DEBUG] Schedule form state:", JSON.stringify(form));
@@ -294,7 +379,6 @@ export default function ExamSchedulePanel({
                 <TableHead>Class / Section</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Time</TableHead>
-                <TableHead>Room</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -342,16 +426,6 @@ export default function ExamSchedulePanel({
                           : "—"}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      {s.roomNumber ? (
-                        <Badge variant="outline" className="gap-1 border-border/50">
-                          <DoorOpen className="w-3 h-3" />
-                          {s.roomNumber}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
@@ -382,7 +456,7 @@ export default function ExamSchedulePanel({
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editing ? "Edit Schedule" : "Add Schedule"}
@@ -440,7 +514,7 @@ export default function ExamSchedulePanel({
                 value={form.subjectId}
                 onValueChange={(v) => setForm({ ...form, subjectId: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 rounded-xl">
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
                 <SelectContent>
@@ -452,53 +526,90 @@ export default function ExamSchedulePanel({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+
+            <div className="bg-muted/20 p-5 rounded-2xl border border-border/40 space-y-4">
               <div className="grid gap-1.5">
-                <label className="text-sm font-medium">
-                  Date <span className="text-destructive">*</span>
+                <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
+                  Exam Date <span className="text-destructive">*</span>
                 </label>
-                <Input
-                  type="date"
-                  value={form.examDate}
-                  onChange={(e) =>
-                    setForm({ ...form, examDate: e.target.value })
-                  }
-                />
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-3 h-4 w-4 text-primary" />
+                  <Input
+                    type="date"
+                    value={form.examDate}
+                    onChange={(e) => setForm({ ...form, examDate: e.target.value })}
+                    className="pl-10 h-11 border-transparent bg-background shadow-inner focus-visible:ring-primary/20 rounded-xl w-full"
+                  />
+                </div>
               </div>
-              <div className="grid gap-1.5">
-                <label className="text-sm font-medium">
-                  Start <span className="text-destructive">*</span>
-                </label>
-                <Input
-                  type="time"
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <TimePicker12h
+                  label="Start Time"
                   value={form.startTime}
-                  onChange={(e) =>
-                    setForm({ ...form, startTime: e.target.value })
-                  }
+                  onChange={(v) => setForm({ ...form, startTime: v })}
                 />
-              </div>
-              <div className="grid gap-1.5">
-                <label className="text-sm font-medium">
-                  End <span className="text-destructive">*</span>
-                </label>
-                <Input
-                  type="time"
+
+                <TimePicker12h
+                  label="End Time"
                   value={form.endTime}
-                  onChange={(e) =>
-                    setForm({ ...form, endTime: e.target.value })
-                  }
+                  onChange={(v) => setForm({ ...form, endTime: v })}
                 />
               </div>
-            </div>
-            <div className="grid gap-1.5">
-              <label className="text-sm font-medium">Room</label>
-              <Input
-                value={form.roomNumber || ""}
-                onChange={(e) =>
-                  setForm({ ...form, roomNumber: e.target.value })
-                }
-                placeholder="e.g. R-201"
-              />
+
+              {/* Seating Type & Side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-1.5">
+                  <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
+                    Seating Type
+                  </label>
+                  <Select
+                    value={String(form.maxStudentsPerSeat)}
+                    onValueChange={(v) => {
+                      const max = Number(v);
+                      setForm({ ...form, maxStudentsPerSeat: max, seatSide: max === 1 ? "" : form.seatSide });
+                    }}
+                  >
+                    <SelectTrigger className="h-11 border-transparent bg-background shadow-inner focus-visible:ring-primary/20 rounded-xl">
+                      <SelectValue placeholder="Select seating type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          Single Seating (1 per seat)
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="2">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-500" />
+                          Double Seating (2 per seat)
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.maxStudentsPerSeat === 2 && (
+                  <div className="grid gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                    <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
+                      Seat Side <span className="text-destructive">*</span>
+                    </label>
+                    <Select
+                      value={form.seatSide}
+                      onValueChange={(v) => setForm({ ...form, seatSide: v as "LEFT" | "RIGHT" })}
+                    >
+                      <SelectTrigger className="h-11 border-transparent bg-background shadow-inner focus-visible:ring-primary/20 rounded-xl">
+                        <SelectValue placeholder="Select side" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LEFT">Left Side</SelectItem>
+                        <SelectItem value="RIGHT">Right Side</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>

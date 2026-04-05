@@ -3,6 +3,7 @@ import { invigilationService } from "@/services/invigilation";
 import type {
   InvigilationRequestDTO,
   SittingPlanRequestDTO,
+  AutoAllocationRequestDTO,
 } from "@/services/types/invigilation";
 
 // ── Query Keys ──────────────────────────────────────────────────────
@@ -98,9 +99,33 @@ export const useRemoveSeat = () => {
   return useMutation({
     mutationFn: ({ id, examScheduleId: _eid }: { id: number; examScheduleId: number }) =>
       invigilationService.removeSeat(id),
+  onSuccess: (_d, v) =>
+    qc.invalidateQueries({
+      queryKey: keys.seatingByExam(v.examScheduleId),
+    }),
+});
+};
+
+export const useBulkRemoveSeats = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, examScheduleId: _eid }: { ids: number[]; examScheduleId: number }) =>
+      invigilationService.bulkRemoveSeats(ids),
     onSuccess: (_d, v) =>
       qc.invalidateQueries({
         queryKey: keys.seatingByExam(v.examScheduleId),
       }),
   });
+};
+
+export const useAutoAllocateSeats = () => {
+const qc = useQueryClient();
+return useMutation({
+  mutationFn: (data: AutoAllocationRequestDTO) =>
+    invigilationService.autoAllocate(data).then((r) => r.data),
+  onSuccess: (_d, v) =>
+    qc.invalidateQueries({
+      queryKey: keys.seatingByExam(v.examScheduleId),
+    }),
+});
 };

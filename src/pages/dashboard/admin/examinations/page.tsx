@@ -120,7 +120,7 @@ export default function ExaminationsPage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-start justify-between"
+        className="flex items-start justify-between print:hidden"
       >
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -142,7 +142,7 @@ export default function ExaminationsPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="flex gap-1.5 p-1 bg-muted/60 rounded-xl border border-border/40 w-fit overflow-x-auto"
+        className="flex gap-1.5 p-1 bg-muted/60 rounded-xl border border-border/40 w-fit overflow-x-auto print:hidden"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;

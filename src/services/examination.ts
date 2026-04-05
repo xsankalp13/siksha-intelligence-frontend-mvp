@@ -54,7 +54,12 @@ export const examinationService = {
 
   /** PATCH /auth/examination/exams/:uuid/publish */
   publishExam(uuid: string) {
-    return api.patch<ExamResponseDTO>(`/auth/examination/exams/${uuid}/publish`);
+    return api.patch<ExamResponseDTO>(`/auth/examination/exams/${uuid}/publish`, {
+      published: true,
+      isPublished: true,
+      publish: true,
+      status: true
+    });
   },
 
   // ── Exam Schedules ───────────────────────────────────────────────

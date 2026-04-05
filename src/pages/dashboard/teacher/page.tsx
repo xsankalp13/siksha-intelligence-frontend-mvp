@@ -124,39 +124,7 @@ export default function TeacherDashboard() {
         dispatch(setCredentials({ user: freshUser, accessToken: token }));
       }).catch(err => console.error("Could not refresh profile", err));
     }
-
-    if (user?.userId) {
-      dispatch(fetchTeacherSchedule(user.userId));
-    }
-  }, [dispatch, user?.userId, token]);
-
-  // Derive stats from real data
-  const pulseData: any[] = [];
-  const latestDay = pulseData.filter((d) => d.total > 0).slice(-1)[0];
-  const totalStudents = 0; // Future improvement: compute from real schedule
-
-  const presentToday = latestDay?.present ?? 0;
-  const absentToday = latestDay?.absent ?? 0;
-  const pendingTasks = 0;
-
-  // At-risk students (>3 absences)
-  const atRiskStudents = useMemo(
-    () => [] as any[],
-    []
-  );
-
-  // Heatmap data
-  const heatmapData: any[] = [];
-
-  const now = new Date();
-  const timeGreet =
-    now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
-
-  // Carousel navigation
-  const carouselPageSize = 4;
-  const totalCarouselPages = Math.ceil(atRiskStudents.length / carouselPageSize);
-
-  const firstLecture = schedule && schedule.length > 0 ? schedule[0] : null;
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-8 pb-10">
@@ -268,54 +236,49 @@ export default function TeacherDashboard() {
             <AlertTriangle className="h-4 w-4 text-amber-500" />
           </div>
 
-          {atRiskStudents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <UserCheck className="h-10 w-10 text-emerald-400 mb-2" />
-              <p className="text-sm font-medium text-muted-foreground">All students on track!</p>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-3">
-                {atRiskStudents
-                  .slice(carouselIndex * carouselPageSize, (carouselIndex + 1) * carouselPageSize)
-                  .map((student) => (
-                    <div
-                      key={student.studentId}
-                      className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-accent/30 transition-colors"
-                    >
-                      <UserAvatar
-                        name={student.name}
-                        profileUrl={student.profileUrl}
-                        className="h-9 w-9"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{student.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Roll #{student.rollNumber} · {student.absenceCount} absences
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-600">
-                        {student.attendancePercentage}%
-                      </span>
-                    </div>
-                  ))}
+          {/* Sidebar - ID Card Section */}
+          <div className="lg:col-span-1 space-y-6">
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white border border-slate-200/60 rounded-3xl p-6 shadow-sm sticky top-8 overflow-hidden"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-slate-900">Digital ID Card</h2>
+                <CreditCard className="w-5 h-5 text-primary" />
               </div>
-              {totalCarouselPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-4">
-                  <button
-                    onClick={() => setCarouselIndex((i) => Math.max(0, i - 1))}
-                    disabled={carouselIndex === 0}
-                    className="p-1 rounded-lg hover:bg-accent disabled:opacity-30 transition-colors"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <span className="text-xs text-muted-foreground">
-                    {carouselIndex + 1} / {totalCarouselPages}
-                  </span>
-                  <button
-                    onClick={() => setCarouselIndex((i) => Math.min(totalCarouselPages - 1, i + 1))}
-                    disabled={carouselIndex === totalCarouselPages - 1}
-                    className="p-1 rounded-lg hover:bg-accent disabled:opacity-30 transition-colors"
+
+              <div className="flex flex-col items-center gap-6">
+                <AnimatePresence mode="wait">
+                  {isLoading ? (
+                    <motion.div 
+                      key="loader"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="w-full aspect-[1/1.58] bg-slate-50 animate-pulse rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-200"
+                    >
+                      <Loader2 className="w-8 h-8 text-slate-300 animate-spin" />
+                    </motion.div>
+                  ) : profile && (
+                    <motion.div 
+                      key="id-card"
+                      initial={{ opacity: 0, scale: 0.9, rotateY: 90 }}
+                      animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                      transition={{ type: 'spring', damping: 15 }}
+                      className="w-full perspect-1000"
+                    >
+                      <IdCardPreview onDownload={handleDownloadId} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="w-full space-y-3">
+                  <Button 
+                    onClick={handleDownloadId}
+                    disabled={!profile}
+                    className="w-full gap-2 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 h-11"
                   >
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>

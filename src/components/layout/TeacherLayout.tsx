@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
-import TeacherTopbar from "./TeacherTopbar";
+import Topbar from "./Topbar";
 import { cn } from "@/lib/utils";
 import { TEACHER_NAV_ITEMS } from "@/config/navigation";
 
@@ -18,7 +18,7 @@ export default function TeacherLayout() {
           collapsed ? "ml-[68px]" : "ml-[260px]"
         )}
       >
-        <TeacherTopbar />
+        <Topbar />
 
         <main className="flex-1 overflow-x-hidden p-6 md:p-8">
           <Outlet />

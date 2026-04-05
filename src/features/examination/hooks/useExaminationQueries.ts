@@ -13,6 +13,7 @@ import type {
   PastPaperRequestDTO,
   PastPaperQueryParams,
   StudentMarkRequestDTO,
+  ExamResponseDTO,
 } from "@/services/types/examination";
 
 // ── Query Keys ──────────────────────────────────────────────────────
@@ -86,7 +87,34 @@ export const usePublishExam = () => {
   return useMutation({
     mutationFn: (uuid: string) =>
       examinationService.publishExam(uuid).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.exams }),
+    onMutate: async (uuid) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await qc.cancelQueries({ queryKey: keys.exams });
+
+      // Snapshot the previous value
+      const previousExams = qc.getQueryData<ExamResponseDTO[]>(keys.exams);
+
+      // Optimistically update to the new value
+      if (previousExams) {
+        qc.setQueryData<ExamResponseDTO[]>(keys.exams, (old) => {
+          if (!old) return old;
+          return old.map((exam) =>
+            exam.uuid === uuid ? { ...exam, published: true } : exam
+          );
+        });
+      }
+
+      // Return a context object with the snapshotted value
+      return { previousExams };
+    },
+    // If the mutation fails, use the context returned from onMutate to roll back
+    onError: (_err, _uuid, context) => {
+      if (context?.previousExams) {
+        qc.setQueryData(keys.exams, context.previousExams);
+      }
+    },
+    // Always refetch after error or success to synchronize with the backend
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.exams }),
   });
 };
 

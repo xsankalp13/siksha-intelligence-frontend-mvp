@@ -23,6 +23,7 @@ import {
   Settings2,
   Lock,
   CreditCard,
+  Briefcase,
 } from "lucide-react";
 
 export type NavItem = {
@@ -52,6 +53,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "Examinations", path: "/dashboard/admin/examinations", icon: ClipboardCheck },
 
   { label: "Rooms", path: "/dashboard/admin/rooms", icon: DoorOpen },
+  { label: "HRMS", path: "/dashboard/admin/hrms", icon: Briefcase },
   { label: "Finance", path: "/dashboard/admin/finance", icon: Receipt },
 
   { label: "Settings", path: "/dashboard/admin/settings", icon: Settings },
@@ -115,14 +117,14 @@ export const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
 
 export const TEACHER_NAV_ITEMS: NavItem[] = [
   {
-    label: "Dashboard",
+    label: "Overview",
     path: "/dashboard/teacher",
     icon: LayoutDashboard,
     end: true,
   },
-  { label: "Schedule", path: "/dashboard/teacher/schedule", icon: CalendarDays },
-  { label: "My Classes", path: "/dashboard/teacher/classes", icon: GraduationCap },
-  { label: "Attendance", path: "/dashboard/teacher/attendance", icon: CalendarCheck },
-  { label: "Profile", path: "/dashboard/teacher/profile", icon: User },
+  {
+    label: "My HR",
+    path: "/dashboard/teacher/my-hr",
+    icon: Briefcase,
+  },
 ];
-
