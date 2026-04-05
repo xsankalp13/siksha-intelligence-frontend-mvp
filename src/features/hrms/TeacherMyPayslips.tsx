@@ -21,7 +21,7 @@ export default function TeacherMyPayslips() {
 
   const downloadPayslip = async (row: PayslipSummaryDTO) => {
     try {
-      const response = await hrmsService.downloadMyPayslipPdf(row.payslipId);
+      const response = await hrmsService.downloadMyPayslipPdf(row.uuid ?? String(row.payslipId));
       triggerBlobDownload(
         response.data,
         `payslip-${row.payYear}-${String(row.payMonth).padStart(2, "0")}.pdf`,
@@ -73,7 +73,7 @@ export default function TeacherMyPayslips() {
     <DataTable
       columns={columns}
       data={data?.content ?? []}
-      getRowId={(row) => row.payslipId}
+      getRowId={(row) => row.uuid}
       emptyMessage={isLoading ? "Loading payslips..." : "No payslips available."}
     />
   );

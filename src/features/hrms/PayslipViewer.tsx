@@ -14,7 +14,7 @@ import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
 
 interface PayslipViewerProps {
-  payslipId: number | null;
+  payslipId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -24,7 +24,7 @@ export default function PayslipViewer({ payslipId, open, onOpenChange }: Payslip
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["hrms", "payslip", "detail", payslipId],
-    queryFn: () => hrmsService.getPayslip(payslipId as number).then((res) => res.data),
+    queryFn: () => hrmsService.getPayslip(payslipId as string).then((res) => res.data),
     enabled: Boolean(payslipId),
   });
 
@@ -76,27 +76,14 @@ export default function PayslipViewer({ payslipId, open, onOpenChange }: Payslip
               </div>
             </div>
 
-            {/* Earnings */}
+            {/* Line Items */}
             <div>
-              <p className="mb-1 text-sm font-medium">Earnings</p>
+              <p className="mb-1 text-sm font-medium">Salary Line Items</p>
               <div className="space-y-1 text-sm">
-                {(data?.earnings ?? []).map((item) => (
+                {(data?.lineItems ?? []).map((item) => (
                   <div key={item.componentCode} className="flex justify-between rounded border px-3 py-1.5">
                     <span>{item.componentName}</span>
                     <span className="font-semibold">{formatCurrency(item.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Deductions */}
-            <div>
-              <p className="mb-1 text-sm font-medium">Deductions</p>
-              <div className="space-y-1 text-sm">
-                {(data?.deductions ?? []).map((item) => (
-                  <div key={item.componentCode} className="flex justify-between rounded border px-3 py-1.5">
-                    <span>{item.componentName}</span>
-                    <span className="font-semibold text-destructive">−{formatCurrency(item.amount)}</span>
                   </div>
                 ))}
               </div>

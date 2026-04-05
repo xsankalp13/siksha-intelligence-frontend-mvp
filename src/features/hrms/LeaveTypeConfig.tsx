@@ -17,11 +17,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
 import type {
   LeaveTypeConfigCreateUpdateDTO,
   LeaveTypeConfigResponseDTO,
+  StaffCategory,
 } from "@/services/types/hrms";
+
+const STAFF_CATEGORY_OPTIONS: Array<{ value: StaffCategory; label: string }> = [
+  { value: "TEACHING", label: "Teaching" },
+  { value: "NON_TEACHING_ADMIN", label: "Non-teaching Admin" },
+  { value: "NON_TEACHING_SUPPORT", label: "Non-teaching Support" },
+];
 
 const initialForm: LeaveTypeConfigCreateUpdateDTO = {
   leaveCode: "",
@@ -44,6 +52,7 @@ export default function LeaveTypeConfig() {
   const [formOpen, setFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<LeaveTypeConfigResponseDTO | null>(null);
   const [editing, setEditing] = useState<LeaveTypeConfigResponseDTO | null>(null);
+  const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [form, setForm] = useState<LeaveTypeConfigCreateUpdateDTO>(initialForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
@@ -57,7 +66,7 @@ export default function LeaveTypeConfig() {
   const saveMutation = useMutation({
     mutationFn: (payload: LeaveTypeConfigCreateUpdateDTO) =>
       editing
-        ? hrmsService.updateLeaveType(editing.leaveTypeId, payload)
+        ? hrmsService.updateLeaveType(editing.uuid, payload)
         : hrmsService.createLeaveType(payload),
     onSuccess: () => {
       toast.success(editing ? "Leave type updated" : "Leave type created");
@@ -72,7 +81,7 @@ export default function LeaveTypeConfig() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => hrmsService.deleteLeaveType(id),
+    mutationFn: (id: string) => hrmsService.deleteLeaveType(id),
     onSuccess: () => {
       toast.success("Leave type deleted");
       setDeleteTarget(null);
@@ -83,6 +92,7 @@ export default function LeaveTypeConfig() {
 
   const closeForm = () => {
     setFormOpen(false);
+    setSaveReviewOpen(false);
     setEditing(null);
     setForm(initialForm);
     setFieldErrors({});
@@ -110,6 +120,7 @@ export default function LeaveTypeConfig() {
       requiresDocument: row.requiresDocument,
       documentRequiredAfterDays: row.documentRequiredAfterDays,
       isPaid: row.isPaid,
+      applicableCategories: row.applicableCategories ?? [],
       applicableGrades: row.applicableGrades,
       sortOrder: row.sortOrder,
     });
@@ -136,6 +147,23 @@ export default function LeaveTypeConfig() {
         header: "Carry Forward",
         render: (row) =>
           row.carryForwardAllowed ? `Yes (max ${row.maxCarryForward})` : "No",
+      },
+      {
+        key: "categories",
+        header: "Categories",
+        render: (row) => (
+          <div className="flex flex-wrap gap-1">
+            {(row.applicableCategories ?? []).length > 0 ? (
+              row.applicableCategories?.map((category) => (
+                <Badge key={category} variant="outline" className="text-[10px]">
+                  {category.replace(/_/g, " ")}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-xs text-muted-foreground">All</span>
+            )}
+          </div>
+        ),
       },
       {
         key: "requiresDocument",
@@ -177,7 +205,7 @@ export default function LeaveTypeConfig() {
       <DataTable
         columns={columns}
         data={rows}
-        getRowId={(row) => row.leaveTypeId}
+        getRowId={(row) => row.uuid}
         onEdit={openEdit}
         onDelete={(row) => setDeleteTarget(row)}
         emptyMessage={isLoading ? "Loading leave types..." : "No leave types found."}
@@ -325,6 +353,36 @@ export default function LeaveTypeConfig() {
               )}
             </div>
 
+            <div className="grid gap-2">
+              <Label>Applicable Categories</Label>
+              <div className="grid gap-2 rounded-md border p-3">
+                {STAFF_CATEGORY_OPTIONS.map((option) => {
+                  const selected = (form.applicableCategories ?? []).includes(option.value);
+                  return (
+                    <label key={option.value} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setForm((prev) => {
+                            const current = prev.applicableCategories ?? [];
+                            return {
+                              ...prev,
+                              applicableCategories: checked
+                                ? [...current, option.value]
+                                : current.filter((item) => item !== option.value),
+                            };
+                          });
+                        }}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Sort order */}
             <div className="grid gap-2 md:max-w-[200px]">
               <Label htmlFor="lt-sort">Sort Order</Label>
@@ -341,7 +399,7 @@ export default function LeaveTypeConfig() {
           <DialogFooter>
             <Button variant="outline" onClick={closeForm}>Cancel</Button>
             <Button
-              onClick={() => saveMutation.mutate(form)}
+              onClick={() => setSaveReviewOpen(true)}
               disabled={saveMutation.isPending || !form.leaveCode || !form.displayName}
             >
               {editing ? "Save Changes" : "Create"}
@@ -350,13 +408,33 @@ export default function LeaveTypeConfig() {
         </DialogContent>
       </Dialog>
 
+      <ReviewDialog
+        open={saveReviewOpen}
+        onOpenChange={setSaveReviewOpen}
+        title={editing ? "Confirm Leave Type Update" : "Confirm Leave Type Creation"}
+        description="Review quota and rule settings before saving this leave type."
+        severity="warning"
+        confirmLabel={editing ? "Save Changes" : "Create Leave Type"}
+        isPending={saveMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I verified leave rules, quota limits, and applicable categories."
+        onConfirm={() => saveMutation.mutate(form)}
+      >
+        <div className="space-y-1 text-sm">
+          <p>Code: <span className="font-medium">{form.leaveCode || "-"}</span></p>
+          <p>Name: <span className="font-medium">{form.displayName || "-"}</span></p>
+          <p>Annual Quota: <span className="font-medium">{form.annualQuota ?? 0}</span></p>
+          <p>Paid: <span className="font-medium">{form.isPaid ? "Yes" : "No"}</span></p>
+        </div>
+      </ReviewDialog>
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete leave type?"
         description={`This will remove ${deleteTarget?.displayName ?? "this leave type"} (${deleteTarget?.leaveCode ?? ""}).`}
         confirmLabel="Delete"
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.leaveTypeId); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.uuid); }}
         loading={deleteMutation.isPending}
       />
     </div>

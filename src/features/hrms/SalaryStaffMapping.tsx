@@ -24,16 +24,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
+import StaffSearchSelect from "@/features/hrms/components/StaffSearchSelect";
 import SalaryOverrideEditor from "@/features/hrms/SalaryOverrideEditor";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
-import type { StaffSalaryMappingCreateDTO, StaffSalaryMappingResponseDTO } from "@/services/types/hrms";
+import type {
+  StaffSalaryMappingCreateDTO,
+  StaffSalaryMappingResponseDTO,
+} from "@/services/types/hrms";
 
 const todayIso = new Date().toISOString().slice(0, 10);
 
 const initialForm: StaffSalaryMappingCreateDTO = {
-  staffId: 0,
-  templateId: 0,
+  staffRef: "",
+  templateRef: "",
   effectiveFrom: todayIso,
   effectiveTo: undefined,
   remarks: "",
@@ -42,11 +47,12 @@ const initialForm: StaffSalaryMappingCreateDTO = {
 
 export default function SalaryStaffMapping() {
   const queryClient = useQueryClient();
-  const { formatCurrency, formatDate } = useHrmsFormatters();
+  const { formatDate } = useHrmsFormatters();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StaffSalaryMappingResponseDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StaffSalaryMappingResponseDTO | null>(null);
   const [previewTarget, setPreviewTarget] = useState<StaffSalaryMappingResponseDTO | null>(null);
+  const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [form, setForm] = useState<StaffSalaryMappingCreateDTO>(initialForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
@@ -63,12 +69,17 @@ export default function SalaryStaffMapping() {
     queryFn: () => hrmsService.listSalaryTemplates().then((res) => res.data),
   });
 
+  const staffQuery = useQuery({
+    queryKey: ["hrms", "staff", "dropdown"],
+    queryFn: () => hrmsService.listStaffForDropdown().then((res) => res.data.content ?? []),
+  });
+
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["hrms", "salary", "mappings"] });
 
   const saveMutation = useMutation({
     mutationFn: (payload: StaffSalaryMappingCreateDTO) =>
       editing
-        ? hrmsService.updateSalaryMapping(editing.mappingId, payload)
+        ? hrmsService.updateSalaryMapping(editing.uuid, payload)
         : hrmsService.createSalaryMapping(payload),
     onSuccess: () => {
       toast.success(editing ? "Mapping updated" : "Mapping created");
@@ -83,7 +94,7 @@ export default function SalaryStaffMapping() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => hrmsService.updateSalaryMapping(id, { staffId: 0, templateId: 0, effectiveFrom: "" }),
+    mutationFn: (id: string) => hrmsService.deleteSalaryMapping(id),
     onSuccess: () => {
       toast.success("Mapping deleted");
       setDeleteTarget(null);
@@ -94,6 +105,7 @@ export default function SalaryStaffMapping() {
 
   const closeForm = () => {
     setFormOpen(false);
+    setSaveReviewOpen(false);
     setEditing(null);
     setForm(initialForm);
     setFieldErrors({});
@@ -107,15 +119,18 @@ export default function SalaryStaffMapping() {
   };
 
   const openEdit = (row: StaffSalaryMappingResponseDTO) => {
+    const staffRef = (staffQuery.data ?? []).find((staff) => staff.staffId === row.staffId)?.uuid ?? "";
+    const templateRef = (templatesQuery.data ?? []).find((template) => template.templateId === row.templateId)?.uuid ?? "";
+
     setEditing(row);
     setForm({
-      staffId: row.staffId,
-      templateId: row.templateId,
+      staffRef,
+      templateRef,
       effectiveFrom: row.effectiveFrom,
       effectiveTo: row.effectiveTo,
       remarks: row.remarks ?? "",
       overrides: row.overrides?.map((o) => ({
-        componentId: o.componentId,
+        componentRef: o.componentRef,
         overrideValue: o.overrideValue,
         reason: o.reason,
       })) ?? [],
@@ -128,13 +143,10 @@ export default function SalaryStaffMapping() {
 
   const columns = useMemo<Column<StaffSalaryMappingResponseDTO>[]>(
     () => [
-      { key: "mappingId", header: "ID", searchable: true },
       { key: "staffName", header: "Staff", searchable: true },
       { key: "employeeId", header: "Emp. ID", searchable: true },
       { key: "templateName", header: "Template", searchable: true },
       { key: "gradeCode", header: "Grade", render: (row) => row.gradeCode ?? "-" },
-      { key: "ctc", header: "CTC", render: (row) => formatCurrency(row.ctc) },
-      { key: "netPay", header: "Net Pay", render: (row) => formatCurrency(row.netPay) },
       {
         key: "effectiveFrom",
         header: "Effective",
@@ -144,11 +156,16 @@ export default function SalaryStaffMapping() {
         key: "overrides",
         header: "Overrides",
         render: (row) =>
-          row.hasOverrides ? (
+          (row.overrides?.length ?? 0) > 0 ? (
             <Badge variant="outline">{(row.overrides?.length ?? 0)} overrides</Badge>
           ) : (
             "-"
           ),
+      },
+      {
+        key: "active",
+        header: "Status",
+        render: (row) => <Badge variant={row.active ? "default" : "secondary"}>{row.active ? "Active" : "Inactive"}</Badge>,
       },
       {
         key: "computed",
@@ -160,7 +177,7 @@ export default function SalaryStaffMapping() {
         ),
       },
     ],
-    [formatCurrency, formatDate],
+    [formatDate],
   );
 
   if (isError) {
@@ -184,7 +201,7 @@ export default function SalaryStaffMapping() {
       <DataTable
         columns={columns}
         data={rows}
-        getRowId={(row) => row.mappingId}
+        getRowId={(row) => row.uuid}
         onEdit={openEdit}
         onDelete={(row) => setDeleteTarget(row)}
         emptyMessage={isLoading ? "Loading salary mappings..." : "No salary mappings found."}
@@ -201,34 +218,32 @@ export default function SalaryStaffMapping() {
           </DialogHeader>
 
           <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="map-staff-id">Staff ID</Label>
-              <Input
-                id="map-staff-id"
-                type="number"
-                min={1}
-                value={form.staffId || ""}
-                onChange={(e) => setForm((p) => ({ ...p, staffId: Number(e.target.value || 0) }))}
-              />
-              {fieldErrors.staffId?.[0] && <p className="text-xs text-destructive">{fieldErrors.staffId[0]}</p>}
-            </div>
+            <StaffSearchSelect
+              label="Staff"
+              value={form.staffRef || null}
+              onChange={(uuid: string | null) => setForm((p) => ({ ...p, staffRef: uuid ?? "" }))}
+              disabled={staffQuery.isLoading || Boolean(editing)}
+              error={fieldErrors.staffRef?.[0] ?? fieldErrors.staffId?.[0]}
+            />
 
             <div className="grid gap-2">
               <Label>Template</Label>
               <Select
-                value={form.templateId ? String(form.templateId) : undefined}
-                onValueChange={(v) => setForm((p) => ({ ...p, templateId: Number(v) }))}
+                value={form.templateRef || undefined}
+                onValueChange={(v) => setForm((p) => ({ ...p, templateRef: v }))}
               >
                 <SelectTrigger><SelectValue placeholder="Select template" /></SelectTrigger>
                 <SelectContent>
                   {(templatesQuery.data ?? []).map((t) => (
-                    <SelectItem key={t.templateId} value={String(t.templateId)}>
+                    <SelectItem key={t.templateId} value={t.uuid}>
                       {t.templateName} {t.gradeName ? `(${t.gradeName})` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {fieldErrors.templateId?.[0] && <p className="text-xs text-destructive">{fieldErrors.templateId[0]}</p>}
+              {(fieldErrors.templateRef?.[0] ?? fieldErrors.templateId?.[0]) && (
+                <p className="text-xs text-destructive">{fieldErrors.templateRef?.[0] ?? fieldErrors.templateId?.[0]}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -266,8 +281,8 @@ export default function SalaryStaffMapping() {
           <DialogFooter>
             <Button variant="outline" onClick={closeForm}>Cancel</Button>
             <Button
-              onClick={() => saveMutation.mutate(form)}
-              disabled={saveMutation.isPending || !form.staffId || !form.templateId || !form.effectiveFrom}
+              onClick={() => setSaveReviewOpen(true)}
+              disabled={saveMutation.isPending || !form.staffRef || !form.templateRef || !form.effectiveFrom}
             >
               {editing ? "Save Changes" : "Create"}
             </Button>
@@ -275,17 +290,37 @@ export default function SalaryStaffMapping() {
         </DialogContent>
       </Dialog>
 
+      <ReviewDialog
+        open={saveReviewOpen}
+        onOpenChange={setSaveReviewOpen}
+        title={editing ? "Confirm Mapping Update" : "Confirm Mapping Creation"}
+        description="Please review staff, template, and effective dates before saving."
+        severity="warning"
+        confirmLabel={editing ? "Save Changes" : "Create Mapping"}
+        isPending={saveMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I verified the mapping details and effective dates."
+        onConfirm={() => saveMutation.mutate(form)}
+      >
+        <div className="space-y-1 text-sm">
+          <p>Staff Ref: <span className="font-medium">{form.staffRef || "-"}</span></p>
+          <p>Template Ref: <span className="font-medium">{form.templateRef || "-"}</span></p>
+          <p>Effective: <span className="font-medium">{form.effectiveFrom}{form.effectiveTo ? ` to ${form.effectiveTo}` : ""}</span></p>
+          <p>Remarks: <span className="font-medium">{form.remarks?.trim() || "-"}</span></p>
+        </div>
+      </ReviewDialog>
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete salary mapping?"
         description={`This will remove mapping for ${deleteTarget?.staffName ?? "staff"} #${deleteTarget?.mappingId ?? ""}.`}
         confirmLabel="Delete"
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.mappingId); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.uuid); }}
         loading={deleteMutation.isPending}
       />
 
-      {previewTarget && <SalaryOverrideEditor selectedMappingId={previewTarget.mappingId} />}
+      {previewTarget && <SalaryOverrideEditor selectedMappingUuid={previewTarget.uuid} />}
     </div>
   );
 }

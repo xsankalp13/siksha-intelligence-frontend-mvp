@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
 import CalendarYearView from "@/features/hrms/CalendarYearView";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
@@ -75,6 +76,7 @@ export default function LeaveCalendarDesigner() {
   const [calendarYear, setCalendarYear] = useState(currentYear);
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [formOpen, setFormOpen] = useState(false);
+  const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarEventResponseDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CalendarEventResponseDTO | null>(null);
   const [form, setForm] = useState<CalendarEventCreateDTO>(initialForm);
@@ -101,7 +103,7 @@ export default function LeaveCalendarDesigner() {
   const saveMutation = useMutation({
     mutationFn: (payload: CalendarEventCreateDTO) =>
       editing
-        ? hrmsService.updateCalendarEvent(editing.eventId, payload)
+        ? hrmsService.updateCalendarEvent(editing.uuid, payload)
         : hrmsService.createCalendarEvent(payload),
     onSuccess: () => {
       toast.success(editing ? "Calendar event updated" : "Calendar event created");
@@ -116,7 +118,7 @@ export default function LeaveCalendarDesigner() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => hrmsService.deleteCalendarEvent(id),
+    mutationFn: (id: string) => hrmsService.deleteCalendarEvent(id),
     onSuccess: () => {
       toast.success("Calendar event deleted");
       setDeleteTarget(null);
@@ -127,6 +129,7 @@ export default function LeaveCalendarDesigner() {
 
   const closeForm = () => {
     setFormOpen(false);
+    setSaveReviewOpen(false);
     setEditing(null);
     setForm(initialForm);
     setFieldErrors({});
@@ -292,7 +295,7 @@ export default function LeaveCalendarDesigner() {
         <DataTable
           columns={columns}
           data={rows}
-          getRowId={(row) => row.eventId}
+          getRowId={(row) => row.uuid}
           onEdit={openEdit}
           onDelete={(row) => setDeleteTarget(row)}
           emptyMessage={
@@ -413,13 +416,32 @@ export default function LeaveCalendarDesigner() {
               disabled={
                 saveMutation.isPending || !form.date || !form.dayType || !form.academicYear
               }
-              onClick={() => saveMutation.mutate(form)}
+              onClick={() => setSaveReviewOpen(true)}
             >
               {editing ? "Save Changes" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReviewDialog
+        open={saveReviewOpen}
+        onOpenChange={setSaveReviewOpen}
+        title={editing ? "Confirm Calendar Event Update" : "Confirm Calendar Event Creation"}
+        description="Review calendar event details before saving."
+        severity="warning"
+        confirmLabel={editing ? "Save Changes" : "Create Event"}
+        isPending={saveMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I verified date, day type, and applicability settings."
+        onConfirm={() => saveMutation.mutate(form)}
+      >
+        <div className="space-y-1 text-sm">
+          <p>Date: <span className="font-medium">{form.date || "-"}</span></p>
+          <p>Type: <span className="font-medium">{form.dayType}</span></p>
+          <p>Title: <span className="font-medium">{form.title?.trim() || "-"}</span></p>
+        </div>
+      </ReviewDialog>
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
@@ -430,7 +452,7 @@ export default function LeaveCalendarDesigner() {
         description={`This will remove "${deleteTarget?.title ?? "this event"}" on ${formatDate(deleteTarget?.date)}.`}
         confirmLabel="Delete"
         onConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate(deleteTarget.eventId);
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.uuid);
         }}
         loading={deleteMutation.isPending}
       />

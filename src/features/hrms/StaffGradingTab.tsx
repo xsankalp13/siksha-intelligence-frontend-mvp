@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
+import StaffSearchSelect from "@/features/hrms/components/StaffSearchSelect";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { adminService, type StaffSummaryDTO } from "@/services/admin";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
@@ -49,8 +51,8 @@ const initialForm: StaffGradeCreateUpdateDTO = {
 };
 
 const initialAssignForm: StaffGradeAssignDTO = {
-  staffId: 0,
-  gradeId: 0,
+  staffRef: "",
+  gradeRef: "",
   effectiveFrom: new Date().toISOString().slice(0, 10),
   promotionOrderRef: "",
   remarks: "",
@@ -60,6 +62,7 @@ export default function StaffGradingTab() {
   const queryClient = useQueryClient();
   const { formatCurrency, formatDate } = useHrmsFormatters();
   const [formOpen, setFormOpen] = useState(false);
+  const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [editing, setEditing] = useState<StaffGradeResponseDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StaffGradeResponseDTO | null>(null);
   const [form, setForm] = useState<StaffGradeCreateUpdateDTO>(initialForm);
@@ -69,11 +72,14 @@ export default function StaffGradingTab() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignForm, setAssignForm] = useState<StaffGradeAssignDTO>(initialAssignForm);
   const [assignErrors, setAssignErrors] = useState<Record<string, string[]>>({});
-  const [selectedStaffIds, setSelectedStaffIds] = useState<number[]>([]);
+  const [selectedStaffRefs, setSelectedStaffRefs] = useState<string[]>([]);
   const [staffSearch, setStaffSearch] = useState("");
+  const [assignReviewPayload, setAssignReviewPayload] = useState<
+    (Omit<StaffGradeAssignDTO, "staffRef"> & { staffRefs: string[] }) | null
+  >(null);
 
   // History
-  const [historyStaffId, setHistoryStaffId] = useState<number | null>(null);
+  const [historyStaffUuid, setHistoryStaffUuid] = useState<string | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["hrms", "grades"],
@@ -81,9 +87,9 @@ export default function StaffGradingTab() {
   });
 
   const historyQuery = useQuery({
-    queryKey: ["hrms", "grade-history", historyStaffId],
-    queryFn: () => hrmsService.getStaffGradeHistory(historyStaffId!).then((res) => res.data),
-    enabled: historyStaffId != null && historyStaffId > 0,
+    queryKey: ["hrms", "grade-history", historyStaffUuid],
+    queryFn: () => hrmsService.getStaffGradeHistory(historyStaffUuid!).then((res) => res.data),
+    enabled: Boolean(historyStaffUuid),
   });
 
   const staffQuery = useQuery({
@@ -107,7 +113,7 @@ export default function StaffGradingTab() {
   const saveMutation = useMutation({
     mutationFn: (payload: StaffGradeCreateUpdateDTO) =>
       editing
-        ? hrmsService.updateGrade(editing.gradeId, payload)
+        ? hrmsService.updateGrade(editing.uuid, payload)
         : hrmsService.createGrade(payload),
     onSuccess: () => {
       toast.success(editing ? "Grade updated" : "Grade created");
@@ -122,7 +128,7 @@ export default function StaffGradingTab() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => hrmsService.deleteGrade(id),
+    mutationFn: (id: string) => hrmsService.deleteGrade(id),
     onSuccess: () => {
       toast.success("Grade deleted");
       setDeleteTarget(null);
@@ -132,12 +138,12 @@ export default function StaffGradingTab() {
   });
 
   const assignMutation = useMutation({
-    mutationFn: async (payload: Omit<StaffGradeAssignDTO, "staffId"> & { staffIds: number[] }) => {
+    mutationFn: async (payload: Omit<StaffGradeAssignDTO, "staffRef"> & { staffRefs: string[] }) => {
       const results = await Promise.allSettled(
-        payload.staffIds.map((staffId) =>
+        payload.staffRefs.map((staffRef) =>
           hrmsService.assignGrade({
-            staffId,
-            gradeId: payload.gradeId,
+            staffRef,
+            gradeRef: payload.gradeRef,
             effectiveFrom: payload.effectiveFrom,
             promotionOrderRef: payload.promotionOrderRef,
             remarks: payload.remarks,
@@ -147,8 +153,8 @@ export default function StaffGradingTab() {
 
       const failed = results.filter((result) => result.status === "rejected").length;
       return {
-        total: payload.staffIds.length,
-        success: payload.staffIds.length - failed,
+        total: payload.staffRefs.length,
+        success: payload.staffRefs.length - failed,
         failed,
       };
     },
@@ -171,6 +177,7 @@ export default function StaffGradingTab() {
 
   const closeForm = () => {
     setFormOpen(false);
+    setSaveReviewOpen(false);
     setEditing(null);
     setForm(initialForm);
     setFieldErrors({});
@@ -187,8 +194,9 @@ export default function StaffGradingTab() {
     setAssignOpen(false);
     setAssignForm(initialAssignForm);
     setAssignErrors({});
-    setSelectedStaffIds([]);
+    setSelectedStaffRefs([]);
     setStaffSearch("");
+    setAssignReviewPayload(null);
   };
 
   const openEdit = (row: StaffGradeResponseDTO) => {
@@ -239,28 +247,28 @@ export default function StaffGradingTab() {
 
   const allVisibleSelected =
     filteredUnassignedStaff.length > 0 &&
-    filteredUnassignedStaff.every((staff) => selectedStaffIds.includes(staff.staffId));
+    filteredUnassignedStaff.every((staff) => selectedStaffRefs.includes(staff.uuid));
 
-  const toggleStaffSelection = (staffId: number) => {
-    setSelectedStaffIds((prev) =>
-      prev.includes(staffId) ? prev.filter((id) => id !== staffId) : [...prev, staffId],
+  const toggleStaffSelection = (staffRef: string) => {
+    setSelectedStaffRefs((prev) =>
+      prev.includes(staffRef) ? prev.filter((id) => id !== staffRef) : [...prev, staffRef],
     );
     setAssignErrors((prev) => {
-      if (!prev.staffIds && !prev.staffId) return prev;
-      return { ...prev, staffIds: [], staffId: [] };
+      if (!prev.staffRefs && !prev.staffRef) return prev;
+      return { ...prev, staffRefs: [], staffRef: [] };
     });
   };
 
   const toggleSelectAllVisible = () => {
     if (allVisibleSelected) {
-      const visibleIds = new Set(filteredUnassignedStaff.map((staff) => staff.staffId));
-      setSelectedStaffIds((prev) => prev.filter((id) => !visibleIds.has(id)));
+      const visibleRefs = new Set(filteredUnassignedStaff.map((staff) => staff.uuid));
+      setSelectedStaffRefs((prev) => prev.filter((id) => !visibleRefs.has(id)));
       return;
     }
 
-    setSelectedStaffIds((prev) => {
+    setSelectedStaffRefs((prev) => {
       const merged = new Set(prev);
-      filteredUnassignedStaff.forEach((staff) => merged.add(staff.staffId));
+      filteredUnassignedStaff.forEach((staff) => merged.add(staff.uuid));
       return Array.from(merged);
     });
   };
@@ -323,7 +331,7 @@ export default function StaffGradingTab() {
         <DataTable
           columns={columns}
           data={rows}
-          getRowId={(row) => row.gradeId}
+          getRowId={(row) => row.uuid}
           onEdit={openEdit}
           onDelete={(row) => setDeleteTarget(row)}
           emptyMessage={isLoading ? "Loading grades..." : "No grades found."}
@@ -334,21 +342,18 @@ export default function StaffGradingTab() {
       <div className="space-y-3 rounded-lg border p-4">
         <h4 className="text-sm font-semibold">Grade History Lookup</h4>
         <div className="flex items-end gap-3">
-          <div className="grid gap-2">
-            <Label htmlFor="history-staff-id">Staff ID</Label>
-            <Input
-              id="history-staff-id"
-              type="number"
-              min={1}
-              className="w-[160px]"
-              value={historyStaffId ?? ""}
-              onChange={(e) => setHistoryStaffId(e.target.value ? Number(e.target.value) : null)}
+          <div className="min-w-[320px]">
+            <StaffSearchSelect
+              label="Staff Member"
+              value={historyStaffUuid}
+              onChange={(uuid) => setHistoryStaffUuid(uuid)}
+              placeholder="Select staff to view grade history..."
             />
           </div>
           <Button
             variant="outline"
             size="sm"
-            disabled={!historyStaffId || historyStaffId <= 0}
+            disabled={!historyStaffUuid}
             onClick={() => historyQuery.refetch()}
           >
             View History
@@ -362,7 +367,7 @@ export default function StaffGradingTab() {
               (historyQuery.data as StaffGradeAssignmentResponseDTO[]).map((h) => (
                 <div key={h.assignmentId} className="flex items-center justify-between rounded border px-3 py-2">
                   <span>
-                    <span className="font-mono font-semibold">{h.gradeCode}</span> {h.gradeName} ({h.teachingWing.replace(/_/g, " ")})
+                    <span className="font-mono font-semibold">{h.gradeCode}</span> {h.gradeName}
                   </span>
                   <span className="text-muted-foreground">
                     {formatDate(h.effectiveFrom)} → {h.effectiveTo ? formatDate(h.effectiveTo) : "Present"}
@@ -487,13 +492,33 @@ export default function StaffGradingTab() {
             <Button variant="outline" onClick={closeForm}>Cancel</Button>
             <Button
               disabled={saveMutation.isPending || !form.gradeCode || !form.gradeName}
-              onClick={() => saveMutation.mutate(form)}
+              onClick={() => setSaveReviewOpen(true)}
             >
               {editing ? "Save Changes" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReviewDialog
+        open={saveReviewOpen}
+        onOpenChange={setSaveReviewOpen}
+        title={editing ? "Confirm Grade Update" : "Confirm Grade Creation"}
+        description="Review grade configuration before saving."
+        severity="warning"
+        confirmLabel={editing ? "Save Changes" : "Create Grade"}
+        isPending={saveMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I verified grade code, wing, and pay band values."
+        onConfirm={() => saveMutation.mutate(form)}
+      >
+        <div className="space-y-1 text-sm">
+          <p>Code: <span className="font-medium">{form.gradeCode || "-"}</span></p>
+          <p>Name: <span className="font-medium">{form.gradeName || "-"}</span></p>
+          <p>Wing: <span className="font-medium">{form.teachingWing}</span></p>
+          <p>Band: <span className="font-medium">{formatCurrency(form.payBandMin)} - {formatCurrency(form.payBandMax)}</span></p>
+        </div>
+      </ReviewDialog>
 
       {/* Assign Grade Dialog */}
       <Dialog open={assignOpen} onOpenChange={(open) => { if (!open) closeAssignDialog(); }}>
@@ -513,7 +538,7 @@ export default function StaffGradingTab() {
               />
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
-                  {selectedStaffIds.length} selected • {unassignedStaff.length} unassigned total
+                  {selectedStaffRefs.length} selected • {unassignedStaff.length} unassigned total
                 </span>
                 <Button
                   type="button"
@@ -534,7 +559,7 @@ export default function StaffGradingTab() {
                 ) : (
                   filteredUnassignedStaff.map((staff) => {
                     const fullName = `${staff.firstName} ${staff.middleName ?? ""} ${staff.lastName}`.replace(/\s+/g, " ").trim();
-                    const checked = selectedStaffIds.includes(staff.staffId);
+                    const checked = selectedStaffRefs.includes(staff.uuid);
                     return (
                       <label
                         key={staff.staffId}
@@ -544,7 +569,7 @@ export default function StaffGradingTab() {
                           type="checkbox"
                           className="mt-0.5"
                           checked={checked}
-                          onChange={() => toggleStaffSelection(staff.staffId)}
+                          onChange={() => toggleStaffSelection(staff.uuid)}
                         />
                         <span className="min-w-0">
                           <span className="block font-medium">{fullName}</span>
@@ -557,19 +582,19 @@ export default function StaffGradingTab() {
                   })
                 )}
               </div>
-              {assignErrors.staffIds?.[0] && <p className="text-xs text-destructive">{assignErrors.staffIds[0]}</p>}
-              {assignErrors.staffId?.[0] && <p className="text-xs text-destructive">{assignErrors.staffId[0]}</p>}
+              {assignErrors.staffRefs?.[0] && <p className="text-xs text-destructive">{assignErrors.staffRefs[0]}</p>}
+              {assignErrors.staffRef?.[0] && <p className="text-xs text-destructive">{assignErrors.staffRef[0]}</p>}
             </div>
             <div className="grid gap-2">
               <Label>Grade</Label>
               <Select
-                value={assignForm.gradeId ? String(assignForm.gradeId) : undefined}
-                onValueChange={(v) => setAssignForm((p) => ({ ...p, gradeId: Number(v) }))}
+                value={assignForm.gradeRef || undefined}
+                onValueChange={(v) => setAssignForm((p) => ({ ...p, gradeRef: v }))}
               >
                 <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
                 <SelectContent>
                   {rows.map((g) => (
-                    <SelectItem key={g.gradeId} value={String(g.gradeId)}>
+                    <SelectItem key={g.gradeId} value={g.uuid}>
                       {g.gradeCode} — {g.gradeName}
                     </SelectItem>
                   ))}
@@ -598,26 +623,56 @@ export default function StaffGradingTab() {
           <DialogFooter>
             <Button variant="outline" onClick={closeAssignDialog}>Cancel</Button>
             <Button
-              disabled={assignMutation.isPending || selectedStaffIds.length === 0 || !assignForm.gradeId}
+              disabled={assignMutation.isPending || selectedStaffRefs.length === 0 || !assignForm.gradeRef}
               onClick={() => {
-                if (selectedStaffIds.length === 0) {
-                  setAssignErrors({ staffIds: ["Select at least one staff member"] });
+                if (selectedStaffRefs.length === 0) {
+                  setAssignErrors({ staffRefs: ["Select at least one staff member"] });
                   return;
                 }
-                assignMutation.mutate({
-                  staffIds: selectedStaffIds,
-                  gradeId: assignForm.gradeId,
+                setAssignReviewPayload({
+                  staffRefs: selectedStaffRefs,
+                  gradeRef: assignForm.gradeRef,
                   effectiveFrom: assignForm.effectiveFrom,
                   promotionOrderRef: assignForm.promotionOrderRef,
                   remarks: assignForm.remarks,
                 });
               }}
             >
-              Assign ({selectedStaffIds.length})
+              Assign ({selectedStaffRefs.length})
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReviewDialog
+        open={Boolean(assignReviewPayload)}
+        onOpenChange={(open) => {
+          if (!open) setAssignReviewPayload(null);
+        }}
+        title="Confirm Grade Assignment"
+        description="This will assign the selected grade to all selected staff."
+        severity="warning"
+        confirmLabel="Assign Grade"
+        isPending={assignMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I verified selected staff and effective date for this bulk assignment."
+        onConfirm={() => {
+          if (!assignReviewPayload) return;
+          assignMutation.mutate(assignReviewPayload);
+        }}
+      >
+        <div className="space-y-1 text-sm">
+          <p>
+            Staff Selected: <span className="font-medium">{assignReviewPayload?.staffRefs.length ?? 0}</span>
+          </p>
+          <p>
+            Effective From: <span className="font-medium">{assignReviewPayload?.effectiveFrom ?? "-"}</span>
+          </p>
+          <p>
+            Remarks: <span className="font-medium">{assignReviewPayload?.remarks?.trim() || "-"}</span>
+          </p>
+        </div>
+      </ReviewDialog>
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
@@ -625,7 +680,7 @@ export default function StaffGradingTab() {
         title="Delete staff grade?"
         description={`This will remove ${deleteTarget?.gradeName ?? "this grade"} (${deleteTarget?.gradeCode ?? ""}).`}
         confirmLabel="Delete"
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.gradeId); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.uuid); }}
         loading={deleteMutation.isPending}
       />
     </div>

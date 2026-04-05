@@ -24,19 +24,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
 import type {
   SalaryTemplateCreateDTO,
   SalaryTemplateResponseDTO,
   SalaryTemplateUpdateDTO,
+  StaffCategory,
 } from "@/services/types/hrms";
+
+const CATEGORY_OPTIONS: Array<{ value: StaffCategory; label: string }> = [
+  { value: "TEACHING", label: "Teaching" },
+  { value: "NON_TEACHING_ADMIN", label: "Non-teaching Admin" },
+  { value: "NON_TEACHING_SUPPORT", label: "Non-teaching Support" },
+];
 
 const currentYear = new Date().getFullYear();
 
 const initialForm: SalaryTemplateCreateDTO = {
   templateName: "",
   description: "",
-  gradeId: undefined,
+  gradeRef: undefined,
+  applicableCategory: undefined,
   academicYear: `${currentYear}-${currentYear + 1}`,
   components: [],
 };
@@ -45,6 +54,7 @@ export default function SalaryTemplateBuilder() {
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<SalaryTemplateResponseDTO | null>(null);
+  const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SalaryTemplateResponseDTO | null>(null);
   const [form, setForm] = useState<SalaryTemplateCreateDTO>(initialForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -81,7 +91,7 @@ export default function SalaryTemplateBuilder() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: number; payload: SalaryTemplateUpdateDTO }) =>
+    mutationFn: ({ id, payload }: { id: string; payload: SalaryTemplateUpdateDTO }) =>
       hrmsService.updateSalaryTemplate(id, payload),
     onSuccess: () => {
       toast.success("Template updated");
@@ -96,7 +106,7 @@ export default function SalaryTemplateBuilder() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => hrmsService.deleteSalaryTemplate(id),
+    mutationFn: (id: string) => hrmsService.deleteSalaryTemplate(id),
     onSuccess: () => {
       toast.success("Template deleted");
       setDeleteTarget(null);
@@ -107,6 +117,7 @@ export default function SalaryTemplateBuilder() {
 
   const closeForm = () => {
     setFormOpen(false);
+    setSaveReviewOpen(false);
     setEditing(null);
     setForm(initialForm);
     setFieldErrors({});
@@ -120,41 +131,55 @@ export default function SalaryTemplateBuilder() {
   };
 
   const openEdit = (row: SalaryTemplateResponseDTO) => {
+    const gradeRef =
+      row.gradeId != null
+        ? (gradesQuery.data ?? []).find((grade) => grade.gradeId === row.gradeId)?.uuid
+        : undefined;
+
+    const mappedComponents = row.components
+      .map((c) => {
+        const componentRef = (componentsQuery.data ?? []).find((item) => item.componentId === c.componentId)?.uuid;
+        return componentRef ? { componentRef, value: c.value } : null;
+      })
+      .filter((item): item is { componentRef: string; value: number } => item !== null);
+
     setEditing(row);
     setForm({
       templateName: row.templateName,
       description: row.description,
-      gradeId: row.gradeId,
+      gradeRef,
+      applicableCategory: row.applicableCategory,
       academicYear: row.academicYear,
-      components: row.components.map((c) => ({ componentId: c.componentId, value: c.value })),
+      components: mappedComponents,
     });
     setFieldErrors({});
     setFormOpen(true);
   };
 
-  const updateComponentValue = (componentId: number, value: number) => {
+  const updateComponentValue = (componentRef: string, value: number) => {
     setForm((prev) => {
-      const existing = prev.components.find((c) => c.componentId === componentId);
+      const existing = prev.components.find((c) => c.componentRef === componentRef);
       if (existing) {
         return {
           ...prev,
           components: prev.components.map((c) =>
-            c.componentId === componentId ? { ...c, value } : c,
+            c.componentRef === componentRef ? { ...c, value } : c,
           ),
         };
       }
-      return { ...prev, components: [...prev.components, { componentId, value }] };
+      return { ...prev, components: [...prev.components, { componentRef, value }] };
     });
   };
 
   const submit = () => {
     if (editing) {
       updateMutation.mutate({
-        id: editing.templateId,
+        id: editing.uuid,
         payload: {
           templateName: form.templateName,
           description: form.description,
-          gradeId: form.gradeId,
+          gradeRef: form.gradeRef,
+          applicableCategory: form.applicableCategory,
           academicYear: form.academicYear,
           components: form.components,
         },
@@ -170,6 +195,16 @@ export default function SalaryTemplateBuilder() {
     () => [
       { key: "templateName", header: "Template", searchable: true },
       { key: "gradeName", header: "Grade", render: (row) => row.gradeName ?? "-" },
+      {
+        key: "applicableCategory",
+        header: "Category",
+        render: (row) =>
+          row.applicableCategory ? (
+            <Badge variant="outline">{row.applicableCategory.replace(/_/g, " ")}</Badge>
+          ) : (
+            "All"
+          ),
+      },
       { key: "academicYear", header: "Year" },
       {
         key: "components",
@@ -210,7 +245,7 @@ export default function SalaryTemplateBuilder() {
       <DataTable
         columns={columns}
         data={rows}
-        getRowId={(row) => row.templateId}
+        getRowId={(row) => row.uuid}
         onEdit={openEdit}
         onDelete={(row) => setDeleteTarget(row)}
         emptyMessage={isLoading ? "Loading salary templates..." : "No salary templates found."}
@@ -240,14 +275,14 @@ export default function SalaryTemplateBuilder() {
               <div className="grid gap-2">
                 <Label>Grade (optional)</Label>
                 <Select
-                  value={form.gradeId ? String(form.gradeId) : "none"}
-                  onValueChange={(v) => setForm((p) => ({ ...p, gradeId: v === "none" ? undefined : Number(v) }))}
+                  value={form.gradeRef ?? "none"}
+                  onValueChange={(v) => setForm((p) => ({ ...p, gradeRef: v === "none" ? undefined : v }))}
                 >
                   <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     {(gradesQuery.data ?? []).map((g) => (
-                      <SelectItem key={g.gradeId} value={String(g.gradeId)}>
+                      <SelectItem key={g.gradeId} value={g.uuid}>
                         {g.gradeCode} — {g.gradeName}
                       </SelectItem>
                     ))}
@@ -266,6 +301,31 @@ export default function SalaryTemplateBuilder() {
             </div>
 
             <div className="grid gap-2">
+              <Label>Applicable Category (optional)</Label>
+              <Select
+                value={form.applicableCategory ?? "ALL"}
+                onValueChange={(value) =>
+                  setForm((p) => ({
+                    ...p,
+                    applicableCategory: value === "ALL" ? undefined : (value as StaffCategory),
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All categories</SelectItem>
+                  {CATEGORY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
               <Label htmlFor="tpl-desc">Description</Label>
               <Textarea
                 id="tpl-desc"
@@ -278,7 +338,7 @@ export default function SalaryTemplateBuilder() {
             <div className="space-y-2">
               <p className="text-sm font-medium">Component Values</p>
               {(componentsQuery.data ?? []).map((comp) => {
-                const existing = form.components.find((c) => c.componentId === comp.componentId);
+                const existing = form.components.find((c) => c.componentRef === comp.uuid);
                 return (
                   <div key={comp.componentId} className="flex items-center gap-3 rounded border px-3 py-2">
                     <div className="flex-1">
@@ -292,7 +352,7 @@ export default function SalaryTemplateBuilder() {
                       min={0}
                       className="w-[120px]"
                       value={existing?.value ?? ""}
-                      onChange={(e) => updateComponentValue(comp.componentId, Number(e.target.value || 0))}
+                      onChange={(e) => updateComponentValue(comp.uuid, Number(e.target.value || 0))}
                       placeholder={String(comp.defaultValue)}
                     />
                   </div>
@@ -304,7 +364,7 @@ export default function SalaryTemplateBuilder() {
           <DialogFooter>
             <Button variant="outline" onClick={closeForm}>Cancel</Button>
             <Button
-              onClick={submit}
+              onClick={() => setSaveReviewOpen(true)}
               disabled={createMutation.isPending || updateMutation.isPending || !form.templateName}
             >
               {editing ? "Save Changes" : "Create"}
@@ -313,13 +373,33 @@ export default function SalaryTemplateBuilder() {
         </DialogContent>
       </Dialog>
 
+      <ReviewDialog
+        open={saveReviewOpen}
+        onOpenChange={setSaveReviewOpen}
+        title={editing ? "Confirm Template Update" : "Confirm Template Creation"}
+        description="Review template scope and component values before saving."
+        severity="warning"
+        confirmLabel={editing ? "Save Changes" : "Create Template"}
+        isPending={createMutation.isPending || updateMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I verified category, year, and component values for this template."
+        onConfirm={submit}
+      >
+        <div className="space-y-1 text-sm">
+          <p>Name: <span className="font-medium">{form.templateName || "-"}</span></p>
+          <p>Academic Year: <span className="font-medium">{form.academicYear || "-"}</span></p>
+          <p>Category: <span className="font-medium">{form.applicableCategory ?? "ALL"}</span></p>
+          <p>Components: <span className="font-medium">{form.components.length}</span></p>
+        </div>
+      </ReviewDialog>
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete salary template?"
         description={`This will remove ${deleteTarget?.templateName ?? "this template"}.`}
         confirmLabel="Delete"
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.templateId); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.uuid); }}
         loading={deleteMutation.isPending}
       />
     </div>

@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
 import type {
   CalculationMethod,
@@ -49,6 +50,7 @@ const initialForm: SalaryComponentCreateUpdateDTO = {
 export default function SalaryComponents() {
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
+  const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [editing, setEditing] = useState<SalaryComponentResponseDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SalaryComponentResponseDTO | null>(null);
   const [form, setForm] = useState<SalaryComponentCreateUpdateDTO>(initialForm);
@@ -64,7 +66,7 @@ export default function SalaryComponents() {
   const saveMutation = useMutation({
     mutationFn: (payload: SalaryComponentCreateUpdateDTO) =>
       editing
-        ? hrmsService.updateSalaryComponent(editing.componentId, payload)
+        ? hrmsService.updateSalaryComponent(editing.uuid, payload)
         : hrmsService.createSalaryComponent(payload),
     onSuccess: () => {
       toast.success(editing ? "Component updated" : "Component created");
@@ -79,7 +81,7 @@ export default function SalaryComponents() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => hrmsService.deleteSalaryComponent(id),
+    mutationFn: (id: string) => hrmsService.deleteSalaryComponent(id),
     onSuccess: () => {
       toast.success("Component deleted");
       setDeleteTarget(null);
@@ -90,6 +92,7 @@ export default function SalaryComponents() {
 
   const closeForm = () => {
     setFormOpen(false);
+    setSaveReviewOpen(false);
     setEditing(null);
     setForm(initialForm);
     setFieldErrors({});
@@ -172,7 +175,7 @@ export default function SalaryComponents() {
       <DataTable
         columns={columns}
         data={rows}
-        getRowId={(row) => row.componentId}
+        getRowId={(row) => row.uuid}
         onEdit={openEdit}
         onDelete={(row) => setDeleteTarget(row)}
         emptyMessage={isLoading ? "Loading salary components..." : "No salary components found."}
@@ -245,12 +248,32 @@ export default function SalaryComponents() {
 
           <DialogFooter>
             <Button variant="outline" onClick={closeForm}>Cancel</Button>
-            <Button disabled={saveMutation.isPending || !form.componentCode || !form.componentName} onClick={() => saveMutation.mutate(form)}>
+            <Button disabled={saveMutation.isPending || !form.componentCode || !form.componentName} onClick={() => setSaveReviewOpen(true)}>
               {editing ? "Save Changes" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReviewDialog
+        open={saveReviewOpen}
+        onOpenChange={setSaveReviewOpen}
+        title={editing ? "Confirm Component Update" : "Confirm Component Creation"}
+        description="Review salary component details before saving."
+        severity="warning"
+        confirmLabel={editing ? "Save Changes" : "Create Component"}
+        isPending={saveMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I verified type, method, and default value for this component."
+        onConfirm={() => saveMutation.mutate(form)}
+      >
+        <div className="space-y-1 text-sm">
+          <p>Code: <span className="font-medium">{form.componentCode || "-"}</span></p>
+          <p>Name: <span className="font-medium">{form.componentName || "-"}</span></p>
+          <p>Type: <span className="font-medium">{form.type}</span></p>
+          <p>Method: <span className="font-medium">{form.calculationMethod}</span></p>
+        </div>
+      </ReviewDialog>
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
@@ -258,7 +281,7 @@ export default function SalaryComponents() {
         title="Delete salary component?"
         description={`This will remove ${deleteTarget?.componentName ?? "this component"} (${deleteTarget?.componentCode ?? ""}).`}
         confirmLabel="Delete"
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.componentId); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.uuid); }}
         loading={deleteMutation.isPending}
       />
     </div>

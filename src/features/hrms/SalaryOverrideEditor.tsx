@@ -3,26 +3,31 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import StaffSearchSelect from "@/features/hrms/components/StaffSearchSelect";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
 
 interface SalaryOverrideEditorProps {
-  selectedMappingId?: number;
+  selectedMappingUuid?: string;
 }
 
-export default function SalaryOverrideEditor({ selectedMappingId }: SalaryOverrideEditorProps) {
+export default function SalaryOverrideEditor({ selectedMappingUuid }: SalaryOverrideEditorProps) {
   const { formatCurrency } = useHrmsFormatters();
-  const [mappingIdInput, setMappingIdInput] = useState<string>(
-    selectedMappingId ? String(selectedMappingId) : "",
-  );
-  const mappingId = Number(mappingIdInput);
+  const [selectedStaffUuid, setSelectedStaffUuid] = useState<string | null>(null);
+  const [mappingUuid, setMappingUuid] = useState<string>(selectedMappingUuid ?? "");
+
+  const mappingQuery = useQuery({
+    queryKey: ["hrms", "salary", "mapping-by-staff", selectedStaffUuid],
+    queryFn: () => hrmsService.getStaffSalaryMapping(selectedStaffUuid!).then((res) => res.data),
+    enabled: Boolean(selectedStaffUuid),
+  });
+
+  const resolvedMappingUuid = mappingQuery.data?.uuid ?? mappingUuid;
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["hrms", "salary", "computed", mappingId],
-    queryFn: () => hrmsService.getComputedSalary(mappingId).then((res) => res.data),
-    enabled: Number.isFinite(mappingId) && mappingId > 0,
+    queryKey: ["hrms", "salary", "computed", resolvedMappingUuid],
+    queryFn: () => hrmsService.getComputedSalary(resolvedMappingUuid).then((res) => res.data),
+    enabled: Boolean(resolvedMappingUuid),
   });
 
   return (
@@ -31,21 +36,24 @@ export default function SalaryOverrideEditor({ selectedMappingId }: SalaryOverri
         <CardTitle className="text-base">Computed Salary Preview</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-2 md:max-w-xs">
-          <Label htmlFor="override-mapping-id">Mapping ID</Label>
-          <Input
-            id="override-mapping-id"
-            type="number"
-            min={1}
-            value={mappingIdInput}
-            onChange={(e) => setMappingIdInput(e.target.value)}
-          />
-        </div>
+        <StaffSearchSelect
+          label="Staff Member"
+          value={selectedStaffUuid}
+          onChange={(uuid) => {
+            setSelectedStaffUuid(uuid);
+            if (!uuid) setMappingUuid(selectedMappingUuid ?? "");
+          }}
+          placeholder="Select staff to load active salary mapping"
+        />
+
+        {!mappingQuery.isLoading && selectedStaffUuid && !mappingQuery.data && (
+          <p className="text-sm text-muted-foreground">No active salary mapping found for selected staff.</p>
+        )}
 
         <Button
           variant="outline"
           size="sm"
-          disabled={!Number.isFinite(mappingId) || mappingId <= 0}
+          disabled={!resolvedMappingUuid}
           onClick={() => refetch()}
         >
           Refresh Computed Preview
@@ -108,11 +116,11 @@ export default function SalaryOverrideEditor({ selectedMappingId }: SalaryOverri
         )}
 
         {!data && !isLoading && !isError && (
-          <p className="text-sm text-muted-foreground">Enter a mapping ID and click refresh to see computed breakdown.</p>
+          <p className="text-sm text-muted-foreground">Select a staff member (or open from mapping preview) and click refresh to see computed breakdown.</p>
         )}
 
         <p className="text-xs text-muted-foreground">
-          Preview is sourced from <code>/salary/mappings/{"{mappingId}"}/computed</code>. All calculations are backend-authoritative.
+          Preview is sourced from <code>/salary/mappings/{"{mappingUuid}"}/computed</code>. All calculations are backend-authoritative.
         </p>
       </CardContent>
     </Card>

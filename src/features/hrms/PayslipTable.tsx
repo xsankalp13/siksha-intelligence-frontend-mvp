@@ -10,32 +10,53 @@ import PayslipViewer from "@/features/hrms/PayslipViewer";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { triggerBlobDownload } from "@/services/idCard";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
+import type { PageResponse } from "@/services/types/common";
 import type { PayslipSummaryDTO } from "@/services/types/hrms";
 
 export default function PayslipTable() {
   const { formatCurrency } = useHrmsFormatters();
-  const [viewerPayslipId, setViewerPayslipId] = useState<number | null>(null);
+  const [viewerPayslipId, setViewerPayslipId] = useState<string | null>(null);
   const [runIdFilter, setRunIdFilter] = useState<string>("");
   const runId = Number(runIdFilter);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["hrms", "payroll", "payslips", runId || "all"],
-    queryFn: () => {
+    queryFn: async (): Promise<PageResponse<PayslipSummaryDTO>> => {
       if (runId > 0) {
-        return hrmsService.listPayslipsByRun(runId, { page: 0, size: 100 }).then((res) => res.data);
+        return hrmsService.listPayslipsByRun(String(runId), { page: 0, size: 100 }).then((res) => res.data);
       }
       // If no run ID, list from most recent runs
-      return hrmsService.listPayrollRuns({ page: 0, size: 1, sort: ["payYear,desc", "payMonth,desc"] }).then((res) => {
-        const latestRun = res.data.content?.[0];
-        if (!latestRun) return { content: [], totalElements: 0, totalPages: 0, number: 0, size: 0, first: true, last: true, numberOfElements: 0, empty: true };
-        return hrmsService.listPayslipsByRun(latestRun.runId, { page: 0, size: 100 }).then((r) => r.data);
-      });
+      const runResponse = await hrmsService.listPayrollRuns({ page: 0, size: 1, sort: ["payYear,desc", "payMonth,desc"] });
+      const latestRun = runResponse.data.content?.[0];
+      if (!latestRun) {
+        return {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          number: 0,
+          size: 0,
+          first: true,
+          last: true,
+          numberOfElements: 0,
+          empty: true,
+          sort: { empty: true, sorted: false, unsorted: true },
+          pageable: {
+            offset: 0,
+            sort: { empty: true, sorted: false, unsorted: true },
+            paged: true,
+            pageNumber: 0,
+            pageSize: 0,
+            unpaged: false,
+          },
+        };
+      }
+      return hrmsService.listPayslipsByRun(latestRun.runUuid ?? String(latestRun.runId), { page: 0, size: 100 }).then((r) => r.data);
     },
   });
 
   const downloadPayslip = async (row: PayslipSummaryDTO) => {
     try {
-      const response = await hrmsService.downloadPayslipPdf(row.payslipId);
+      const response = await hrmsService.downloadPayslipPdf(row.uuid ?? String(row.payslipId));
       triggerBlobDownload(response.data, `payslip-${row.payYear}-${String(row.payMonth).padStart(2, "0")}-${row.staffName}.pdf`);
     } catch (downloadError) {
       toast.error(normalizeHrmsError(downloadError).message);
@@ -52,6 +73,8 @@ export default function PayslipTable() {
         header: "Period",
         render: (row) => `${String(row.payMonth).padStart(2, "0")}/${row.payYear}`,
       },
+      { key: "grossPay", header: "Gross", render: (row) => formatCurrency(row.grossPay) },
+      { key: "totalDeductions", header: "Deductions", render: (row) => formatCurrency(row.totalDeductions) },
       { key: "netPay", header: "Net Pay", render: (row) => formatCurrency(row.netPay) },
       {
         key: "status",
@@ -62,7 +85,7 @@ export default function PayslipTable() {
         key: "viewer",
         header: "View",
         render: (row) => (
-          <Button size="sm" variant="outline" onClick={() => setViewerPayslipId(row.payslipId)}>
+          <Button size="sm" variant="outline" onClick={() => setViewerPayslipId(row.uuid)}>
             View
           </Button>
         ),
@@ -109,7 +132,7 @@ export default function PayslipTable() {
       <DataTable
         columns={columns}
         data={data?.content ?? []}
-        getRowId={(row) => row.payslipId}
+        getRowId={(row) => row.uuid}
         emptyMessage={isLoading ? "Loading payslips..." : "No payslips found."}
       />
 

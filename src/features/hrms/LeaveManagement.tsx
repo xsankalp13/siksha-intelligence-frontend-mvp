@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import ConfirmDialog from "@/components/common/ConfirmDialog";
 import DataTable, { type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,17 +24,20 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
+import { useAppSelector } from "@/store/hooks";
 import type {
   LeaveApplicationCreateDTO,
   LeaveApplicationResponseDTO,
   LeaveReviewDTO,
+  StaffCategory,
   LeaveStatus,
 } from "@/services/types/hrms";
 
 const initialApplyForm: LeaveApplicationCreateDTO = {
-  leaveTypeId: 0,
+  leaveTypeRef: "",
   fromDate: "",
   toDate: "",
   isHalfDay: false,
@@ -47,6 +49,12 @@ const initialApplyForm: LeaveApplicationCreateDTO = {
 type LeaveAction = "approve" | "reject" | "cancel";
 
 const statusOptions: Array<"ALL" | LeaveStatus> = ["ALL", "PENDING", "APPROVED", "REJECTED", "CANCELLED"];
+const categoryOptions: Array<"ALL" | StaffCategory> = [
+  "ALL",
+  "TEACHING",
+  "NON_TEACHING_ADMIN",
+  "NON_TEACHING_SUPPORT",
+];
 
 const statusColor: Record<LeaveStatus, "default" | "secondary" | "destructive" | "outline"> = {
   PENDING: "outline",
@@ -58,8 +66,11 @@ const statusColor: Record<LeaveStatus, "default" | "secondary" | "destructive" |
 export default function LeaveManagement() {
   const queryClient = useQueryClient();
   const { formatDate } = useHrmsFormatters();
+  const currentUserId = useAppSelector((s) => Number(s.auth.user?.userId ?? 0));
   const [status, setStatus] = useState<"ALL" | LeaveStatus>("ALL");
+  const [category, setCategory] = useState<"ALL" | StaffCategory>("ALL");
   const [applyOpen, setApplyOpen] = useState(false);
+  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false);
   const [applyForm, setApplyForm] = useState<LeaveApplicationCreateDTO>(initialApplyForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [actionTarget, setActionTarget] = useState<{
@@ -74,7 +85,7 @@ export default function LeaveManagement() {
   });
 
   const leavesQuery = useQuery({
-    queryKey: ["hrms", "leaves", status],
+    queryKey: ["hrms", "leaves", status, category],
     queryFn: () =>
       hrmsService
         .listLeaveApplications({
@@ -82,6 +93,7 @@ export default function LeaveManagement() {
           size: 100,
           sort: ["appliedOn,desc"],
           status: status === "ALL" ? undefined : status,
+          category: category === "ALL" ? undefined : category,
         })
         .then((res) => res.data),
   });
@@ -95,6 +107,7 @@ export default function LeaveManagement() {
     mutationFn: (payload: LeaveApplicationCreateDTO) => hrmsService.applyLeave(payload),
     onSuccess: () => {
       toast.success("Leave application submitted");
+      setApplyConfirmOpen(false);
       setApplyOpen(false);
       setApplyForm(initialApplyForm);
       setFieldErrors({});
@@ -113,7 +126,7 @@ export default function LeaveManagement() {
       action,
       payload,
     }: {
-      applicationId: number;
+      applicationId: string;
       action: LeaveAction;
       payload?: LeaveReviewDTO;
     }) => {
@@ -140,6 +153,18 @@ export default function LeaveManagement() {
   const columns = useMemo<Column<LeaveApplicationResponseDTO>[]>(
     () => [
       { key: "staffName", header: "Staff", searchable: true },
+      {
+        key: "staffCategory",
+        header: "Category",
+        render: (row) => (
+          <Badge variant="outline">{row.staffCategory?.replace(/_/g, " ") ?? "-"}</Badge>
+        ),
+      },
+      {
+        key: "designation",
+        header: "Designation",
+        render: (row) => row.designationName ?? "-",
+      },
       {
         key: "leaveType",
         header: "Leave Type",
@@ -177,6 +202,14 @@ export default function LeaveManagement() {
         render: (row) => <span className="max-w-[200px] truncate block">{row.reason || "-"}</span>,
       },
       {
+        key: "reviewedBy",
+        header: "Reviewed By",
+        render: (row) =>
+          row.reviewedByName
+            ? `${row.reviewedByName} (${formatDate(row.reviewedAt)})`
+            : "-",
+      },
+      {
         key: "workflow",
         header: "Actions",
         render: (row) => (
@@ -184,7 +217,7 @@ export default function LeaveManagement() {
             <Button
               variant="outline"
               size="sm"
-              disabled={row.status !== "PENDING"}
+              disabled={row.status !== "PENDING" || (currentUserId > 0 && currentUserId === row.staffId)}
               onClick={() => setActionTarget({ row, action: "approve" })}
             >
               Approve
@@ -209,7 +242,7 @@ export default function LeaveManagement() {
         ),
       },
     ],
-    [formatDate],
+    [currentUserId, formatDate],
   );
 
   return (
@@ -228,6 +261,22 @@ export default function LeaveManagement() {
               {statusOptions.map((option) => (
                 <SelectItem key={option} value={option}>
                   {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={category}
+            onValueChange={(value) => setCategory(value as "ALL" | StaffCategory)}
+          >
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Filter category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categoryOptions.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option.replace(/_/g, " ")}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -269,7 +318,7 @@ export default function LeaveManagement() {
       <DataTable
         columns={columns}
         data={rows}
-        getRowId={(row) => row.applicationId}
+        getRowId={(row) => row.uuid ?? String(row.applicationId)}
         emptyMessage={leavesQuery.isLoading ? "Loading leaves..." : "No leave requests found."}
       />
 
@@ -285,9 +334,9 @@ export default function LeaveManagement() {
             <div className="grid gap-2">
               <Label>Leave Type</Label>
               <Select
-                value={applyForm.leaveTypeId ? String(applyForm.leaveTypeId) : undefined}
+                value={applyForm.leaveTypeRef || undefined}
                 onValueChange={(value) =>
-                  setApplyForm((prev) => ({ ...prev, leaveTypeId: Number(value) }))
+                  setApplyForm((prev) => ({ ...prev, leaveTypeRef: value }))
                 }
               >
                 <SelectTrigger>
@@ -295,14 +344,14 @@ export default function LeaveManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   {(leaveTypesQuery.data ?? []).map((type) => (
-                    <SelectItem key={type.leaveTypeId} value={String(type.leaveTypeId)}>
+                    <SelectItem key={type.leaveTypeId} value={type.uuid}>
                       {type.displayName} ({type.leaveCode})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {fieldErrors.leaveTypeId?.[0] && (
-                <p className="text-xs text-destructive">{fieldErrors.leaveTypeId[0]}</p>
+              {(fieldErrors.leaveTypeRef?.[0] ?? fieldErrors.leaveTypeId?.[0]) && (
+                <p className="text-xs text-destructive">{fieldErrors.leaveTypeRef?.[0] ?? fieldErrors.leaveTypeId?.[0]}</p>
               )}
             </div>
 
@@ -407,12 +456,12 @@ export default function LeaveManagement() {
             <Button
               disabled={
                 applyMutation.isPending ||
-                !applyForm.leaveTypeId ||
+                !applyForm.leaveTypeRef ||
                 !applyForm.fromDate ||
                 !applyForm.toDate ||
                 !applyForm.reason
               }
-              onClick={() => applyMutation.mutate(applyForm)}
+              onClick={() => setApplyConfirmOpen(true)}
             >
               Submit
             </Button>
@@ -420,8 +469,7 @@ export default function LeaveManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Approve / Reject / Cancel Confirm */}
-      <ConfirmDialog
+      <ReviewDialog
         open={Boolean(actionTarget)}
         onOpenChange={(open) => {
           if (!open) {
@@ -439,18 +487,21 @@ export default function LeaveManagement() {
             ? `${actionTarget.action.toUpperCase()} leave for ${actionTarget.row.staffName} (${actionTarget.row.leaveTypeName}, ${actionTarget.row.totalDays} days)`
             : "Confirm leave action"
         }
-        confirmLabel={actionTarget ? actionTarget.action.toUpperCase() : "Confirm"}
+        severity={actionTarget?.action === "approve" ? "warning" : "danger"}
+        confirmLabel={actionTarget?.action.toUpperCase() ?? "CONFIRM"}
+        isPending={actionMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I have reviewed this leave request and want to proceed with this action."
         onConfirm={() => {
           if (!actionTarget) return;
           actionMutation.mutate({
-            applicationId: actionTarget.row.applicationId,
+            applicationId: actionTarget.row.uuid ?? String(actionTarget.row.applicationId),
             action: actionTarget.action,
             payload: remarks ? { remarks } : undefined,
           });
         }}
-        loading={actionMutation.isPending}
       >
-        <div className="space-y-2 pt-2">
+        <div className="space-y-2">
           <Label htmlFor="leave-action-remarks">Reviewer Remarks (optional)</Label>
           <Textarea
             id="leave-action-remarks"
@@ -459,7 +510,26 @@ export default function LeaveManagement() {
             placeholder="Add reviewer remarks"
           />
         </div>
-      </ConfirmDialog>
+      </ReviewDialog>
+      <ReviewDialog
+        open={applyConfirmOpen}
+        onOpenChange={setApplyConfirmOpen}
+        title="Confirm Leave Application"
+        description="Please review leave details before submitting for approval."
+        severity="warning"
+        confirmLabel="Submit Leave"
+        isPending={applyMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I confirm these leave details are accurate."
+        onConfirm={() => applyMutation.mutate(applyForm)}
+      >
+        <div className="space-y-1 text-sm">
+          <p>From: <span className="font-medium">{applyForm.fromDate || "-"}</span></p>
+          <p>To: <span className="font-medium">{applyForm.toDate || "-"}</span></p>
+          <p>Half Day: <span className="font-medium">{applyForm.isHalfDay ? applyForm.halfDayType ?? "Yes" : "No"}</span></p>
+          <p>Reason: <span className="font-medium">{applyForm.reason?.trim() || "-"}</span></p>
+        </div>
+      </ReviewDialog>
     </div>
   );
 }

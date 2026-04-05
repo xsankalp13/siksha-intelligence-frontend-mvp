@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
+import StatusTimeline from "@/features/hrms/components/StatusTimeline";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { useAppSelector } from "@/store/hooks";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
@@ -15,19 +17,22 @@ import type { PayrollRunCreateDTO, PayrollRunResponseDTO, PayrollStatus } from "
 const now = new Date();
 
 const statusColor: Record<PayrollStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  DRAFT: "outline",
-  PROCESSING: "secondary",
   PROCESSED: "secondary",
   APPROVED: "default",
   DISBURSED: "default",
-  FAILED: "destructive",
 };
+
+type PayrollReviewTarget =
+  | { action: "approve"; run: PayrollRunResponseDTO }
+  | { action: "disburse"; run: PayrollRunResponseDTO };
 
 export default function PayrollProcessing() {
   const queryClient = useQueryClient();
   const { formatCurrency, formatDate } = useHrmsFormatters();
   const roles = useAppSelector((s) => s.auth.user?.roles ?? []);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [isProcessDialogOpen, setIsProcessDialogOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<PayrollReviewTarget | null>(null);
   const [form, setForm] = useState<PayrollRunCreateDTO>({
     payMonth: now.getMonth() + 1,
     payYear: now.getFullYear(),
@@ -58,6 +63,7 @@ export default function PayrollProcessing() {
     onSuccess: () => {
       toast.success("Payroll run created & processed");
       setCreateError(null);
+      setIsProcessDialogOpen(false);
       refresh();
     },
     onError: (mutationError) => {
@@ -68,18 +74,20 @@ export default function PayrollProcessing() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: (runId: number) => hrmsService.approvePayrollRun(runId),
+    mutationFn: (runUuid: string) => hrmsService.approvePayrollRun(runUuid),
     onSuccess: () => {
       toast.success("Payroll run approved");
+      setReviewTarget(null);
       refresh();
     },
     onError: (mutationError) => toast.error(normalizeHrmsError(mutationError).message),
   });
 
   const disburseMutation = useMutation({
-    mutationFn: (runId: number) => hrmsService.disbursePayrollRun(runId),
+    mutationFn: (runUuid: string) => hrmsService.disbursePayrollRun(runUuid),
     onSuccess: () => {
       toast.success("Payroll run disbursed");
+      setReviewTarget(null);
       refresh();
     },
     onError: (mutationError) => toast.error(normalizeHrmsError(mutationError).message),
@@ -134,7 +142,7 @@ export default function PayrollProcessing() {
                 row.status !== "PROCESSED" ||
                 approveMutation.isPending
               }
-              onClick={() => approveMutation.mutate(row.runId)}
+              onClick={() => setReviewTarget({ action: "approve", run: row })}
             >
               Approve
             </Button>
@@ -146,7 +154,7 @@ export default function PayrollProcessing() {
                 row.status !== "APPROVED" ||
                 disburseMutation.isPending
               }
-              onClick={() => disburseMutation.mutate(row.runId)}
+              onClick={() => setReviewTarget({ action: "disburse", run: row })}
             >
               Disburse
             </Button>
@@ -219,7 +227,7 @@ export default function PayrollProcessing() {
             />
           </div>
           <Button
-            onClick={() => createMutation.mutate(form)}
+            onClick={() => setIsProcessDialogOpen(true)}
             disabled={
               !canManagePayroll ||
               createMutation.isPending ||
@@ -246,9 +254,151 @@ export default function PayrollProcessing() {
       <DataTable
         columns={columns}
         data={data?.content ?? []}
-        getRowId={(row) => row.runId}
+        getRowId={(row) => row.runUuid}
         emptyMessage={isLoading ? "Loading payroll runs..." : "No payroll runs found."}
       />
+
+      <ReviewDialog
+        open={isProcessDialogOpen}
+        onOpenChange={setIsProcessDialogOpen}
+        title="Run Payroll For Selected Period?"
+        description={`This will process payroll for ${String(form.payMonth).padStart(2, "0")}/${form.payYear}.`}
+        severity="warning"
+        confirmLabel="Run Payroll"
+        isPending={createMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I have verified attendance, mappings, and financial totals for this run."
+        onConfirm={() => createMutation.mutate(form)}
+      >
+        <div className="space-y-3 text-sm">
+          <StatusTimeline
+            steps={[
+              { label: "Process", status: "current" },
+              { label: "Approve", status: "pending" },
+              { label: "Disburse", status: "pending" },
+            ]}
+          />
+          <p>
+            Period: <span className="font-medium">{String(form.payMonth).padStart(2, "0")}/{form.payYear}</span>
+          </p>
+          <p>
+            Remarks: <span className="font-medium">{form.remarks?.trim() || "-"}</span>
+          </p>
+        </div>
+      </ReviewDialog>
+
+      <ReviewDialog
+        open={reviewTarget?.action === "approve"}
+        onOpenChange={(open) => {
+          if (!open) setReviewTarget(null);
+        }}
+        title="Approve Payroll Run?"
+        description={
+          reviewTarget?.action === "approve"
+            ? `Run #${reviewTarget.run.runId} for ${String(reviewTarget.run.payMonth).padStart(2, "0")}/${reviewTarget.run.payYear}.`
+            : undefined
+        }
+        severity="warning"
+        confirmLabel="Approve"
+        isPending={approveMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I have reviewed the totals and authorize this payroll run for approval."
+        onConfirm={() => {
+          if (reviewTarget?.action !== "approve") return;
+          approveMutation.mutate(reviewTarget.run.runUuid);
+        }}
+      >
+        <div className="space-y-2 text-sm">
+          {reviewTarget?.action === "approve" && (
+            <StatusTimeline
+              steps={[
+                {
+                  label: "Processed",
+                  status: "completed",
+                  date: formatDate(reviewTarget.run.processedOn),
+                },
+                { label: "Approve", status: "current" },
+                { label: "Disburse", status: "pending" },
+              ]}
+            />
+          )}
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-left text-xs">
+              <tbody>
+                <tr className="border-b">
+                  <th className="bg-muted/40 px-3 py-2 font-medium">Run ID</th>
+                  <td className="px-3 py-2">{reviewTarget?.action === "approve" ? reviewTarget.run.runId : "-"}</td>
+                </tr>
+                <tr className="border-b">
+                  <th className="bg-muted/40 px-3 py-2 font-medium">Staff Count</th>
+                  <td className="px-3 py-2">{reviewTarget?.action === "approve" ? reviewTarget.run.totalStaff : "-"}</td>
+                </tr>
+                <tr className="border-b">
+                  <th className="bg-muted/40 px-3 py-2 font-medium">Gross</th>
+                  <td className="px-3 py-2">{reviewTarget?.action === "approve" ? formatCurrency(reviewTarget.run.totalGross) : "-"}</td>
+                </tr>
+                <tr className="border-b">
+                  <th className="bg-muted/40 px-3 py-2 font-medium">Deductions</th>
+                  <td className="px-3 py-2">{reviewTarget?.action === "approve" ? formatCurrency(reviewTarget.run.totalDeductions) : "-"}</td>
+                </tr>
+                <tr>
+                  <th className="bg-muted/40 px-3 py-2 font-medium">Net Pay</th>
+                  <td className="px-3 py-2">{reviewTarget?.action === "approve" ? formatCurrency(reviewTarget.run.totalNet) : "-"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </ReviewDialog>
+
+      <ReviewDialog
+        open={reviewTarget?.action === "disburse"}
+        onOpenChange={(open) => {
+          if (!open) setReviewTarget(null);
+        }}
+        title="Disburse Payroll Run?"
+        description={
+          reviewTarget?.action === "disburse"
+            ? `Run #${reviewTarget.run.runId} for ${String(reviewTarget.run.payMonth).padStart(2, "0")}/${reviewTarget.run.payYear}.`
+            : undefined
+        }
+        severity="danger"
+        confirmLabel="Disburse"
+        isPending={disburseMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I confirm payment instructions are final and funds are ready for disbursement."
+        requireTypeConfirm="DISBURSE"
+        typeConfirmLabel={'Type "DISBURSE" to confirm final payout action:'}
+        onConfirm={() => {
+          if (reviewTarget?.action !== "disburse") return;
+          disburseMutation.mutate(reviewTarget.run.runUuid);
+        }}
+      >
+        <div className="space-y-3 text-sm">
+          {reviewTarget?.action === "disburse" && (
+            <StatusTimeline
+              steps={[
+                {
+                  label: "Processed",
+                  status: "completed",
+                  date: formatDate(reviewTarget.run.processedOn),
+                },
+                { label: "Approved", status: "completed" },
+                { label: "Disburse", status: "current" },
+              ]}
+            />
+          )}
+          <p>
+            Run ID: <span className="font-medium">{reviewTarget?.action === "disburse" ? reviewTarget.run.runId : "-"}</span>
+          </p>
+          <p>
+            Staff: <span className="font-medium">{reviewTarget?.action === "disburse" ? reviewTarget.run.totalStaff : "-"}</span>
+          </p>
+          <p>
+            Total Net: <span className="font-medium">{reviewTarget?.action === "disburse" ? formatCurrency(reviewTarget.run.totalNet) : "-"}</span>
+          </p>
+        </div>
+      </ReviewDialog>
     </div>
   );
 }

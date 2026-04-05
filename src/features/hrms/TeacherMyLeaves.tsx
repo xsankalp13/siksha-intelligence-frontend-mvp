@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import ReviewDialog from "@/features/hrms/components/ReviewDialog";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
 import type {
@@ -34,7 +35,7 @@ import type {
 } from "@/services/types/hrms";
 
 const initialApplyForm: LeaveApplicationCreateDTO = {
-  leaveTypeId: 0,
+  leaveTypeRef: "",
   fromDate: "",
   toDate: "",
   isHalfDay: false,
@@ -57,6 +58,7 @@ export default function TeacherMyLeaves() {
   const { formatDate } = useHrmsFormatters();
   const [status, setStatus] = useState<"ALL" | LeaveStatus>("ALL");
   const [applyOpen, setApplyOpen] = useState(false);
+  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false);
   const [applyForm, setApplyForm] = useState<LeaveApplicationCreateDTO>(initialApplyForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [cancelTarget, setCancelTarget] = useState<LeaveApplicationResponseDTO | null>(null);
@@ -88,6 +90,7 @@ export default function TeacherMyLeaves() {
     mutationFn: (payload: LeaveApplicationCreateDTO) => hrmsService.applyLeave(payload),
     onSuccess: () => {
       toast.success("Leave application submitted");
+      setApplyConfirmOpen(false);
       setApplyOpen(false);
       setApplyForm(initialApplyForm);
       setFieldErrors({});
@@ -101,7 +104,7 @@ export default function TeacherMyLeaves() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: (applicationId: number) => hrmsService.cancelLeave(applicationId),
+    mutationFn: (applicationId: string) => hrmsService.cancelLeave(applicationId),
     onSuccess: () => {
       toast.success("Leave cancelled");
       setCancelTarget(null);
@@ -215,7 +218,7 @@ export default function TeacherMyLeaves() {
       <DataTable
         columns={columns}
         data={leavesQuery.data?.content ?? []}
-        getRowId={(row) => row.applicationId}
+        getRowId={(row) => row.uuid ?? String(row.applicationId)}
         emptyMessage={leavesQuery.isLoading ? "Loading leaves..." : "No leave requests found."}
       />
 
@@ -231,21 +234,23 @@ export default function TeacherMyLeaves() {
             <div className="grid gap-2">
               <Label>Leave Type</Label>
               <Select
-                value={applyForm.leaveTypeId ? String(applyForm.leaveTypeId) : undefined}
-                onValueChange={(v) => setApplyForm((p) => ({ ...p, leaveTypeId: Number(v) }))}
+                value={applyForm.leaveTypeRef || undefined}
+                onValueChange={(v) => setApplyForm((p) => ({ ...p, leaveTypeRef: v }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select leave type" />
                 </SelectTrigger>
                 <SelectContent>
                   {(leaveTypesQuery.data ?? []).map((type) => (
-                    <SelectItem key={type.leaveTypeId} value={String(type.leaveTypeId)}>
+                    <SelectItem key={type.leaveTypeId} value={type.uuid}>
                       {type.displayName} ({type.leaveCode})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {fieldErrors.leaveTypeId?.[0] && <p className="text-xs text-destructive">{fieldErrors.leaveTypeId[0]}</p>}
+              {(fieldErrors.leaveTypeRef?.[0] ?? fieldErrors.leaveTypeId?.[0]) && (
+                <p className="text-xs text-destructive">{fieldErrors.leaveTypeRef?.[0] ?? fieldErrors.leaveTypeId?.[0]}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -325,12 +330,12 @@ export default function TeacherMyLeaves() {
             <Button
               disabled={
                 applyMutation.isPending ||
-                !applyForm.leaveTypeId ||
+                !applyForm.leaveTypeRef ||
                 !applyForm.fromDate ||
                 !applyForm.toDate ||
                 !applyForm.reason
               }
-              onClick={() => applyMutation.mutate(applyForm)}
+              onClick={() => setApplyConfirmOpen(true)}
             >
               Submit
             </Button>
@@ -348,9 +353,28 @@ export default function TeacherMyLeaves() {
             : "Cancel selected leave."
         }
         confirmLabel="Cancel Leave"
-        onConfirm={() => { if (cancelTarget) cancelMutation.mutate(cancelTarget.applicationId); }}
+        onConfirm={() => { if (cancelTarget) cancelMutation.mutate(cancelTarget.uuid ?? String(cancelTarget.applicationId)); }}
         loading={cancelMutation.isPending}
       />
+
+      <ReviewDialog
+        open={applyConfirmOpen}
+        onOpenChange={setApplyConfirmOpen}
+        title="Confirm Leave Application"
+        description="Please review your leave details before submission."
+        severity="warning"
+        confirmLabel="Submit Leave"
+        isPending={applyMutation.isPending}
+        requireCheckbox
+        checkboxLabel="I confirm this leave request is correct."
+        onConfirm={() => applyMutation.mutate(applyForm)}
+      >
+        <div className="space-y-1 text-sm">
+          <p>From: <span className="font-medium">{applyForm.fromDate || "-"}</span></p>
+          <p>To: <span className="font-medium">{applyForm.toDate || "-"}</span></p>
+          <p>Reason: <span className="font-medium">{applyForm.reason?.trim() || "-"}</span></p>
+        </div>
+      </ReviewDialog>
     </div>
   );
 }
