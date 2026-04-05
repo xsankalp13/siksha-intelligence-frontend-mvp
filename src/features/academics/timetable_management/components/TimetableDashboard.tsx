@@ -162,7 +162,7 @@ export function TimetableDashboard() {
                         <div className="flex justify-between items-start">
                             <div className="space-y-2">
                                 <p className="text-sm font-medium text-muted-foreground">Published</p>
-                                <p className="text-3xl font-bold">{publishedCount}</p>
+                                <p className="text-3xl: font-bold">{publishedCount}</p>
                             </div>
                             <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                                 <CheckCircle2 className="w-5 h-5" />
