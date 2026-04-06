@@ -61,7 +61,7 @@ export default function StaffAttendanceTab() {
       <DataTable
         columns={columns}
         data={rows}
-        getRowId={(row) => row.staffAttendanceId}
+        getRowId={(row) => row.uuid ?? row.staffAttendanceId ?? `${row.staffName}-${row.attendanceDate}-${row.shortCode}`}
         emptyMessage={isLoading ? "Loading attendance..." : "No attendance records found."}
       />
     </div>

@@ -3,13 +3,15 @@ import { Download, LayoutGrid, Hand, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { useTeacherCtClasses, useTeacherCtStudents } from "@/features/teacher/queries/useTeacherQueries";
+import { useTeacherCtClasses, useTeacherCtStudents, useTeacherSchedule } from "@/features/teacher/queries/useTeacherQueries";
 import ClassSelector from "@/features/teacher/components/ClassSelector";
 import QuickAttendanceGrid from "@/features/teacher/components/QuickAttendanceGrid";
 import { teacherService } from "@/services/teacherService";
 
 export default function TeacherAttendancePage() {
   const { data: classes = [], isLoading } = useTeacherCtClasses();
+  const { data: schedule } = useTeacherSchedule();
+  const staffUuid = schedule?.staffUuid ?? "";
   const defaultSelection = classes[0] ? `${classes[0].classUuid}:${classes[0].sectionUuid}` : "";
   const [selectedClass, setSelectedClass] = useState(defaultSelection);
   const [mode, setMode] = useState("grid");
@@ -99,6 +101,7 @@ export default function TeacherAttendancePage() {
         <QuickAttendanceGrid
           students={students?.content ?? []}
           sectionUuid={selectedSectionUuid ?? ""}
+          staffUuid={staffUuid}
         />
       ) : (
         <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">

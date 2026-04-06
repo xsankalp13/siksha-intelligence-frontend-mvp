@@ -15,6 +15,7 @@ export interface TeacherMyClassesResponseDto {
 }
 
 export interface TeacherStudentResponseDto {
+  studentId?: number;
   uuid: string;
   firstName: string;
   lastName: string;

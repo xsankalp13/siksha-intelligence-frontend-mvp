@@ -9,6 +9,7 @@ import { AddSubjectDialog } from '@/features/academics/curriculum_mapping/compon
 import type { SelectedSubjectEntry } from '@/features/academics/curriculum_mapping/components/AddSubjectDialog';
 import { SubjectLibraryPanel } from '@/features/academics/curriculum_mapping/components/SubjectLibraryPanel';
 import { TeacherSubjectMappingPanel } from '@/features/academics/curriculum_mapping/components/TeacherSubjectMappingPanel';
+import { ClassTeacherMappingPanel } from '@/features/academics/class_teacher_mapping/components/ClassTeacherMappingPanel';
 import {
     useGetCurriculumOverview,
     useGetClassCurriculum,
@@ -24,7 +25,7 @@ interface AcademicClassDto {
     name: string;
 }
 
-type ActiveTab = 'curriculum' | 'subjects' | 'teachers';
+type ActiveTab = 'curriculum' | 'subjects' | 'teachers' | 'classTeacher';
 
 export default function CurriculumPage() {
     const [activeTab, setActiveTab] = useState<ActiveTab>('curriculum');
@@ -103,6 +104,12 @@ export default function CurriculumPage() {
             label: 'Teacher Mapping',
             icon: Users,
             description: 'Map subjects to capable teachers',
+        },
+        {
+            id: 'classTeacher',
+            label: 'Class Teacher Mapping',
+            icon: Users,
+            description: 'Assign one class teacher to each section',
         },
     ];
 
@@ -220,6 +227,18 @@ export default function CurriculumPage() {
                     className="h-[800px] flex flex-col"
                 >
                     <TeacherSubjectMappingPanel />
+                </motion.div>
+            )}
+
+            {activeTab === 'classTeacher' && (
+                <motion.div
+                    key="classTeacher"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col"
+                >
+                    <ClassTeacherMappingPanel />
                 </motion.div>
             )}
 
