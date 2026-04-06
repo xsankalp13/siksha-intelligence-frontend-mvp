@@ -23,27 +23,36 @@ export interface AttendanceTypeResponseDTO {
 
 // Student Attendance
 export interface StudentAttendanceRequestDTO {
-  studentId: number;
+  studentUuid?: string;
+  takenByStaffUuid?: string;
+
+  // Deprecated fallback fields; backend accepts for one release cycle.
+  studentId?: number;
   attendanceShortCode: string;
   attendanceDate: string;
-  takenByStaffId: number;
+  takenByStaffId?: number;
   notes?: string;
 }
 
 export interface AbsenceDocumentationSummaryResponseDTO {
   dailyAttendanceId: number;
+  dailyAttendanceUuid?: string;
   approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
   documentationUrl?: string;
 }
 
 export interface StudentAttendanceResponseDTO {
-  dailyAttendanceId: number;
+  dailyAttendanceId?: number;
   uuid: string;
-  studentId: number;
+  studentUuid?: string;
+  takenByStaffUuid?: string;
+
+  // Deprecated fallback response fields.
+  studentId?: number;
   studentFullName: string;
   attendanceDate: string;
   attendanceTypeShortCode: string;
-  takenByStaffId: number;
+  takenByStaffId?: number;
   takenByStaffName: string;
   attendanceType: AttendanceTypeResponseDTO;
   notes?: string;
@@ -57,6 +66,10 @@ export interface StudentAttendanceQueryParams {
   page?: number;
   size?: number;
   sort?: string;
+  studentUuid?: string;
+  takenByStaffUuid?: string;
+
+  // Deprecated fallback query fields.
   studentId?: number;
   takenByStaffId?: number;
   fromDate?: string;
@@ -68,7 +81,10 @@ export interface StudentAttendanceQueryParams {
 export type AttendanceSource = "MANUAL" | "BIOMETRIC" | "SYSTEM";
 
 export interface StaffAttendanceRequestDTO {
-  staffId: number;
+  staffUuid?: string;
+
+  // Deprecated fallback field.
+  staffId?: number;
   attendanceDate: string;
   attendanceShortCode: string;
   timeIn?: string;
@@ -79,8 +95,12 @@ export interface StaffAttendanceRequestDTO {
 }
 
 export interface StaffAttendanceResponseDTO {
-  staffAttendanceId: number;
-  staffId: number;
+  uuid?: string;
+  staffUuid?: string;
+
+  // Deprecated fallback response fields.
+  staffAttendanceId?: number;
+  staffId?: number;
   staffName: string;
   jobTitle?: string;
   attendanceDate: string;
@@ -98,27 +118,39 @@ export interface StaffAttendanceQueryParams {
   page?: number;
   size?: number;
   sort?: string;
+  staffUuid?: string;
+
+  // Deprecated fallback query field.
   staffId?: number;
   date?: string;
 }
 
 // Absence Documentation
 export interface SubmitExcuseRequestDTO {
-  attendanceId: number;
-  submittedByParentId: number;
+  attendanceUuid?: string;
+  submittedByParentUuid?: string;
+
+  // Deprecated fallback fields.
+  attendanceId?: number;
+  submittedByParentId?: number;
   documentUrl?: string;
   note?: string;
   attendanceDate?: string;
 }
 
 export interface AbsenceDocumentationResponseDTO {
-  dailyAttendanceId: number;
+  dailyAttendanceId?: number;
   uuid: string;
+  dailyAttendanceUuid?: string;
   reasonText?: string;
   documentationUrl?: string;
   approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
   reviewerNotes?: string;
-  submittedByUserId: number;
+  submittedByUserUuid?: string;
+  approvedByStaffUuid?: string;
+
+  // Deprecated fallback response fields.
+  submittedByUserId?: number;
   submittedByUserName: string;
   approvedByStaffId?: number;
   approvedByStaffName?: string;

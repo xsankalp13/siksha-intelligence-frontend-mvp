@@ -190,6 +190,7 @@ function TimePicker12h({
 export default function ExamSchedulePanel({
   exam,
   onBack,
+  onEnterMarks: _onEnterMarks,
 }: Props) {
   const { data: schedules = [], isLoading } = useGetSchedulesByExam(exam.uuid);
   const createSchedule = useCreateSchedule();

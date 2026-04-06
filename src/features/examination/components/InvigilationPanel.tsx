@@ -91,7 +91,7 @@ export default function InvigilationPanel() {
     data: invigilations = [],
     isLoading,
   } = useGetInvigilationsByExam(selectedScheduleId);
-  const { data: allRooms = [], isLoading: isLoadingRooms } = useGetRooms();
+  const { data: allRooms = [] } = useGetRooms();
 
   const { data: staffPage } = useQuery<StaffPage>({
     queryKey: ["staff", "teachers", "all"],

@@ -204,17 +204,15 @@ export function TimetableEditor() {
 
         if (!dragData || !dropData) return;
 
-        const { type, item, targetCellKey } = dragData;
+        const { type, item } = dragData;
         const { cellKey, status } = dropData;
 
-        if (type === 'SUBJECT' && status === 'EMPTY') {
+        if (type === 'SUBJECT' && (status === 'EMPTY' || status === 'AWAITING_TEACHER' || status === 'LOCKED')) {
             dispatch(setSubjectToCell({ cellKey, subject: item as Subject }));
         }
 
-        if (type === 'TEACHER' && status === 'AWAITING_TEACHER') {
-            if (targetCellKey === cellKey) {
-                dispatch(setTeacherToCell({ cellKey, teacher: item as Teacher }));
-            }
+        if (type === 'TEACHER' && (status === 'AWAITING_TEACHER' || status === 'LOCKED')) {
+            dispatch(setTeacherToCell({ cellKey, teacher: item as Teacher }));
         }
     }, [dispatch]);
 

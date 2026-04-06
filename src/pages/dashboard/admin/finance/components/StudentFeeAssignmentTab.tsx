@@ -25,7 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -44,8 +44,10 @@ const bulkAssignSchema = z.object({
   notes: z.string().optional(),
 });
 
-type SingleAssignForm = z.infer<typeof singleAssignSchema>;
-type BulkAssignForm = z.infer<typeof bulkAssignSchema>;
+type SingleAssignFormInput = z.input<typeof singleAssignSchema>;
+type SingleAssignForm = z.output<typeof singleAssignSchema>;
+type BulkAssignFormInput = z.input<typeof bulkAssignSchema>;
+type BulkAssignForm = z.output<typeof bulkAssignSchema>;
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -109,12 +111,12 @@ export function StudentFeeAssignmentTab({
   }, [studentSearch, searchStudents]);
 
   // ── Forms ──
-  const singleForm = useForm<SingleAssignForm>({
+  const singleForm = useForm<SingleAssignFormInput, unknown, SingleAssignForm>({
     resolver: zodResolver(singleAssignSchema),
     defaultValues: { studentId: 0, structureId: 0, effectiveDate: format(new Date(), "yyyy-MM-dd"), notes: "" },
   });
 
-  const bulkForm = useForm<BulkAssignForm>({
+  const bulkForm = useForm<BulkAssignFormInput, unknown, BulkAssignForm>({
     resolver: zodResolver(bulkAssignSchema),
     defaultValues: { classId: "", structureId: 0, effectiveDate: format(new Date(), "yyyy-MM-dd"), notes: "" },
   });
@@ -374,9 +376,12 @@ export function StudentFeeAssignmentTab({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Fee Structure</FormLabel>
+                          {(() => {
+                            const selectedStructureId = Number(field.value ?? 0);
+                            return (
                           <Select
                             onValueChange={(val) => field.onChange(parseInt(val))}
-                            value={field.value > 0 ? field.value.toString() : undefined}
+                            value={selectedStructureId > 0 ? String(selectedStructureId) : undefined}
                           >
                             <FormControl>
                               <SelectTrigger><SelectValue placeholder="Select an active structure" /></SelectTrigger>
@@ -389,6 +394,8 @@ export function StudentFeeAssignmentTab({
                               ))}
                             </SelectContent>
                           </Select>
+                            );
+                          })()}
                           <FormMessage />
                         </FormItem>
                       )}
@@ -467,9 +474,12 @@ export function StudentFeeAssignmentTab({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Fee Structure</FormLabel>
+                          {(() => {
+                            const selectedStructureId = Number(field.value ?? 0);
+                            return (
                           <Select
                             onValueChange={(val) => field.onChange(parseInt(val))}
-                            value={field.value > 0 ? field.value.toString() : undefined}
+                            value={selectedStructureId > 0 ? String(selectedStructureId) : undefined}
                           >
                             <FormControl>
                               <SelectTrigger><SelectValue placeholder="Select an active structure" /></SelectTrigger>
@@ -482,6 +492,8 @@ export function StudentFeeAssignmentTab({
                               ))}
                             </SelectContent>
                           </Select>
+                            );
+                          })()}
                           <FormMessage />
                         </FormItem>
                       )}

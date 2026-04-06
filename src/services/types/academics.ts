@@ -9,6 +9,8 @@ export interface SectionResponseDto {
   uuid: string;
   sectionName: string;
   defaultRoom?: NestedRoomResponseDto;
+  classTeacherUuid?: string;
+  classTeacherName?: string;
 }
 
 export interface AcademicClassResponseDto {
@@ -20,6 +22,7 @@ export interface AcademicClassResponseDto {
 export interface SectionRequestDto {
   sectionName: string;
   defaultRoomId?: string;
+  classTeacherUuid?: string | null;
 }
 
 // Subjects

@@ -16,6 +16,7 @@ import {
   Plus,
   Users,
   Shield,
+  Briefcase,
 } from "lucide-react";
 
 import { profileService } from "@/services/profile";

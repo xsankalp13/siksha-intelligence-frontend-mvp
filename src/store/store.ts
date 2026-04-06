@@ -3,6 +3,7 @@ import { initializeAxiosAuth } from '@/lib/axios'
 import { appReducer } from './appSlice'
 import { authReducer, markSessionExpired, setCredentials } from './slices/authSlice'
 import { timetableReducer } from '@/features/academics/timetable_management'
+import { teacherReducer } from './slices/teacherSlice'
 
 // Load persisted auth state from localStorage
 const loadPersistedAuthState = () => {
@@ -34,6 +35,7 @@ export const store = configureStore({
     app: appReducer,
     auth: authReducer,
     timetable: timetableReducer,
+    teacher: teacherReducer,
   },
   preloadedState: loadPersistedAuthState(),
 })

@@ -151,6 +151,9 @@ export interface PrincipalDetailsDTO {
 export interface StaffProfileDTO {
   staffId: number;
   staffSystemId?: string;
+  employeeId?: string;
+  category?: string;
+  designationName?: string;
   jobTitle?: string;
   department?: string;
   staffType?: StaffType;
@@ -163,6 +166,19 @@ export interface StaffProfileDTO {
   principalDetails?: PrincipalDetailsDTO;
   active: boolean;
   profileUrl?: string;
+}
+
+export interface StaffSensitiveInfoDTO {
+  aadhaarNumber?: string;
+  panNumber?: string;
+  passportNumber?: string;
+  apaarId?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankIfscCode?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
 }
 
 // ── Guardian-specific ────────────────────────────────────────────────
@@ -225,4 +241,5 @@ export interface ComprehensiveUserProfileResponseDTO {
   studentDetails?: StudentProfileDTO;
   staffDetails?: StaffProfileDTO;
   guardianDetails?: GuardianProfileDTO;
+  sensitiveInfo?: StaffSensitiveInfoDTO;
 }

@@ -8,7 +8,6 @@ import type {
   LogoutRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
-  MeResponse,
 } from "./types/auth";
 
 // ── Auth Service ─────────────────────────────────────────────────────
@@ -37,10 +36,5 @@ export const authService = {
   /** POST /auth/reset-password */
   resetPassword(data: ResetPasswordRequest) {
     return api.post<MessageResponse>("/auth/reset-password", data);
-  },
-
-  /** GET /auth/me — current user profile */
-  getMe() {
-    return api.get<MeResponse>("/auth/me");
   },
 };
