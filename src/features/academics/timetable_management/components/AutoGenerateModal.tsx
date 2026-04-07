@@ -184,11 +184,24 @@ export function AutoGenerateModal({
                 subjects: subjects.filter(s => t.teachableSubjects?.includes(s._id)).map(s => s.name),
             }));
 
+            // Build class teacher first-period constraint if available
+            let classTeacherConstraint = '';
+            const classTeacherId = _editorContext?.section?.classTeacherId;
+            const classTeacherName = _editorContext?.section?.classTeacherName;
+            if (classTeacherId && classTeacherName) {
+                const ctTeacher = teachers.find(t => t._id === classTeacherId);
+                const ctSubjects = ctTeacher?.teachableSubjects
+                    ?.map(sid => subjects.find(s => s._id === sid)?.name)
+                    .filter(Boolean)
+                    .join(', ') || 'their assigned subject';
+                classTeacherConstraint = `CRITICAL CONSTRAINT: The first period of EVERY working day (Monday through Saturday) MUST be assigned to the class teacher "${classTeacherName}". They can teach: ${ctSubjects}. This constraint is non-negotiable and must be satisfied before any other scheduling decisions. `;
+            }
+
             const request: AutoGenerateRequest = {
                 subjects: subjects.map(s => s.name),
                 teachers: llmTeachers,
                 subjects_per_day: getSubjectsPerDay(),
-                user_query: query || 'Create an optimized timetable with balanced subject distribution.',
+                user_query: classTeacherConstraint + (query || 'Create an optimized timetable with balanced subject distribution.'),
             };
 
             const response = await generateTimetable(request);
@@ -309,6 +322,16 @@ export function AutoGenerateModal({
                             <BrainCircuit className="w-3 h-3 text-violet-500" />
                             Engine: GPT-4o via LLM Server (localhost:5000)
                         </div>
+
+                        {/* Class teacher constraint indicator */}
+                        {_editorContext?.section?.classTeacherName && (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                <p className="text-xs text-emerald-800 font-medium">
+                                    <span className="font-bold">Auto-constraint:</span> {_editorContext.section.classTeacherName} will be placed in the <span className="font-bold">first period every day</span>.
+                                </p>
+                            </div>
+                        )}
 
                         {subjects.length > 0 && (
                             <div className="flex flex-wrap gap-1">

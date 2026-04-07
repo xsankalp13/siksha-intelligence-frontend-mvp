@@ -29,6 +29,7 @@ import {
     useGetRooms,
     useDeleteSectionSchedule 
 } from '../queries/useTimetableQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, Send, RotateCcw, Sparkles, Trash2, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -63,6 +64,7 @@ export function TimetableEditor() {
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const queryClient = useQueryClient();
 
     // ─── Live API ─────────────────────────────────────────────────────────────
     const { data: editorContext, isLoading: isContextLoading } = useGetEditorContext(sectionIdToUse);
@@ -107,7 +109,8 @@ export function TimetableEditor() {
             editorContext &&
             editorContext.existingSchedule.length > 0 &&
             sectionIdToUse &&
-            hydratedSectionId !== sectionIdToUse
+            hydratedSectionId !== sectionIdToUse &&
+            hydratedSectionId !== `ai-${sectionIdToUse}`
         ) {
             dispatch(resetGrid());
             setHydratedSectionId(sectionIdToUse);
@@ -244,9 +247,9 @@ export function TimetableEditor() {
         window.history.replaceState({}, document.title);
     }, [location.state, editorContext, liveSubjects, liveTeachers, sectionIdToUse, hydratedSectionId, dispatch]);
 
-    // Reset hydration tracking when section changes
+    // Reset hydration tracking when section changes (but NOT if AI hydration is active for this section)
     useEffect(() => {
-        if (sectionIdToUse && hydratedSectionId !== sectionIdToUse) {
+        if (sectionIdToUse && hydratedSectionId !== sectionIdToUse && hydratedSectionId !== `ai-${sectionIdToUse}`) {
             dispatch(resetGrid());
         }
     }, [sectionIdToUse]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -396,6 +399,8 @@ export function TimetableEditor() {
                             onSuccess: () => {
                                 setIsPublishConfirmOpen(false);
                                 toast.success("Published!");
+                                // Invalidate cache so the reader fetches fresh data with all days
+                                queryClient.invalidateQueries({ queryKey: ['timetable', 'editor-context', selectedSection._id] });
                                 navigate(`/dashboard/admin/timetable/reader/${classId}/${sectionId}`);
                             }
                         }
@@ -577,11 +582,18 @@ export function TimetableEditor() {
                     sectionId={sectionIdToUse || ''}
                     sectionName={selectedSection?.name || ''}
                     currentDefaultRoomId={selectedSection?.defaultRoom?.uuid}
+                    currentClassTeacherUuid={editorContext?.section?.classTeacherStaffUuid ?? undefined}
+                    currentClassTeacherName={editorContext?.section?.classTeacherName ?? undefined}
                     rooms={rooms as any}
                     onSuccessUpdate={(updatedRoom) => {
                         if (selectedSection) {
                             dispatch(setSelectedSection({ ...selectedSection, defaultRoom: updatedRoom }));
                         }
+                        // Evict editorContext cache so class teacher badge refreshes
+                        if (sectionIdToUse) {
+                            queryClient.invalidateQueries({ queryKey: ['timetable', 'editor-context', sectionIdToUse] });
+                        }
+                        toast.success('Section settings saved! Refreshing timetable context...');
                     }}
                 />
 
