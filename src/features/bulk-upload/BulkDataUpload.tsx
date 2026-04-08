@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2,
@@ -37,6 +37,7 @@ interface BulkDataUploadProps {
   defaultUserType?: BulkImportUserType;
   hideTypeSelector?: boolean;
   onUploadComplete?: (report: BulkImportReportDTO) => void;
+  onPhaseChange?: (phase: Phase) => void;
 }
 
 // ─── Compact file picker card ─────────────────────────────────────────────────
@@ -189,6 +190,7 @@ export default function BulkDataUpload({
   defaultUserType,
   hideTypeSelector = false,
   onUploadComplete,
+  onPhaseChange,
 }: BulkDataUploadProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [file, setFile] = useState<File | null>(null);
@@ -420,6 +422,10 @@ export default function BulkDataUpload({
     if (userType === "staff") downloadStaffTemplate();
     else downloadStudentsTemplate();
   }, [userType]);
+
+  useEffect(() => {
+    onPhaseChange?.(phase);
+  }, [onPhaseChange, phase]);
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 p-6">

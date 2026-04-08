@@ -101,6 +101,7 @@ export default function StaffPage() {
   // ── Dialog state ──────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkUploadPhase, setBulkUploadPhase] = useState<"idle" | "validating" | "ready" | "uploading" | "success" | "error">("idle");
   const [editingStaff, setEditingStaff] = useState<StaffSummaryDTO | null>(null);
   const [pendingEditData, setPendingEditData] = useState<StaffFormData | null>(null);
   const [actionTarget, setActionTarget] = useState<{ staff: StaffSummaryDTO; action: 'activate' | 'block' } | null>(null);
@@ -317,13 +318,15 @@ export default function StaffPage() {
   };
 
   const handleBulkUploadComplete = async () => {
-    setBulkOpen(false);
+    // Keep dialog open so users can review row-level result details after import.
     setPage(0);
     setSearch("");
     setSearchInput("");
     await fetchStaff(0, "", staffTypeFilter);
     toast.success("Bulk import complete — table refreshed");
   };
+
+  const isBulkUploading = bulkUploadPhase === "uploading";
 
   return (
     <motion.div
@@ -559,8 +562,29 @@ export default function StaffPage() {
       )}
 
       {/* Bulk Upload Dialog */}
-      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <Dialog
+        open={bulkOpen}
+        onOpenChange={(open) => {
+          if (!open && isBulkUploading) {
+            toast.info("Import is in progress. Use Minimize to continue in the background.");
+            return;
+          }
+          setBulkOpen(open);
+          if (!open) setBulkUploadPhase("idle");
+        }}
+      >
+        <DialogContent
+          className="max-w-4xl max-h-[85vh] overflow-y-auto"
+          onInteractOutside={(event) => {
+            if (isBulkUploading) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            if (isBulkUploading) event.preventDefault();
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isBulkUploading) event.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Bulk Staff Upload</DialogTitle>
             <DialogDescription>
@@ -571,6 +595,7 @@ export default function StaffPage() {
             defaultUserType="staff"
             hideTypeSelector
             onUploadComplete={handleBulkUploadComplete}
+            onPhaseChange={setBulkUploadPhase}
           />
         </DialogContent>
       </Dialog>

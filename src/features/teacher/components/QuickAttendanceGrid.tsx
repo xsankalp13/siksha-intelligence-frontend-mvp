@@ -24,6 +24,8 @@ type Props = {
   students: TeacherStudentResponseDto[];
   sectionUuid: string;
   staffUuid: string;
+  selectedDate?: string;
+  initialRecords?: Record<string, string> | null;
   onSubmitSuccess?: () => void;
 };
 
@@ -35,11 +37,18 @@ const styleMap: Record<AttendanceCode, string> = {
   L: "ring-amber-500/70",
 };
 
-export default function QuickAttendanceGrid({ students, sectionUuid, staffUuid, onSubmitSuccess }: Props) {
+export default function QuickAttendanceGrid({ students, sectionUuid, staffUuid, selectedDate, initialRecords, onSubmitSuccess }: Props) {
   const [state, setState] = useState<Record<string, AttendanceCode>>({});
   const [submitting, setSubmitting] = useState(false);
   const [showMarkAllConfirm, setShowMarkAllConfirm] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+
+  // If we receive initialRecords that has keys, it means attendance is already marked for this date.
+  const isAlreadyMarked = useMemo(() => {
+    return initialRecords != null && Object.keys(initialRecords).length > 0;
+  }, [initialRecords]);
+
+  const [isEditMode, setIsEditMode] = useState(!isAlreadyMarked);
 
   // Fetch backend attendance types to get exact shortcodes
   const { data: attendanceTypes, isFetching } = useQuery({
@@ -61,12 +70,24 @@ export default function QuickAttendanceGrid({ students, sectionUuid, staffUuid, 
   }, [attendanceTypes]);
 
   useEffect(() => {
+    setIsEditMode(!isAlreadyMarked);
+  }, [isAlreadyMarked]);
+
+  useEffect(() => {
     const next: Record<string, AttendanceCode> = {};
     students.forEach((s) => {
-      next[s.uuid] = "P";
+      // If we have an initial backend record (like 'PR'), map it back to UI state 'P'.
+      if (initialRecords && initialRecords[s.uuid]) {
+        const backendCode = initialRecords[s.uuid];
+        if (backendCode === shortCodeMap?.A) next[s.uuid] = "A";
+        else if (backendCode === shortCodeMap?.L) next[s.uuid] = "L";
+        else next[s.uuid] = "P";
+      } else {
+        next[s.uuid] = "P";
+      }
     });
     setState(next);
-  }, [students, sectionUuid]);
+  }, [students, sectionUuid, initialRecords, shortCodeMap]);
 
   const summary = useMemo(() => {
     const values = Object.values(state);
@@ -99,7 +120,7 @@ export default function QuickAttendanceGrid({ students, sectionUuid, staffUuid, 
     if (students.length === 0) return;
     setSubmitting(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = selectedDate || new Date().toISOString().slice(0, 10);
       const takenBy = staffUuid.trim();
 
       if (!takenBy) {
@@ -198,8 +219,10 @@ export default function QuickAttendanceGrid({ students, sectionUuid, staffUuid, 
           <button
             key={student.uuid}
             type="button"
-            onClick={() => cycle(student.uuid)}
-            className="rounded-xl border border-border/60 bg-background/60 p-2 text-left transition hover:bg-accent/40"
+            onClick={() => isEditMode && cycle(student.uuid)}
+            className={`rounded-xl border border-border/60 p-2 text-left transition ${
+              isEditMode ? "bg-background/60 hover:bg-accent/40" : "bg-card opacity-90 cursor-default"
+            }`}
           >
             <div className="flex items-center gap-2">
               <UserAvatar name={`${student.firstName} ${student.lastName}`} profileUrl={student.profileUrl} className={`h-8 w-8 ring-2 ${styleMap[state[student.uuid] ?? "P"]}`} />
@@ -236,8 +259,14 @@ export default function QuickAttendanceGrid({ students, sectionUuid, staffUuid, 
           <span className="flex items-center gap-1 text-amber-700"><Clock3 className="h-4 w-4" /> {summary.L}</span>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleMarkAllRequest}>Mark All Present</Button>
-          <Button size="sm" onClick={handleSubmitRequest} disabled={submitting}>{submitting ? "Submitting..." : "Submit Attendance"}</Button>
+          {isEditMode ? (
+            <>
+              <Button variant="outline" size="sm" onClick={handleMarkAllRequest}>Mark All Present</Button>
+              <Button size="sm" onClick={handleSubmitRequest} disabled={submitting || !shortCodeMap}>{submitting ? "Submitting..." : "Submit Attendance"}</Button>
+            </>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setIsEditMode(true)}>Edit Attendance</Button>
+          )}
         </div>
       </div>
 

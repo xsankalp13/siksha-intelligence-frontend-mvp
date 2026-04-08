@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { useTeacherCtClasses, useTeacherCtStudents, useTeacherSchedule } from "@/features/teacher/queries/useTeacherQueries";
 import ClassSelector from "@/features/teacher/components/ClassSelector";
 import QuickAttendanceGrid from "@/features/teacher/components/QuickAttendanceGrid";
+import { attendanceService } from "@/services/attendance";
 import { teacherService } from "@/services/teacherService";
+import { useQuery } from "@tanstack/react-query";
 
 export default function TeacherAttendancePage() {
   const { data: classes = [], isLoading } = useTeacherCtClasses();
@@ -16,6 +18,11 @@ export default function TeacherAttendancePage() {
   const [selectedClass, setSelectedClass] = useState(defaultSelection);
   const [mode, setMode] = useState("grid");
   const [downloading, setDownloading] = useState(false);
+
+  const today = new Date();
+  const maxDate = today.toISOString().split("T")[0];
+  const minDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const [selectedDate, setSelectedDate] = useState(maxDate);
 
   useEffect(() => {
     if (!selectedClass && defaultSelection) {
@@ -56,6 +63,45 @@ export default function TeacherAttendancePage() {
     }
   };
 
+  // Fetch existing attendance records for this teacher on the selected date
+  const { data: existingAttendancePage } = useQuery({
+    queryKey: ["teacher-attendance", staffUuid, selectedDate],
+    queryFn: async () => {
+      if (!staffUuid) return null;
+      return (
+        await attendanceService.listStudentAttendance({
+          takenByStaffUuid: staffUuid,
+          fromDate: selectedDate,
+          toDate: selectedDate,
+          size: 200,
+        })
+      ).data;
+    },
+    enabled: Boolean(staffUuid && selectedDate),
+  });
+
+  // Map existing records to student Uuids for QuickAttendanceGrid
+  const initialRecords = useMemo(() => {
+    if (!existingAttendancePage?.content || existingAttendancePage.content.length === 0) return null;
+    if (!students?.content) return null;
+
+    // Filter to only records belonging to students in the CURRENT selected section
+    const sectionStudentUuids = new Set(students.content.map((s) => s.uuid));
+    const relevantRecords = existingAttendancePage.content.filter((r) =>
+      r.studentUuid && sectionStudentUuids.has(r.studentUuid)
+    );
+
+    if (relevantRecords.length === 0) return null;
+
+    const map: Record<string, string> = {};
+    relevantRecords.forEach((r) => {
+      if (r.attendanceTypeShortCode && r.studentUuid) {
+        map[r.studentUuid] = r.attendanceTypeShortCode;
+      }
+    });
+    return map;
+  }, [existingAttendancePage, students]);
+
   if (!isLoading && classes.length === 0) {
     return (
       <div className="mx-auto max-w-6xl">
@@ -83,6 +129,14 @@ export default function TeacherAttendancePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <input
+            type="date"
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            min={minDate}
+            max={maxDate}
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
           <ClassSelector value={selectedClass} onChange={setSelectedClass} classes={classes} />
           <Tabs value={mode} onValueChange={setMode}>
             <TabsList>
@@ -102,6 +156,8 @@ export default function TeacherAttendancePage() {
           students={students?.content ?? []}
           sectionUuid={selectedSectionUuid ?? ""}
           staffUuid={staffUuid}
+          selectedDate={selectedDate}
+          initialRecords={initialRecords}
         />
       ) : (
         <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
