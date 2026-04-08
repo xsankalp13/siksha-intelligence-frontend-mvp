@@ -22,6 +22,11 @@ import type {
   PastPaperResponseDTO,
   PastPaperQueryParams,
 } from "./types/examination";
+import type {
+  ExamTemplateRequestDTO,
+  ExamTemplateResponseDTO,
+  EvaluationStructureDTO,
+} from "./types/examTemplate";
 
 // ── Examination Service ──────────────────────────────────────────────
 
@@ -297,5 +302,44 @@ export const examinationService = {
   /** DELETE /auth/examination/past-papers/:uuid */
   deletePastPaper(uuid: string) {
     return api.delete(`/auth/examination/past-papers/${uuid}`);
+  },
+
+  // ── Exam Templates ────────────────────────────────────────────────
+  /** GET /auth/examination/templates */
+  getAllTemplates() {
+    return api.get<ExamTemplateResponseDTO[]>("/auth/examination/templates");
+  },
+
+  /** GET /auth/examination/templates/:id */
+  getTemplateById(id: string) {
+    return api.get<ExamTemplateResponseDTO>(`/auth/examination/templates/${id}`);
+  },
+
+  /** POST /auth/examination/templates */
+  createTemplate(data: ExamTemplateRequestDTO) {
+    return api.post<ExamTemplateResponseDTO>("/auth/examination/templates", data);
+  },
+
+  /** PUT /auth/examination/templates/:id (only if unused) */
+  updateTemplate(id: string, data: ExamTemplateRequestDTO) {
+    return api.put<ExamTemplateResponseDTO>(`/auth/examination/templates/${id}`, data);
+  },
+
+  /** DELETE /auth/examination/templates/:id (only if unused) */
+  deleteTemplate(id: string) {
+    return api.delete(`/auth/examination/templates/${id}`);
+  },
+
+  /** GET /auth/examination/templates/:id/preview (optional) */
+  getTemplatePreview(id: string) {
+    return api.get(`/auth/examination/templates/${id}/preview`);
+  },
+
+  // ── Evaluation Structure ──────────────────────────────────────────
+  /** GET /auth/examination/schedules/:scheduleId/evaluation-structure */
+  getEvaluationStructure(scheduleId: number) {
+    return api.get<EvaluationStructureDTO>(
+      `/auth/examination/schedules/${scheduleId}/evaluation-structure`
+    );
   },
 };

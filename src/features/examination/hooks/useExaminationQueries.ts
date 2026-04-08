@@ -15,6 +15,7 @@ import type {
   StudentMarkRequestDTO,
   ExamResponseDTO,
 } from "@/services/types/examination";
+import type { ExamTemplateRequestDTO } from "@/services/types/examTemplate";
 
 // ── Query Keys ──────────────────────────────────────────────────────
 const keys = {
@@ -39,6 +40,13 @@ const keys = {
     ["examination", "grade-scales", systemUuid] as const,
   pastPapers: (params?: PastPaperQueryParams) =>
     ["examination", "past-papers", params] as const,
+  templates: ["examination", "templates"] as const,
+  template: (id: string) =>
+    ["examination", "templates", id] as const,
+  templatePreview: (id: string) =>
+    ["examination", "templates", id, "preview"] as const,
+  evaluationStructure: (scheduleId: number) =>
+    ["examination", "evaluation-structure", scheduleId] as const,
 };
 
 // ── Exams ────────────────────────────────────────────────────────────
@@ -476,3 +484,74 @@ export const useDeletePastPaper = () => {
       qc.invalidateQueries({ queryKey: ["examination", "past-papers"] }),
   });
 };
+
+// ── Exam Templates ──────────────────────────────────────────────────
+
+export const useGetAllTemplates = () =>
+  useQuery({
+    queryKey: keys.templates,
+    queryFn: async () =>
+      (await examinationService.getAllTemplates()).data,
+  });
+
+export const useGetTemplateById = (id: string) =>
+  useQuery({
+    queryKey: keys.template(id),
+    queryFn: async () =>
+      (await examinationService.getTemplateById(id)).data,
+    enabled: !!id,
+  });
+
+export const useCreateTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ExamTemplateRequestDTO) =>
+      examinationService.createTemplate(data).then((r) => r.data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: keys.templates }),
+  });
+};
+
+export const useUpdateTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: ExamTemplateRequestDTO;
+    }) =>
+      examinationService.updateTemplate(id, data).then((r) => r.data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: keys.templates }),
+  });
+};
+
+export const useDeleteTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      examinationService.deleteTemplate(id),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: keys.templates }),
+  });
+};
+
+export const useGetTemplatePreview = (id: string) =>
+  useQuery({
+    queryKey: keys.templatePreview(id),
+    queryFn: async () =>
+      (await examinationService.getTemplatePreview(id)).data,
+    enabled: !!id,
+  });
+
+// ── Evaluation Structure ────────────────────────────────────────────
+
+export const useGetEvaluationStructure = (scheduleId: number) =>
+  useQuery({
+    queryKey: keys.evaluationStructure(scheduleId),
+    queryFn: async () =>
+      (await examinationService.getEvaluationStructure(scheduleId)).data,
+    enabled: !!scheduleId,
+  });

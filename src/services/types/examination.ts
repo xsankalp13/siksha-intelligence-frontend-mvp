@@ -1,4 +1,5 @@
 // ── Examination DTOs ─────────────────────────────────────────────────
+import type { TemplateSnapshotDTO } from "./examTemplate";
 
 // Exams
 export type ExamType = "MIDTERM" | "FINAL" | "UNIT_TEST" | "FORMATIVE" | "SUMMATIVE";
@@ -18,6 +19,8 @@ export interface ExamResponseDTO {
   examType: ExamType;
   startDate: string;
   endDate: string;
+  templateId?: string;          // Optional — UUID of the linked ExamTemplate
+  templateName?: string;        // Optional — Name of the linked ExamTemplate
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -27,6 +30,7 @@ export interface ExamResponseDTO {
 
 // Exam Schedules
 export interface ExamScheduleRequestDTO {
+  templateId: string;
   classId: string;
   sectionId?: string;
   subjectId: string;
@@ -38,11 +42,14 @@ export interface ExamScheduleRequestDTO {
   passingMarks: number;       // positive integer, ≤ maxMarks
   maxStudentsPerSeat?: number; // 1=single (default), 2=double/bench sharing
   seatSide?: "LEFT" | "RIGHT"; // Side for double seating
+  roomNumber?: string;
 }
 
 export interface ExamScheduleResponseDTO {
   scheduleId: number;
   examUuid: string;
+  templateId?: string;
+  templateSnapshot?: TemplateSnapshotDTO;
   classId: string;
   className: string;
   sectionId?: string;
@@ -57,6 +64,7 @@ export interface ExamScheduleResponseDTO {
   totalStudents?: number;
   maxStudentsPerSeat?: number; // 1=single, 2=double/bench sharing
   seatSide?: "LEFT" | "RIGHT";
+  roomNumber?: string;
 }
 
 // Question Bank

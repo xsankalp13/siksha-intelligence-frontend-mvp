@@ -14,6 +14,7 @@ import {
   Map,
 
   ClipboardCheck,
+  FileCheck,
 
   Clock,
   DoorOpen,
@@ -162,5 +163,10 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
     label: "My HR",
     path: "/dashboard/teacher/my-hr",
     icon: Briefcase,
+  },
+  {
+    label: "Evaluation",
+    path: "/dashboard/teacher/evaluation",
+    icon: FileCheck,
   },
 ];

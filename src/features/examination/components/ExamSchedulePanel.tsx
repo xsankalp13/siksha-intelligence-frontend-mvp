@@ -50,6 +50,7 @@ import {
   useCreateSchedule,
   useUpdateSchedule,
   useDeleteSchedule,
+  useGetAllTemplates,
 } from "../hooks/useExaminationQueries";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
@@ -83,6 +84,7 @@ interface ScheduleFormState {
   classId: string;
   sectionId: string;
   subjectId: string;
+  templateId: string;
   examDate: string;
   startTime: string;
   endTime: string;
@@ -94,6 +96,7 @@ const emptyForm: ScheduleFormState = {
   classId: "",
   sectionId: "",
   subjectId: "",
+  templateId: "",
   examDate: "",
   startTime: "",
   endTime: "",
@@ -193,6 +196,7 @@ export default function ExamSchedulePanel({
   onEnterMarks: _onEnterMarks,
 }: Props) {
   const { data: schedules = [], isLoading } = useGetSchedulesByExam(exam.uuid);
+  const { data: templates = [] } = useGetAllTemplates();
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
   const deleteSchedule = useDeleteSchedule();
@@ -232,6 +236,7 @@ export default function ExamSchedulePanel({
       classId: s.classId,
       sectionId: s.sectionId || "",
       subjectId: s.subjectId,
+      templateId: s.templateId || "",
       examDate: s.examDate,
       startTime: s.startTime ? s.startTime.substring(0, 5) : "",
       endTime: s.endTime ? s.endTime.substring(0, 5) : "",
@@ -247,6 +252,7 @@ export default function ExamSchedulePanel({
     if (
       !form.classId ||
       !form.subjectId ||
+      !form.templateId ||
       !form.examDate ||
       !form.startTime ||
       !form.endTime
@@ -268,15 +274,18 @@ export default function ExamSchedulePanel({
 
     const formatTimeForBackend = (t: string) => (t && t.length === 5 ? `${t}:00` : t);
 
+    const selectedTpl = templates.find(t => t.id === form.templateId);
+
     const payload: ExamScheduleRequestDTO = {
       classId: form.classId,
       sectionId: form.sectionId || undefined,
       subjectId: form.subjectId,
+      templateId: form.templateId,
       examDate: form.examDate,
       startTime: formatTimeForBackend(form.startTime),
       endTime: formatTimeForBackend(form.endTime),
       duration,
-      maxMarks: 100,
+      maxMarks: selectedTpl?.totalMarks || 100,
       passingMarks: 33,
       maxStudentsPerSeat: form.maxStudentsPerSeat,
       ...(form.maxStudentsPerSeat === 2 && { seatSide: form.seatSide as "LEFT" | "RIGHT" }),
@@ -327,6 +336,8 @@ export default function ExamSchedulePanel({
       }
     );
   };
+
+
 
   return (
     <div className="space-y-4">
@@ -526,6 +537,39 @@ export default function ExamSchedulePanel({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Template Selector */}
+            <div className="grid gap-1.5 pt-2 border-t border-border/40">
+              <label className="text-sm font-medium">
+                Exam Template <span className="text-destructive">*</span>
+              </label>
+              <Select
+                value={form.templateId}
+                onValueChange={(v) => setForm({ ...form, templateId: v })}
+                disabled={!!editing}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select examination template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name} ({t.totalQuestions}Q · {t.totalMarks} marks)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.templateId && (() => {
+                const sel = templates.find(t => t.id === form.templateId);
+                return sel ? (
+                  <div className="mt-1 p-3 bg-muted/30 rounded-lg text-sm text-muted-foreground flex gap-4">
+                    <span>Sections: <strong className="text-foreground">{sel.sections.length}</strong></span>
+                    <span>Questions: <strong className="text-foreground">{sel.totalQuestions}</strong></span>
+                    <span>Total Marks: <strong className="text-foreground">{sel.totalMarks}</strong></span>
+                  </div>
+                ) : null;
+              })()}
             </div>
 
             <div className="bg-muted/20 p-5 rounded-2xl border border-border/40 space-y-4">
