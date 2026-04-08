@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Button } from '@/components/ui/button';
 import { TimetableGrid } from './TimetableGrid';
-import { setSubjectToCell, setTeacherToCell, resetGrid, setSelectedClass, setSelectedSection } from '../store/timetableSlice';
+import { setSelectedClass, setSelectedSection, resetGrid, overwriteCell } from '../store/timetableSlice';
 import type { RootState } from '@/store/store';
 import { useGetEditorContext, useGetRooms } from '../queries/useTimetableQueries';
 import { ArrowLeft, Printer, Share2, Download } from 'lucide-react';
@@ -29,7 +29,7 @@ export function TimetableReader() {
 
     const { data: context, isLoading } = useGetEditorContext(sectionIdToUse);
     const { data: rooms = [] } = useGetRooms();
-    const [hydratedSectionId, setHydratedSectionId] = useState<string | null>(null);
+
 
     // ─── Hydrate Redux selection from URL if missing ─────────────────────────
     useEffect(() => {
@@ -39,81 +39,95 @@ export function TimetableReader() {
         }
     }, [context?.section, selectedSection, selectedClass, dispatch, classId, sectionId]);
 
-    useEffect(() => {
-        if (context && sectionIdToUse && hydratedSectionId !== sectionIdToUse) {
-            dispatch(resetGrid());
-            setHydratedSectionId(sectionIdToUse);
-            
-            // 1. Mark BREAKS and NON-TEACHING SLOTS as locked
-            context.timeslots.forEach(ts => {
-                const isLabelBreak = ts.slotLabel?.toLowerCase().includes('lunch') || ts.slotLabel?.toLowerCase().includes('break');
-                const isNonTeaching = ts.isNonTeachingSlot || ts.slotLabel?.toLowerCase().includes('assembly') || ts.slotLabel?.toLowerCase().includes('office');
+    // Track the schedule fingerprint so we re-hydrate whenever data changes
+    const lastScheduleKeyRef = useRef<string>('');
 
-                if (ts.isBreak || isLabelBreak || ts.isNonTeachingSlot || isNonTeaching) {
+    useEffect(() => {
+        if (!context || !sectionIdToUse) return;
+
+        // Build a fingerprint from the schedule entries — re-hydrate if it changes
+        const scheduleKey = context.existingSchedule
+            .map(e => `${e.timeslotId}:${e.subjectId}:${e.teacherId}`)
+            .sort()
+            .join('|');
+
+        if (lastScheduleKeyRef.current === scheduleKey) return;
+        lastScheduleKeyRef.current = scheduleKey;
+
+        dispatch(resetGrid());
+
+        // 1. Mark BREAKS and NON-TEACHING SLOTS as locked
+        context.timeslots.forEach(ts => {
+            const isLabelBreak = ts.slotLabel?.toLowerCase().includes('lunch') || ts.slotLabel?.toLowerCase().includes('break');
+            const isNonTeaching = ts.isNonTeachingSlot || ts.slotLabel?.toLowerCase().includes('assembly') || ts.slotLabel?.toLowerCase().includes('office');
+
+            if (ts.isBreak || isLabelBreak || ts.isNonTeachingSlot || isNonTeaching) {
+                const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
+                const timeStr = normalizeTime(ts.startTime);
+                const cellKey = `${dayName}_${timeStr}`;
+
+                let label = ts.slotLabel;
+                if (ts.isBreak || isLabelBreak) {
+                    label = ts.slotLabel?.toLowerCase().includes('lunch') ? 'Lunch' : 'Break';
+                }
+
+                const color = (ts.isBreak || isLabelBreak)
+                    ? 'bg-orange-50 text-orange-600 border-orange-200'
+                    : 'bg-slate-100 text-slate-500 border-slate-200';
+
+                dispatch(overwriteCell({
+                    cellKey,
+                    data: {
+                        subject: { _id: 'break', name: label || 'Break', code: 'LOCKED', color },
+                        teacher: { _id: 'break-sys', name: label || 'Break' },
+                        status: 'LOCKED',
+                        roomId: null,
+                    }
+                }));
+            }
+        });
+
+        // 2. Hydrate grid with published schedule data
+        context.existingSchedule.forEach((entry) => {
+            let cellKey: string | null = null;
+
+            if (entry.timeslotId) {
+                const ts = context.timeslots.find(t => t.uuid === entry.timeslotId);
+                if (ts) {
                     const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
                     const timeStr = normalizeTime(ts.startTime);
-                    const cellKey = `${dayName}_${timeStr}`;
-
-                    let label = ts.slotLabel;
-                    if (ts.isBreak || isLabelBreak) {
-                        label = ts.slotLabel?.toLowerCase().includes('lunch') ? 'Lunch' : 'Break';
-                    }
-
-                    const color = (ts.isBreak || isLabelBreak) 
-                        ? 'bg-orange-50 text-orange-600 border-orange-200' 
-                        : 'bg-slate-100 text-slate-500 border-slate-200';
-
-                    dispatch(setSubjectToCell({ 
-                        cellKey, 
-                        subject: { _id: 'break', name: label, code: 'LOCKED', color: color } as any 
-                    }));
-                    dispatch(setTeacherToCell({ cellKey, teacher: { _id: 'break-sys', name: label } as any }));
+                    cellKey = `${dayName}_${timeStr}`;
                 }
-            });
+            }
 
-            // 2. Hydrate grid with read-only data
-            context.existingSchedule.forEach((entry) => {
-                let cellKey = null;
-                
-                // Priority 1: Map by timeslot UUID (most accurate)
-                if (entry.timeslotId) {
-                    const ts = context.timeslots.find(t => t.uuid === entry.timeslotId);
-                    if (ts) {
-                        const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
-                        const timeStr = normalizeTime(ts.startTime);
-                        cellKey = `${dayName}_${timeStr}`;
-                    }
-                }
-                
-                // Priority 2: Use direct slotLabel if UUID lookup failed
-                if (!cellKey) cellKey = entry.slotLabel;
+            if (!cellKey) cellKey = entry.slotLabel;
 
-                const subject = context.availableSubjects.find(s => s.uuid === entry.subjectId);
-                const teacher = context.teachers.find(t => t.id === entry.teacherId);
+            const subject = context.availableSubjects.find(s => s.uuid === entry.subjectId);
+            const teacher = context.teachers.find(t => t.id === entry.teacherId);
 
-                if (cellKey && subject && teacher) {
-                    dispatch(setSubjectToCell({ 
-                        cellKey, 
-                        subject: { 
-                            _id: subject.uuid, 
-                            name: subject.name, 
+            if (cellKey && subject && teacher) {
+                dispatch(overwriteCell({
+                    cellKey,
+                    data: {
+                        subject: {
+                            _id: subject.uuid,
+                            name: subject.name,
                             code: subject.subjectCode,
-                            color: subject.color 
-                        } as any,
-                        roomId: entry.roomId || null
-                    }));
-                    
-                    dispatch(setTeacherToCell({ 
-                        cellKey, 
+                            color: subject.color,
+                        },
                         teacher: {
                             _id: teacher.id,
-                            name: teacher.name
-                        } as any 
-                    }));
-                }
-            });
-        }
-    }, [context, sectionIdToUse, hydratedSectionId, dispatch]);
+                            name: teacher.name,
+                        },
+                        status: 'LOCKED',
+                        roomId: entry.roomId || null,
+                    }
+                }));
+            }
+        });
+
+    }, [context, sectionIdToUse, dispatch]);
+
 
     const handlePrint = () => {
         window.print();
@@ -142,7 +156,15 @@ export function TimetableReader() {
                         </Button>
                         <div>
                             <h1 className="text-xl font-bold">{selectedClass?.name} - {selectedSection?.name}</h1>
-                            <p className="text-sm text-muted-foreground">Weekly Academic Schedule</p>
+                            <p className="text-sm text-muted-foreground">
+                                Weekly Academic Schedule
+                                {context?.section?.classTeacherName && (
+                                    <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full text-xs font-semibold">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                        Class Teacher: {context.section.classTeacherName}
+                                    </span>
+                                )}
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -209,6 +231,11 @@ export function TimetableReader() {
                     <h1 className="text-2xl font-black text-slate-900 leading-none">
                         {selectedClass?.name} — {selectedSection?.name}
                     </h1>
+                    {context?.section?.classTeacherName && (
+                        <p className="text-xs text-slate-600 font-semibold mt-1">
+                            Class Teacher: {context.section.classTeacherName}
+                        </p>
+                    )}
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-2">
                         Academic Timetable — Made by Shiksha Intelligence
                     </p>

@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
@@ -18,10 +18,10 @@ import { TimetableGrid } from './TimetableGrid';
 import { AutoGenerateModal } from './AutoGenerateModal';
 import { CellEditDialog } from './CellEditDialog';
 import { SectionSettingsModal } from './SectionSettingsModal';
-import { setSubjectToCell, setTeacherToCell, setCellRoom, resetGrid, setSelectedClass, setSelectedSection } from '../store/timetableSlice';
+import { setSubjectToCell, setTeacherToCell, setCellRoom, resetGrid, setSelectedClass, setSelectedSection, fillCellSubject, fillCellTeacher, clearIsNewFlags } from '../store/timetableSlice';
 
 import type { RootState } from '@/store/store';
-import type { Subject, Teacher, ScheduleRequestDto } from '../types';
+import type { Subject, Teacher, ScheduleRequestDto, TimetablePeriod } from '../types';
 import { 
     useBulkUpdateSchedule, 
     useUpdateScheduleStatus, 
@@ -29,6 +29,7 @@ import {
     useGetRooms,
     useDeleteSectionSchedule 
 } from '../queries/useTimetableQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, Send, RotateCcw, Sparkles, Trash2, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -43,6 +44,7 @@ const normalizeTime = (time: string) => {
 
 export function TimetableEditor() {
     const navigate = useNavigate();
+    const location = useLocation();
     const dispatch = useDispatch();
     const { selectedClass, selectedSection, grid } = useSelector(
         (state: RootState) => state.timetable
@@ -62,6 +64,7 @@ export function TimetableEditor() {
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [isPublishConfirmOpen, setIsPublishConfirmOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const queryClient = useQueryClient();
 
     // ─── Live API ─────────────────────────────────────────────────────────────
     const { data: editorContext, isLoading: isContextLoading } = useGetEditorContext(sectionIdToUse);
@@ -106,7 +109,8 @@ export function TimetableEditor() {
             editorContext &&
             editorContext.existingSchedule.length > 0 &&
             sectionIdToUse &&
-            hydratedSectionId !== sectionIdToUse
+            hydratedSectionId !== sectionIdToUse &&
+            hydratedSectionId !== `ai-${sectionIdToUse}`
         ) {
             dispatch(resetGrid());
             setHydratedSectionId(sectionIdToUse);
@@ -170,9 +174,82 @@ export function TimetableEditor() {
         }
     }, [editorContext, liveSubjects, liveTeachers, sectionIdToUse, hydratedSectionId, dispatch, rooms]);
 
-    // Reset hydration tracking when section changes
+    // ─── Hydrate from AI-generated timetable (location.state from bulk generation) ──
     useEffect(() => {
-        if (sectionIdToUse && hydratedSectionId !== sectionIdToUse) {
+        const aiTimetable = (location.state as any)?.aiTimetable as Record<string, TimetablePeriod[]> | undefined;
+        if (!aiTimetable || !editorContext || !liveSubjects.length || !liveTeachers.length) return;
+        // Only hydrate once
+        if (hydratedSectionId === `ai-${sectionIdToUse}`) return;
+
+        dispatch(resetGrid());
+        setHydratedSectionId(`ai-${sectionIdToUse}`);
+
+        const DAYS_LIST = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+        setTimeout(() => {
+            // 1. Place breaks
+            editorContext.timeslots.forEach(ts => {
+                const isLabelBreak = ts.slotLabel?.toLowerCase().includes('lunch') || ts.slotLabel?.toLowerCase().includes('break');
+                const isNonTeaching = ts.isNonTeachingSlot || ts.slotLabel?.toLowerCase().includes('assembly') || ts.slotLabel?.toLowerCase().includes('office');
+                if (ts.isBreak || isLabelBreak || ts.isNonTeachingSlot || isNonTeaching) {
+                    const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
+                    const cellKey = `${dayName}_${normalizeTime(ts.startTime)}`;
+                    let label = ts.slotLabel;
+                    if (ts.isBreak || isLabelBreak) label = ts.slotLabel?.toLowerCase().includes('lunch') ? 'Lunch' : 'Break';
+                    const color = (ts.isBreak || isLabelBreak) ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200';
+                    dispatch(setSubjectToCell({ cellKey, subject: { _id: 'break', name: label, code: 'LOCKED', color } as any }));
+                    dispatch(setTeacherToCell({ cellKey, teacher: { _id: 'break-sys', name: label } as any }));
+                }
+            });
+
+            // 2. Build cell keys per day
+            const cellKeysByDay: Record<string, string[]> = {};
+            const teachingSlots = editorContext.timeslots
+                .filter(ts => !ts.isBreak && !ts.isNonTeachingSlot)
+                .sort((a, b) => normalizeTime(a.startTime).localeCompare(normalizeTime(b.startTime)));
+            for (const ts of teachingSlots) {
+                const dayName = DAYS_LIST[ts.dayOfWeek - 1] || 'Monday';
+                const cellKey = `${dayName}_${normalizeTime(ts.startTime)}`;
+                if (!cellKeysByDay[dayName]) cellKeysByDay[dayName] = [];
+                cellKeysByDay[dayName].push(cellKey);
+            }
+
+            // 3. Place AI timetable with animation
+            type AnimItem = { cellKey: string; subject: Subject; teacher: Teacher };
+            const animQueue: AnimItem[] = [];
+            for (const dayName of Object.keys(aiTimetable)) {
+                const periods = aiTimetable[dayName];
+                const dayCellKeys = cellKeysByDay[dayName] || [];
+                periods.forEach((period, idx) => {
+                    if (idx >= dayCellKeys.length) return;
+                    const lower = (n: string) => n.toLowerCase().trim();
+                    const subject = liveSubjects.find(s => lower(s.name) === lower(period.subject));
+                    const teacher = liveTeachers.find(t => lower(t.name) === lower(period.teacher));
+                    if (subject && teacher) animQueue.push({ cellKey: dayCellKeys[idx], subject, teacher });
+                });
+            }
+
+            let i = 0;
+            const timer = setInterval(() => {
+                if (i >= animQueue.length) {
+                    clearInterval(timer);
+                    setTimeout(() => dispatch(clearIsNewFlags()), 1500);
+                    return;
+                }
+                const item = animQueue[i];
+                dispatch(fillCellSubject({ cellKey: item.cellKey, subject: item.subject }));
+                setTimeout(() => dispatch(fillCellTeacher({ cellKey: item.cellKey, teacher: item.teacher })), 60);
+                i++;
+            }, 100);
+        }, 150);
+
+        // Clean location state so reload doesn't re-trigger
+        window.history.replaceState({}, document.title);
+    }, [location.state, editorContext, liveSubjects, liveTeachers, sectionIdToUse, hydratedSectionId, dispatch]);
+
+    // Reset hydration tracking when section changes (but NOT if AI hydration is active for this section)
+    useEffect(() => {
+        if (sectionIdToUse && hydratedSectionId !== sectionIdToUse && hydratedSectionId !== `ai-${sectionIdToUse}`) {
             dispatch(resetGrid());
         }
     }, [sectionIdToUse]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -322,6 +399,8 @@ export function TimetableEditor() {
                             onSuccess: () => {
                                 setIsPublishConfirmOpen(false);
                                 toast.success("Published!");
+                                // Invalidate cache so the reader fetches fresh data with all days
+                                queryClient.invalidateQueries({ queryKey: ['timetable', 'editor-context', selectedSection._id] });
                                 navigate(`/dashboard/admin/timetable/reader/${classId}/${sectionId}`);
                             }
                         }
@@ -503,11 +582,18 @@ export function TimetableEditor() {
                     sectionId={sectionIdToUse || ''}
                     sectionName={selectedSection?.name || ''}
                     currentDefaultRoomId={selectedSection?.defaultRoom?.uuid}
+                    currentClassTeacherUuid={editorContext?.section?.classTeacherStaffUuid ?? undefined}
+                    currentClassTeacherName={editorContext?.section?.classTeacherName ?? undefined}
                     rooms={rooms as any}
                     onSuccessUpdate={(updatedRoom) => {
                         if (selectedSection) {
                             dispatch(setSelectedSection({ ...selectedSection, defaultRoom: updatedRoom }));
                         }
+                        // Evict editorContext cache so class teacher badge refreshes
+                        if (sectionIdToUse) {
+                            queryClient.invalidateQueries({ queryKey: ['timetable', 'editor-context', sectionIdToUse] });
+                        }
+                        toast.success('Section settings saved! Refreshing timetable context...');
                     }}
                 />
 

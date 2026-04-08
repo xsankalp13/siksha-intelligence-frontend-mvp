@@ -8,7 +8,8 @@ import {
     Plus, 
     MoreVertical,
     Edit2,
-    Eye
+    Eye,
+    Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -38,6 +39,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSelectTimetableScope } from "../hooks/useSelectTimetableScope";
 import { SelectionDialog } from "./SelectionDialog";
+import { BulkGenerateModal } from "./BulkGenerateModal";
 import { useGetTimetableOverview } from "../queries/useTimetableQueries";
 import type { TimetableOverviewDto } from "../types";
 
@@ -48,6 +50,7 @@ export function TimetableDashboard() {
     const { selectScope } = useSelectTimetableScope();
     const { data: serverData, isLoading } = useGetTimetableOverview();
     const [isSelectionDialogOpen, setIsSelectionDialogOpen] = useState(false);
+    const [isBulkGenerateOpen, setIsBulkGenerateOpen] = useState(false);
 
     const data = serverData || [];
 
@@ -121,11 +124,21 @@ export function TimetableDashboard() {
                         Monitor and manage class schedules across the entire institution.
                     </p>
                 </div>
-                {/* Action button toggles the generic scope selector dialog */}
-                <Button onClick={() => setIsSelectionDialogOpen(true)} className="shadow-md group">
-                    <Plus className="w-4 h-4 mr-2 transition-transform group-hover:rotate-90" />
-                    New Schedule
-                </Button>
+                {/* Action buttons */}
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsBulkGenerateOpen(true)}
+                        className="shadow-sm group border-violet-200 hover:border-violet-300 hover:bg-violet-50 text-violet-700"
+                    >
+                        <Sparkles className="w-4 h-4 mr-2 text-violet-500 transition-transform group-hover:scale-110" />
+                        Create Timetable For All Classes
+                    </Button>
+                    <Button onClick={() => setIsSelectionDialogOpen(true)} className="shadow-md group">
+                        <Plus className="w-4 h-4 mr-2 transition-transform group-hover:rotate-90" />
+                        New Schedule
+                    </Button>
+                </div>
             </div>
 
             {/* KPI Ribbon */}
@@ -149,7 +162,7 @@ export function TimetableDashboard() {
                         <div className="flex justify-between items-start">
                             <div className="space-y-2">
                                 <p className="text-sm font-medium text-muted-foreground">Published</p>
-                                <p className="text-3xl font-bold">{publishedCount}</p>
+                                <p className="text-3xl: font-bold">{publishedCount}</p>
                             </div>
                             <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                                 <CheckCircle2 className="w-5 h-5" />
@@ -276,6 +289,11 @@ export function TimetableDashboard() {
             <SelectionDialog 
                 open={isSelectionDialogOpen} 
                 onOpenChange={setIsSelectionDialogOpen} 
+            />
+
+            <BulkGenerateModal
+                open={isBulkGenerateOpen}
+                onOpenChange={setIsBulkGenerateOpen}
             />
         </div>
     );
