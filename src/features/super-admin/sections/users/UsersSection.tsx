@@ -33,7 +33,7 @@ function CreateSchoolAdminDialog({ open, onClose }: { open: boolean; onClose: ()
     mutationFn: () => api.post('/auth/admin/users/school-admin', {
       username: form.username,
       email: form.email,
-      password: form.password,
+      initialPassword: form.password,
       firstName: form.firstName,
       lastName: form.lastName,
     }),
