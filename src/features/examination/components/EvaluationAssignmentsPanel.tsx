@@ -8,9 +8,11 @@ import {
   Search,
   CheckCircle2,
   Clock,
-  Play,
   Upload,
   FileCheck,
+  ChevronDown,
+  ChevronUp,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +84,11 @@ export default function EvaluationAssignmentsPanel() {
   const [teacherIdInput, setTeacherIdInput] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [selectedRole, setSelectedRole] = useState<EvaluationAssignmentRole>("EVALUATOR");
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const { data: assignments = [], isLoading, isError } = useAdminEvaluationAssignments();
   const { data: exams = [] } = useGetAllExams();
@@ -101,6 +108,18 @@ export default function EvaluationAssignmentsPanel() {
         a.role.toLowerCase().includes(q)
     );
   }, [assignments, search]);
+
+  const groupedAssignments = useMemo(() => {
+    const groups: Record<string, typeof assignments> = {};
+    filtered.forEach(a => {
+      if (!groups[a.examName]) groups[a.examName] = [];
+      groups[a.examName].push(a);
+    });
+    return Object.entries(groups).map(([examName, items]) => ({
+      examName,
+      assignments: items,
+    }));
+  }, [filtered]);
 
   const handleAssign = async () => {
     if (!selectedScheduleId || !teacherIdInput.trim()) {
@@ -172,93 +191,120 @@ export default function EvaluationAssignmentsPanel() {
         />
       </div>
 
-      {/* Assignments Table */}
-      {isLoading ? (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[200px] rounded-xl border-2 border-dashed border-border/50 text-center gap-2 bg-card">
-          <ClipboardCheck className="w-8 h-8 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">No evaluation assignments found</p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border/60 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 border-b border-border/50">
-                  <th className="text-left p-3 font-medium text-muted-foreground">Exam</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Subject</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Date</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Teacher</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Role</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Due Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                <AnimatePresence mode="popLayout">
-                  {filtered.map((a) => {
-                    const cfg = statusConfig[a.status];
-                    const Icon = cfg.icon;
-                    const rCfg = roleConfig[a.role];
-                    const RoleIcon = rCfg.icon;
-                    return (
-                      <motion.tr
-                        key={a.assignmentId}
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="border-b border-border/30 hover:bg-muted/20 transition-colors"
-                      >
-                        <td className="p-3 font-medium">{a.examName}</td>
-                        <td className="p-3 text-muted-foreground">{a.subjectName}</td>
-                        <td className="p-3 text-muted-foreground">
-                          {new Date(a.examDate).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                              {a.teacherName.charAt(0)}
-                            </div>
-                            {a.teacherName}
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${rCfg.color}`}>
-                            <RoleIcon className="w-3 h-3" />
-                            {rCfg.label}
-                          </span>
-                        </td>
-                        <td className="p-3">
-                          <Badge variant={cfg.variant} className="gap-1 text-xs">
-                            <Icon className="w-3 h-3" />
-                            {cfg.label}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-muted-foreground">
-                          {a.dueDate
-                            ? new Date(a.dueDate).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "—"}
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </AnimatePresence>
-              </tbody>
-            </table>
+      {/* Assignments Table Grouped */}
+      <div className="space-y-3">
+        {isLoading ? (
+          <div className="flex items-center justify-center min-h-[200px]">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
-        </div>
-      )}
+        ) : groupedAssignments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center min-h-[200px] rounded-xl border-2 border-dashed border-border/50 text-center gap-2 bg-card">
+            <ClipboardCheck className="w-8 h-8 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">No evaluation assignments found</p>
+          </div>
+        ) : (
+          groupedAssignments.map((group) => (
+            <div key={group.examName} className="bg-card border border-border/60 rounded-xl overflow-hidden shadow-sm">
+              <div
+                className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer gap-4 border-b border-border/5"
+                onClick={() => toggleGroup(group.examName)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-background rounded-lg border border-border/50">
+                    <ClipboardCheck className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">{group.examName}</h3>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-md border border-border/40">
+                    {group.assignments.length} assignment{group.assignments.length !== 1 && "s"}
+                  </span>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 pointer-events-none shrink-0" onClick={() => { }}>
+                    {expandedGroups[group.examName] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {expandedGroups[group.examName] && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden border-t border-border/50 bg-background"
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/20 border-b border-border/50">
+                            <th className="text-left p-3 font-medium text-muted-foreground">Subject</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Date</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Teacher</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Role</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Due Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.assignments.map((a) => {
+                            const cfg = statusConfig[a.status];
+                            const Icon = cfg.icon;
+                            const rCfg = roleConfig[a.role];
+                            const RoleIcon = rCfg.icon;
+                            return (
+                              <tr
+                                key={a.assignmentId}
+                                className="border-b border-border/20 last:border-0 hover:bg-muted/10 transition-colors"
+                              >
+                                <td className="p-3 text-foreground font-medium">{a.subjectName}</td>
+                                <td className="p-3 text-muted-foreground">
+                                  {new Date(a.examDate).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                                      {a.teacherName.charAt(0)}
+                                    </div>
+                                    {a.teacherName}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${rCfg.color}`}>
+                                    <RoleIcon className="w-3 h-3" />
+                                    {rCfg.label}
+                                  </span>
+                                </td>
+                                <td className="p-3">
+                                  <Badge variant={cfg.variant} className="gap-1 text-xs">
+                                    <Icon className="w-3 h-3" />
+                                    {cfg.label}
+                                  </Badge>
+                                </td>
+                                <td className="p-3 text-muted-foreground">
+                                  {a.dueDate
+                                    ? new Date(a.dueDate).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                    })
+                                    : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))
+        )}
+      </div>
 
       {/* Assign Staff Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
