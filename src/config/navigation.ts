@@ -76,6 +76,11 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
     icon: User,
   },
   {
+    label: "Timetable",
+    path: "/dashboard/student/timetable",
+    icon: CalendarDays,
+  },
+  {
     label: "Academics",
     path: "/dashboard/student/academics",
     icon: BookOpen,
@@ -159,6 +164,11 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
     label: "Profile",
     path: "/dashboard/teacher/profile",
     icon: User,
+  },
+  {
+    label: "Lecture Logs",
+    path: "/dashboard/teacher/lecture-logs",
+    icon: FileText,
   },
   {
     label: "Schedule",

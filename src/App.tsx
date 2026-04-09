@@ -39,9 +39,11 @@ const TeacherClassesPage = lazy(() => import('@/pages/dashboard/teacher/classes/
 const TeacherMyHrPage = lazy(() => import('@/pages/dashboard/teacher/my-hr/page'))
 const TeacherEvaluationPage = lazy(() => import('@/pages/dashboard/teacher/evaluation/page'))
 const TeacherMyClassPage = lazy(() => import('@/pages/dashboard/teacher/my-class/page'))
+const TeacherLectureLogsPage = lazy(() => import('@/pages/dashboard/teacher/lecture-logs/page'))
 
 const StudentDashboard = lazy(() => import('@/pages/dashboard/student/page'))
 const StudentProfilePage = lazy(() => import('@/pages/dashboard/student/profile/page'))
+const StudentTimetablePage = lazy(() => import('@/pages/dashboard/student/timetable/page'))
 const StudentResultsPage = lazy(() => import('@/pages/dashboard/student/results/page'))
 const StudentPastPapersPage = lazy(() => import('@/pages/dashboard/student/past-papers/page'))
 const StudentAdmitCardsPage = lazy(() => import('@/pages/dashboard/student/admit-cards/page'))
@@ -159,6 +161,7 @@ export default function App() {
           <Route path="profile" element={withRouteSuspense(<TeacherProfilePage />)} />
           <Route path="schedule" element={withRouteSuspense(<TeacherSchedulePage />)} />
           <Route path="my-hr" element={withRouteSuspense(<TeacherMyHrPage />)} />
+          <Route path="lecture-logs" element={withRouteSuspense(<TeacherLectureLogsPage />)} />
           <Route path="evaluation" element={withRouteSuspense(<TeacherEvaluationPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/teacher" replace />} />
         </Route>
@@ -176,6 +179,7 @@ export default function App() {
         >
           <Route index element={withRouteSuspense(<StudentDashboard />)} />
           <Route path="profile" element={withRouteSuspense(<StudentProfilePage />)} />
+          <Route path="timetable" element={withRouteSuspense(<StudentTimetablePage />)} />
           <Route path="results" element={withRouteSuspense(<StudentResultsPage />)} />
           <Route path="past-papers" element={withRouteSuspense(<StudentPastPapersPage />)} />
           <Route path="admit-cards" element={withRouteSuspense(<StudentAdmitCardsPage />)} />
