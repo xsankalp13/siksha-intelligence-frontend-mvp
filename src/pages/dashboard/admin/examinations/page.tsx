@@ -23,6 +23,8 @@ import PastPapersPanel from "@/features/examination/components/PastPapersPanel";
 import InvigilationPanel from "@/features/examination/components/InvigilationPanel";
 import SeatingPlanPanel from "@/features/examination/components/SeatingPlanPanel";
 import EvaluationAssignmentsPanel from "@/features/examination/components/EvaluationAssignmentsPanel";
+import ResultsApprovalPanel from "@/features/examination/components/ResultsApprovalPanel";
+import AdmitCardPanel from "@/features/examination/components/AdmitCardPanel";
 import {
   useGetAllGradeSystems,
   useGetAllQuestions,
@@ -33,7 +35,7 @@ import type {
   ExamScheduleResponseDTO,
 } from "@/services/types/examination";
 
-type ActiveTab = "dashboard" | "exams" | "templates" | "grades" | "questions" | "papers" | "invigilation" | "seating" | "evaluation";
+type ActiveTab = "dashboard" | "exams" | "templates" | "grades" | "questions" | "papers" | "invigilation" | "seating" | "admitCards" | "evaluation" | "results";
 
 // Sub-view management for drill-down navigation
 type SubView =
@@ -91,9 +93,19 @@ const tabs: {
     icon: Armchair,
   },
   {
+    id: "admitCards",
+    label: "Admit Cards",
+    icon: FileText,
+  },
+  {
     id: "evaluation",
     label: "Evaluation",
     icon: FileCheck,
+  },
+  {
+    id: "results",
+    label: "Results",
+    icon: Award,
   },
 ];
 
@@ -156,7 +168,7 @@ export default function ExaminationsPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="flex gap-1.5 p-1 bg-muted/60 rounded-xl border border-border/40 w-fit overflow-x-auto print:hidden"
+        className="flex overflow-x-auto gap-1 p-1 bg-muted/60 rounded-xl border border-border/40 w-fit max-w-full print:hidden scroll-smooth [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-thumb]:rounded-full pb-1"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -165,7 +177,7 @@ export default function ExaminationsPage() {
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              className={`relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+              className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0 ${
                 isActive
                   ? "bg-background text-foreground shadow-sm border border-border/50"
                   : "text-muted-foreground hover:text-foreground hover:bg-background/50"
@@ -219,6 +231,7 @@ export default function ExaminationsPage() {
               onEnterMarks={(schedule) =>
                 handleEnterMarks(subView.exam, schedule)
               }
+              onNavigateToTemplates={() => handleTabChange("templates")}
             />
           )}
           {subView.kind === "marks" && (
@@ -297,6 +310,17 @@ export default function ExaminationsPage() {
         </motion.div>
       )}
 
+      {activeTab === "admitCards" && (
+        <motion.div
+          key="admitCards"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <AdmitCardPanel />
+        </motion.div>
+      )}
+
       {activeTab === "evaluation" && (
         <motion.div
           key="evaluation"
@@ -305,6 +329,17 @@ export default function ExaminationsPage() {
           transition={{ duration: 0.2 }}
         >
           <EvaluationAssignmentsPanel />
+        </motion.div>
+      )}
+
+      {activeTab === "results" && (
+        <motion.div
+          key="results"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ResultsApprovalPanel />
         </motion.div>
       )}
     </div>

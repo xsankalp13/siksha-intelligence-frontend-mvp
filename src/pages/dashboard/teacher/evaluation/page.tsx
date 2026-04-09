@@ -26,7 +26,7 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  Upload,
+  Upload as UploadIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,17 +47,19 @@ import {
   useEvaluationStudents,
   useEvaluationStructure,
   useSaveDraftMarks,
-  usePublishMarks,
+  useSubmitMarks,
   useUploadAnswerSheetImages,
   useCompleteImageUpload,
   useAnswerSheetImages,
   useAnswerSheetAnnotations,
   useCreateAnnotation,
+  useMarkScheduleUploadComplete,
 } from "@/features/examination/hooks/useEvaluationQueries";
 import type {
   EvaluationAssignmentResponseDTO,
   TeacherEvaluationStudentResponseDTO,
   EvaluationAssignmentStatus,
+  EvaluationAssignmentRole,
   SaveQuestionMarkRequestDTO,
   AnnotationType,
   AnnotationResponseDTO,
@@ -89,19 +91,20 @@ export default function TeacherEvaluationPage() {
   const scheduleId = searchParams.get("scheduleId") ? Number(searchParams.get("scheduleId")) : null;
   const studentId = searchParams.get("studentId") || null;
   const answerSheetId = searchParams.get("answerSheetId") ? Number(searchParams.get("answerSheetId")) : null;
+  const currentRole = (searchParams.get("role") || "EVALUATOR") as EvaluationAssignmentRole;
 
   // Step 1: assignments list | Step 2: student upload panel | Step 3: evaluation view
   const step = answerSheetId && studentId ? 3 : scheduleId ? 2 : 1;
 
   const goToAssignments = useCallback(() => setSearchParams({}), [setSearchParams]);
   const goToStudents = useCallback(
-    (sid: number) => setSearchParams({ scheduleId: String(sid) }),
+    (sid: number, role: EvaluationAssignmentRole) => setSearchParams({ scheduleId: String(sid), role }),
     [setSearchParams]
   );
   const goToEvaluate = useCallback(
     (sid: number, stId: string, asid: number) =>
-      setSearchParams({ scheduleId: String(sid), studentId: stId, answerSheetId: String(asid) }),
-    [setSearchParams]
+      setSearchParams({ scheduleId: String(sid), studentId: stId, answerSheetId: String(asid), role: currentRole }),
+    [setSearchParams, currentRole]
   );
 
   return (
@@ -113,7 +116,7 @@ export default function TeacherEvaluationPage() {
             variant="ghost"
             size="icon"
             className="mt-0.5 shrink-0"
-            onClick={() => (step === 3 && scheduleId ? goToStudents(scheduleId) : goToAssignments())}
+            onClick={() => (step === 3 && scheduleId ? goToStudents(scheduleId, currentRole) : goToAssignments())}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -138,6 +141,7 @@ export default function TeacherEvaluationPage() {
       {step === 2 && scheduleId && (
         <StudentsUploadPanel
           scheduleId={scheduleId}
+          role={currentRole}
           onBack={goToAssignments}
           onEvaluate={(stId, asId) => goToEvaluate(scheduleId, stId, asId)}
         />
@@ -147,7 +151,7 @@ export default function TeacherEvaluationPage() {
           scheduleId={scheduleId}
           answerSheetId={answerSheetId}
           studentId={studentId}
-          onBack={() => goToStudents(scheduleId)}
+          onBack={() => goToStudents(scheduleId, currentRole)}
         />
       )}
     </div>
@@ -156,7 +160,7 @@ export default function TeacherEvaluationPage() {
 
 // ── Step 1: Assignments List ────────────────────────────────────────
 
-function AssignmentsList({ onSelect }: { onSelect: (scheduleId: number) => void }) {
+function AssignmentsList({ onSelect }: { onSelect: (scheduleId: number, role: EvaluationAssignmentRole) => void }) {
   const [search, setSearch] = useState("");
   const { data: assignments = [], isLoading, isError } = useMyEvaluationAssignments();
 
@@ -166,7 +170,8 @@ function AssignmentsList({ onSelect }: { onSelect: (scheduleId: number) => void 
     return assignments.filter(
       (a) =>
         a.examName.toLowerCase().includes(q) ||
-        a.subjectName.toLowerCase().includes(q)
+        a.subjectName.toLowerCase().includes(q) ||
+        a.role.toLowerCase().includes(q)
     );
   }, [assignments, search]);
 
@@ -192,7 +197,7 @@ function AssignmentsList({ onSelect }: { onSelect: (scheduleId: number) => void 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search exams or subjects..."
+          placeholder="Search exams, subjects, role..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
@@ -207,7 +212,7 @@ function AssignmentsList({ onSelect }: { onSelect: (scheduleId: number) => void 
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((a) => (
-            <AssignmentCard key={a.assignmentId} assignment={a} onClick={() => onSelect(a.examScheduleId)} />
+            <AssignmentCard key={a.assignmentId} assignment={a} onClick={() => onSelect(a.examScheduleId, a.role)} />
           ))}
         </div>
       )}
@@ -224,6 +229,7 @@ function AssignmentCard({
 }) {
   const cfg = assignmentStatusConfig[a.status];
   const Icon = cfg.icon;
+  const isUploader = a.role === "UPLOADER";
 
   return (
     <motion.button
@@ -233,7 +239,17 @@ function AssignmentCard({
       className="text-left w-full rounded-xl border border-border/60 bg-card p-4 shadow-sm hover:shadow-md transition-all group"
     >
       <div className="flex items-start justify-between mb-3">
-        <h3 className="font-semibold text-foreground leading-tight">{a.examName}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-foreground leading-tight">{a.examName}</h3>
+          <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${
+            isUploader
+              ? "bg-sky-500/10 text-sky-700 border-sky-200"
+              : "bg-violet-500/10 text-violet-700 border-violet-200"
+          }`}>
+            {isUploader ? <UploadIcon className="w-2.5 h-2.5" /> : <FileCheck className="w-2.5 h-2.5" />}
+            {isUploader ? "Uploader" : "Evaluator"}
+          </span>
+        </div>
         <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${cfg.color}`}>
           <Icon className="w-3 h-3" /> {cfg.label}
         </span>
@@ -251,7 +267,7 @@ function AssignmentCard({
         )}
       </div>
       <div className="mt-3 text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-        View Students →
+        {isUploader ? "Upload Sheets →" : "View Students →"}
       </div>
     </motion.button>
   );
@@ -261,16 +277,19 @@ function AssignmentCard({
 
 function StudentsUploadPanel({
   scheduleId,
+  role,
   onBack,
   onEvaluate,
 }: {
   scheduleId: number;
+  role: EvaluationAssignmentRole;
   onBack: () => void;
   onEvaluate: (studentId: string, answerSheetId: number) => void;
 }) {
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { data: students = [], isLoading, isError, refetch } = useEvaluationStudents(scheduleId);
+  const markUploadCompleteMutation = useMarkScheduleUploadComplete();
 
   const filtered = useMemo(() => {
     if (!search.trim()) return students;
@@ -313,6 +332,37 @@ function StudentsUploadPanel({
 
   return (
     <div className="space-y-4">
+      {/* Uploader role info banner */}
+      {role === "UPLOADER" && (
+        <div className="flex items-center justify-between gap-2 text-xs font-medium bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 rounded-lg px-3 py-2 border border-sky-200 dark:border-sky-500/20">
+          <div className="flex items-center gap-2">
+            <UploadIcon className="w-4 h-4 shrink-0" />
+            <span>You are assigned as <strong>Uploader</strong> — upload and manage answer sheets. Evaluation is handled by the evaluator.</span>
+          </div>
+          <Button
+            size="sm"
+            className="gap-1.5 text-xs bg-teal-600 hover:bg-teal-700 shrink-0"
+            disabled={markUploadCompleteMutation.isPending}
+            onClick={async () => {
+              try {
+                await markUploadCompleteMutation.mutateAsync(scheduleId);
+                toast.success("Uploads marked as complete — evaluator is now unblocked");
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : "Failed";
+                toast.error(msg);
+              }
+            }}
+          >
+            {markUploadCompleteMutation.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            )}
+            Complete All Uploads
+          </Button>
+        </div>
+      )}
+
       {/* Stats ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
@@ -346,6 +396,7 @@ function StudentsUploadPanel({
             key={student.studentId}
             student={student}
             scheduleId={scheduleId}
+            role={role}
             isExpanded={expandedId === student.studentId}
             onToggle={() => setExpandedId(expandedId === student.studentId ? null : student.studentId)}
             onEvaluate={onEvaluate}
@@ -362,6 +413,7 @@ function StudentsUploadPanel({
 function StudentUploadCard({
   student,
   scheduleId,
+  role,
   isExpanded,
   onToggle,
   onEvaluate,
@@ -369,6 +421,7 @@ function StudentUploadCard({
 }: {
   student: TeacherEvaluationStudentResponseDTO;
   scheduleId: number;
+  role: EvaluationAssignmentRole;
   isExpanded: boolean;
   onToggle: () => void;
   onEvaluate: (studentId: string, answerSheetId: number) => void;
@@ -376,7 +429,8 @@ function StudentUploadCard({
 }) {
   const status = student.answerSheetStatus;
   const cfg = status ? sheetStatusConfig[status] : null;
-  const canEvaluate = status && status !== "UPLOADED"; // COMPLETE, DRAFT, CHECKING, FINAL
+  const isUploader = role === "UPLOADER";
+  const canEvaluate = !isUploader && status && status !== "UPLOADED"; // COMPLETE, DRAFT, CHECKING, FINAL
   const isFinal = status === "FINAL";
 
   const uploadMutation = useUploadAnswerSheetImages();
@@ -634,7 +688,7 @@ function StudentUploadCard({
                       {uploadMutation.isPending ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <Upload className="w-3.5 h-3.5" />
+                        <UploadIcon className="w-3.5 h-3.5" />
                       )}
                       Upload {localPreviews.length} Page(s)
                     </Button>
@@ -691,12 +745,12 @@ function EvaluationView({
   studentId: string;
   onBack: () => void;
 }) {
-  const { data: structure, isLoading: structureLoading } = useEvaluationStructure(answerSheetId);
+  const { data: structure, isLoading: structureLoading, error: structureError } = useEvaluationStructure(answerSheetId);
   const { data: imageGroup, isLoading: imagesLoading } = useAnswerSheetImages(studentId, scheduleId);
   const { data: annotations = [], refetch: refetchAnnotations } = useAnswerSheetAnnotations(answerSheetId);
   const createAnnotation = useCreateAnnotation();
   const saveMutation = useSaveDraftMarks();
-  const publishMutation = usePublishMarks();
+  const submitMutation = useSubmitMarks();
 
   // Students list for fast switching
   const { data: students = [] } = useEvaluationStudents(scheduleId);
@@ -710,7 +764,10 @@ function EvaluationView({
   const [annotationTool, setAnnotationTool] = useState<"TICK" | "CROSS" | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savingRef = useRef(false);
-  const isFinal = structure?.resultStatus === "FINAL";
+  
+  const status = structure?.resultStatus;
+  const isFinal = status === "SUBMITTED" || status === "APPROVED" || status === "PUBLISHED";
+  const isRejected = status === "REJECTED";
 
   // Refs for stable debounced save
   const marksRef = useRef(marks);
@@ -851,19 +908,19 @@ function EvaluationView({
     [annotationTool, answerSheetId, currentPage, isFinal, createAnnotation, refetchAnnotations]
   );
 
-  const handlePublish = async () => {
+  const handleSubmit = async () => {
     const questionMarks = buildPayload();
     if (questionMarks.length === 0) {
-      toast.error("Please enter marks before publishing");
+      toast.error("Please enter marks before submitting");
       return;
     }
     try {
       await saveMutation.mutateAsync({ answerSheetId, data: { questionMarks } });
-      await publishMutation.mutateAsync(answerSheetId);
-      toast.success("Marks published successfully! Evaluation is now locked.");
+      await submitMutation.mutateAsync(answerSheetId);
+      toast.success("Marks submitted for review successfully! Editing is now locked.");
       setPublishDialogOpen(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Publish failed";
+      const msg = err instanceof Error ? err.message : "Submit failed";
       toast.error(msg);
     }
   };
@@ -896,10 +953,93 @@ function EvaluationView({
     (s) => s.answerSheetId && s.answerSheetStatus && s.answerSheetStatus !== "UPLOADED"
   );
 
+  // Detect "uploads not completed" 403 vs other errors
+  const isUploadsIncomplete = useMemo(() => {
+    if (!structureError) return false;
+    const errResponse = (structureError as { response?: { status?: number; data?: { message?: string } } })?.response;
+    return (
+      errResponse?.status === 403 &&
+      (errResponse?.data?.message?.toLowerCase().includes("uploader") ?? false)
+    );
+  }, [structureError]);
+
+  // Upload progress stats
+  const uploadStats = useMemo(() => {
+    const total = students.length;
+    const uploaded = students.filter((s) => s.answerSheetStatus).length;
+    const complete = students.filter(
+      (s) => s.answerSheetStatus === "COMPLETE" || s.answerSheetStatus === "DRAFT" || 
+             s.answerSheetStatus === "CHECKING" || s.answerSheetStatus === "FINAL"
+    ).length;
+    return { total, uploaded, complete, remaining: total - uploaded };
+  }, [students]);
+
   if (structureLoading || imagesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Friendly "Waiting for Uploads" view
+  if (isUploadsIncomplete) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-6">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-full max-w-md rounded-2xl border border-amber-200 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/5 p-8 text-center space-y-5"
+        >
+          <div className="mx-auto w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-500/10 flex items-center justify-center">
+            <motion.div
+              animate={{ y: [0, -4, 0] }}
+              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+            >
+              <UploadIcon className="w-8 h-8 text-amber-600" />
+            </motion.div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-400">
+              Waiting for Uploads
+            </h3>
+            <p className="text-sm text-amber-700/80 dark:text-amber-400/60 mt-1">
+              The assigned uploader hasn&apos;t finished uploading all answer sheets yet.
+              Evaluation will be available once uploads are marked complete.
+            </p>
+          </div>
+
+          {/* Progress stats */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Uploaded", value: uploadStats.uploaded, color: "text-amber-700 dark:text-amber-400" },
+              { label: "Ready", value: uploadStats.complete, color: "text-teal-600" },
+              { label: "Pending", value: uploadStats.remaining, color: "text-muted-foreground" },
+            ].map((s) => (
+              <div key={s.label} className="rounded-xl bg-white/60 dark:bg-white/5 border border-amber-200/50 dark:border-amber-500/10 p-3">
+                <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
+                <p className="text-[10px] uppercase tracking-wider text-amber-600/70 font-medium">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          {uploadStats.total > 0 && (
+            <div className="w-full bg-amber-200/50 dark:bg-amber-500/10 rounded-full h-2 overflow-hidden">
+              <motion.div
+                className="h-full bg-amber-500 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${(uploadStats.uploaded / uploadStats.total) * 100}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              />
+            </div>
+          )}
+
+          <Button variant="outline" onClick={onBack} className="gap-2">
+            <ArrowLeft className="w-4 h-4" /> Go Back
+          </Button>
+        </motion.div>
       </div>
     );
   }
@@ -937,9 +1077,21 @@ function EvaluationView({
             <div className="h-8 w-px bg-border/50" />
             <div className="flex flex-col">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Status</span>
-              {isFinal ? (
+              {status === "PUBLISHED" ? (
                 <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium">
                   <Lock className="w-3 h-3" /> Published
+                </span>
+              ) : status === "APPROVED" ? (
+                <span className="inline-flex items-center gap-1 text-xs text-teal-700 font-medium">
+                  <CheckCircle2 className="w-3 h-3" /> Approved
+                </span>
+              ) : status === "SUBMITTED" ? (
+                <span className="inline-flex items-center gap-1 text-xs text-amber-700 font-medium">
+                  <Clock className="w-3 h-3" /> Submitted
+                </span>
+              ) : isRejected ? (
+                <span className="inline-flex items-center gap-1 text-xs text-red-600 font-medium">
+                  <AlertCircle className="w-3 h-3" /> Rejected (Edit)
                 </span>
               ) : (
                 <SaveIndicator status={saveStatus} />
@@ -1022,15 +1174,15 @@ function EvaluationView({
                 <Button
                   size="sm"
                   onClick={() => setPublishDialogOpen(true)}
-                  disabled={publishMutation.isPending}
-                  className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700"
+                  disabled={submitMutation.isPending}
+                  className="gap-1.5 text-xs bg-amber-500 hover:bg-amber-600 text-white border-transparent"
                 >
-                  {publishMutation.isPending ? (
+                  {submitMutation.isPending ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <ArrowLeft className="w-3.5 h-3.5 rotate-90" />
                   )}
-                  Publish
+                  Submit for Review
                 </Button>
               </>
             )}
@@ -1254,13 +1406,14 @@ function EvaluationView({
         </div>
       </div>
 
-      {/* Publish Confirmation */}
+      {/* Submit Confirmation */}
       <AlertDialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Publish Evaluation?</AlertDialogTitle>
+            <AlertDialogTitle>Submit for Admin Review?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will finalize the marks and <strong>lock the evaluation</strong>. No further edits will be allowed.
+              This will submit the marks to the administration for approval. 
+              <strong> You will not be able to edit this unless it is rejected.</strong>
               <br /><br />
               Total marks: <strong>{totals.current.toFixed(1)} / {totals.max}</strong>
               <br />
@@ -1270,11 +1423,11 @@ function EvaluationView({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handlePublish}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={handleSubmit}
+              className="bg-amber-500 hover:bg-amber-600 text-white"
             >
-              {publishMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Publish & Lock
+              {submitMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Submit for Review
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

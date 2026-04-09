@@ -5,9 +5,18 @@
 
 export type EvaluationAssignmentStatus = "ASSIGNED" | "IN_PROGRESS" | "COMPLETED";
 
+export type EvaluationAssignmentRole = "UPLOADER" | "EVALUATOR";
+
+export type UploadStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+
 export type AnswerSheetStatus = "UPLOADED" | "COMPLETE" | "CHECKING" | "DRAFT" | "FINAL";
 
-export type EvaluationResultStatus = "DRAFT" | "FINAL";
+export type EvaluationResultStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "PUBLISHED"
+  | "REJECTED";
 
 export type AnnotationType = "TICK" | "CROSS" | "DRAW" | "NONE";
 
@@ -17,6 +26,7 @@ export interface EvaluationAssignmentCreateRequestDTO {
   examScheduleId: number;
   teacherId: string; // UUID
   dueDate?: string;  // ISO date
+  role?: EvaluationAssignmentRole; // defaults to EVALUATOR if omitted
 }
 
 export interface EvaluationAssignmentResponseDTO {
@@ -28,7 +38,9 @@ export interface EvaluationAssignmentResponseDTO {
   examDate: string;
   teacherId: string;   // UUID
   teacherName: string;
+  role: EvaluationAssignmentRole;
   status: EvaluationAssignmentStatus;
+  uploadStatus: UploadStatus | null;
   assignedAt: string;
   dueDate: string | null;
 }
@@ -102,10 +114,15 @@ export interface SaveEvaluationMarksRequestDTO {
 }
 
 export interface EvaluationResultResponseDTO {
+  resultId: number;
   answerSheetId: number;
   totalMarks: number;
-  status: string;
+  status: EvaluationResultStatus;
   evaluatedAt: string | null;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  publishedAt: string | null;
+  approvedBy: string | null;
 }
 
 // ── Annotation DTOs ─────────────────────────────────────────────────
@@ -125,4 +142,53 @@ export interface AnnotationResponseDTO {
   y: number;
   type: AnnotationType;
   metadata: Record<string, unknown> | null;
+}
+
+// ── Admin Result Review DTOs ────────────────────────────────────────
+
+export interface AdminResultReviewResponseDTO {
+  resultId: number;
+  answerSheetId: number;
+  scheduleId: number;
+  studentId: string;    // UUID
+  studentName: string;
+  enrollmentNumber: string;
+  examName: string;
+  subjectName: string;
+  totalMarks: number;
+  status: EvaluationResultStatus;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  publishedAt: string | null;
+  approvedBy: string | null;
+}
+
+// ── Student Result DTOs ─────────────────────────────────────────────
+
+export interface StudentResultResponseDTO {
+  resultId: number;
+  scheduleId: number;
+  examName: string;
+  subjectName: string;
+  marksObtained: number;
+  maxMarks: number;
+  publishedAt: string;
+}
+
+export interface StudentResultDetailResponseDTO {
+  resultId: number;
+  scheduleId: number;
+  examName: string;
+  subjectName: string;
+  examDate: string;
+  totalMarks: number;
+  maxMarks: number;
+  publishedAt: string;
+  subjectMarks: SubjectMarkDTO[];
+}
+
+export interface SubjectMarkDTO {
+  subjectName: string;
+  marksObtained: number;
+  maxMarks: number;
 }

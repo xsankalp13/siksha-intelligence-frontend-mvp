@@ -77,6 +77,7 @@ interface Props {
   exam: ExamResponseDTO;
   onBack: () => void;
   onEnterMarks: (schedule: ExamScheduleResponseDTO) => void;
+  onNavigateToTemplates?: () => void;
 }
 
 /* ── internal form state (keeps the original Start / End UI) ── */
@@ -194,6 +195,7 @@ export default function ExamSchedulePanel({
   exam,
   onBack,
   onEnterMarks: _onEnterMarks,
+  onNavigateToTemplates,
 }: Props) {
   const { data: schedules = [], isLoading } = useGetSchedulesByExam(exam.uuid);
   const { data: templates = [] } = useGetAllTemplates();
@@ -570,6 +572,20 @@ export default function ExamSchedulePanel({
                   </div>
                 ) : null;
               })()}
+              {onNavigateToTemplates && (
+                <div className="flex justify-end mt-1">
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs text-primary"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      onNavigateToTemplates();
+                    }}
+                  >
+                    + Create New Template
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="bg-muted/20 p-5 rounded-2xl border border-border/40 space-y-4">

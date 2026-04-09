@@ -11,6 +11,10 @@ import type {
   EvaluationResultResponseDTO,
   AnnotationRequestDTO,
   AnnotationResponseDTO,
+  AdminResultReviewResponseDTO,
+  StudentResultResponseDTO,
+  StudentResultDetailResponseDTO,
+  EvaluationResultStatus,
 } from "./types/evaluation";
 
 // ── Evaluation Service ──────────────────────────────────────────────
@@ -118,10 +122,10 @@ export const evaluationService = {
     );
   },
 
-  /** POST /teacher/evaluation/{answerSheetId}/publish */
-  publishMarks(answerSheetId: number) {
+  /** POST /teacher/evaluation/{answerSheetId}/submit — submits for admin review */
+  submitMarks(answerSheetId: number) {
     return api.post<EvaluationResultResponseDTO>(
-      `/teacher/evaluation/${answerSheetId}/publish`
+      `/teacher/evaluation/${answerSheetId}/submit`
     );
   },
 
@@ -153,5 +157,69 @@ export const evaluationService = {
       `/teacher/evaluation/${scheduleId}/answer-sheets`,
       { params: { page, size } }
     );
+  },
+
+  /** POST /teacher/evaluation/{scheduleId}/upload-complete */
+  markScheduleUploadComplete(scheduleId: number) {
+    return api.post<EvaluationAssignmentResponseDTO>(
+      `/teacher/evaluation/${scheduleId}/upload-complete`
+    );
+  },
+
+  /** DELETE /auth/examination/evaluation/assignments/{assignmentId} */
+  deleteAssignment(assignmentId: number) {
+    return api.delete(`/auth/examination/evaluation/assignments/${assignmentId}`);
+  },
+
+  // ── Admin Result Review APIs ──────────────────────────────────────
+
+  /** GET /admin/results?status= */
+  getResultsForAdmin(status?: EvaluationResultStatus) {
+    return api.get<AdminResultReviewResponseDTO[]>(
+      "/admin/results",
+      { params: status ? { status } : undefined }
+    );
+  },
+
+  /** POST /admin/results/{id}/approve */
+  approveResult(resultId: number) {
+    return api.post<EvaluationResultResponseDTO>(
+      `/admin/results/${resultId}/approve`
+    );
+  },
+
+  /** POST /admin/results/{id}/reject */
+  rejectResult(resultId: number) {
+    return api.post<EvaluationResultResponseDTO>(
+      `/admin/results/${resultId}/reject`
+    );
+  },
+
+  /** POST /admin/results/{id}/publish */
+  publishResult(resultId: number) {
+    return api.post<EvaluationResultResponseDTO>(
+      `/admin/results/${resultId}/publish`
+    );
+  },
+
+  // ── Student Result APIs ───────────────────────────────────────────
+
+  /** GET /student/results */
+  getStudentResults() {
+    return api.get<StudentResultResponseDTO[]>("/student/results");
+  },
+
+  /** GET /student/results/{id} */
+  getStudentResultDetail(resultId: number) {
+    return api.get<StudentResultDetailResponseDTO>(
+      `/student/results/${resultId}`
+    );
+  },
+
+  /** GET /student/results/{id}/pdf — returns PDF blob */
+  downloadStudentResultPdf(resultId: number) {
+    return api.get<Blob>(`/student/results/${resultId}/pdf`, {
+      responseType: "blob",
+    });
   },
 };

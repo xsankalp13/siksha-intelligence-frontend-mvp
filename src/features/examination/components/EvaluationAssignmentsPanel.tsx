@@ -8,7 +8,12 @@ import {
   Search,
   CheckCircle2,
   Clock,
+  Upload,
+  FileCheck,
+  ChevronDown,
+  ChevronUp,
   Play,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +27,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -33,10 +48,14 @@ import { toast } from "sonner";
 import {
   useAdminEvaluationAssignments,
   useAssignTeacher,
+  useDeleteAssignment,
 } from "../hooks/useEvaluationQueries";
 import { useGetAllExams, useGetSchedulesByExam } from "../hooks/useExaminationQueries";
 import { useStaffList } from "@/features/hrms/hooks/useStaffList";
-import type { EvaluationAssignmentStatus } from "@/services/types/evaluation";
+import type {
+  EvaluationAssignmentStatus,
+  EvaluationAssignmentRole,
+} from "@/services/types/evaluation";
 
 // ── Status badge config ──────────────────────────────────────────────
 
@@ -49,6 +68,24 @@ const statusConfig: Record<
   COMPLETED: { label: "Completed", variant: "outline", icon: CheckCircle2 },
 };
 
+// ── Role badge config ────────────────────────────────────────────────
+
+const roleConfig: Record<
+  EvaluationAssignmentRole,
+  { label: string; color: string; icon: React.ElementType }
+> = {
+  UPLOADER: {
+    label: "Uploader",
+    color: "bg-sky-500/10 text-sky-700 border-sky-200",
+    icon: Upload,
+  },
+  EVALUATOR: {
+    label: "Evaluator",
+    color: "bg-violet-500/10 text-violet-700 border-violet-200",
+    icon: FileCheck,
+  },
+};
+
 export default function EvaluationAssignmentsPanel() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -58,12 +95,20 @@ export default function EvaluationAssignmentsPanel() {
   const [selectedScheduleId, setSelectedScheduleId] = useState("");
   const [teacherIdInput, setTeacherIdInput] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [selectedRole, setSelectedRole] = useState<EvaluationAssignmentRole>("EVALUATOR");
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const { data: assignments = [], isLoading, isError } = useAdminEvaluationAssignments();
   const { data: exams = [] } = useGetAllExams();
   const { data: schedules = [] } = useGetSchedulesByExam(selectedExamUuid);
   const { data: staffList = [] } = useStaffList();
   const assignMutation = useAssignTeacher();
+  const deleteMutation = useDeleteAssignment();
 
   const filtered = useMemo(() => {
     if (!search.trim()) return assignments;
@@ -73,9 +118,22 @@ export default function EvaluationAssignmentsPanel() {
         a.teacherName.toLowerCase().includes(q) ||
         a.examName.toLowerCase().includes(q) ||
         a.subjectName.toLowerCase().includes(q) ||
-        a.status.toLowerCase().includes(q)
+        a.status.toLowerCase().includes(q) ||
+        a.role.toLowerCase().includes(q)
     );
   }, [assignments, search]);
+
+  const groupedAssignments = useMemo(() => {
+    const groups: Record<string, typeof assignments> = {};
+    filtered.forEach(a => {
+      if (!groups[a.examName]) groups[a.examName] = [];
+      groups[a.examName].push(a);
+    });
+    return Object.entries(groups).map(([examName, items]) => ({
+      examName,
+      assignments: items,
+    }));
+  }, [filtered]);
 
   const handleAssign = async () => {
     if (!selectedScheduleId || !teacherIdInput.trim()) {
@@ -87,8 +145,9 @@ export default function EvaluationAssignmentsPanel() {
         examScheduleId: Number(selectedScheduleId),
         teacherId: teacherIdInput.trim(),
         dueDate: dueDate || undefined,
+        role: selectedRole,
       });
-      toast.success("Teacher assigned successfully");
+      toast.success(`Teacher assigned as ${selectedRole.toLowerCase()} successfully`);
       setDialogOpen(false);
       resetForm();
     } catch (err: unknown) {
@@ -102,6 +161,24 @@ export default function EvaluationAssignmentsPanel() {
     setSelectedScheduleId("");
     setTeacherIdInput("");
     setDueDate("");
+    setSelectedRole("EVALUATOR");
+  };
+
+  const handleDeleteAssignment = (assignmentId: number) => {
+    setDeleteTarget(assignmentId);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget, {
+      onSuccess: () => {
+        toast.success("Assignment removed successfully");
+        setDeleteTarget(null);
+      },
+      onError: () => {
+        toast.error("Failed to remove assignment. The staff member may have already started or uploaded files.");
+      },
+    });
   };
 
   if (isError) {
@@ -126,11 +203,11 @@ export default function EvaluationAssignmentsPanel() {
           </div>
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Evaluation Assignments</h2>
-            <p className="text-sm text-muted-foreground">Assign teachers to check answer sheets</p>
+            <p className="text-sm text-muted-foreground">Assign uploaders and evaluators for answer sheets</p>
           </div>
         </div>
         <Button onClick={() => setDialogOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" /> Assign Teacher
+          <Plus className="w-4 h-4" /> Assign Staff
         </Button>
       </div>
 
@@ -138,99 +215,148 @@ export default function EvaluationAssignmentsPanel() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search by teacher, exam, subject..."
+          placeholder="Search by teacher, exam, subject, role..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
         />
       </div>
 
-      {/* Assignments Table */}
-      {isLoading ? (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[200px] rounded-xl border-2 border-dashed border-border/50 text-center gap-2 bg-card">
-          <ClipboardCheck className="w-8 h-8 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">No evaluation assignments found</p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border/60 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 border-b border-border/50">
-                  <th className="text-left p-3 font-medium text-muted-foreground">Exam</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Subject</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Date</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Teacher</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Due Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                <AnimatePresence mode="popLayout">
-                  {filtered.map((a) => {
-                    const cfg = statusConfig[a.status];
-                    const Icon = cfg.icon;
-                    return (
-                      <motion.tr
-                        key={a.assignmentId}
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="border-b border-border/30 hover:bg-muted/20 transition-colors"
-                      >
-                        <td className="p-3 font-medium">{a.examName}</td>
-                        <td className="p-3 text-muted-foreground">{a.subjectName}</td>
-                        <td className="p-3 text-muted-foreground">
-                          {new Date(a.examDate).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                              {a.teacherName.charAt(0)}
-                            </div>
-                            {a.teacherName}
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <Badge variant={cfg.variant} className="gap-1 text-xs">
-                            <Icon className="w-3 h-3" />
-                            {cfg.label}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-muted-foreground">
-                          {a.dueDate
-                            ? new Date(a.dueDate).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })
-                            : "—"}
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </AnimatePresence>
-              </tbody>
-            </table>
+      {/* Assignments Table Grouped */}
+      <div className="space-y-3">
+        {isLoading ? (
+          <div className="flex items-center justify-center min-h-[200px]">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
-        </div>
-      )}
+        ) : groupedAssignments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center min-h-[200px] rounded-xl border-2 border-dashed border-border/50 text-center gap-2 bg-card">
+            <ClipboardCheck className="w-8 h-8 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">No evaluation assignments found</p>
+          </div>
+        ) : (
+          groupedAssignments.map((group) => (
+            <div key={group.examName} className="bg-card border border-border/60 rounded-xl overflow-hidden shadow-sm">
+              <div
+                className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer gap-4 border-b border-border/5"
+                onClick={() => toggleGroup(group.examName)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-background rounded-lg border border-border/50">
+                    <ClipboardCheck className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">{group.examName}</h3>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-md border border-border/40">
+                    {group.assignments.length} assignment{group.assignments.length !== 1 && "s"}
+                  </span>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 pointer-events-none shrink-0" onClick={() => { }}>
+                    {expandedGroups[group.examName] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
 
-      {/* Assign Teacher Dialog */}
+              <AnimatePresence>
+                {expandedGroups[group.examName] && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden border-t border-border/50 bg-background"
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/20 border-b border-border/50">
+                            <th className="text-left p-3 font-medium text-muted-foreground">Subject</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Date</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Teacher</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Role</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
+                            <th className="text-left p-3 font-medium text-muted-foreground">Due Date</th>
+                            <th className="text-right p-3 font-medium text-muted-foreground">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.assignments.map((a) => {
+                            const cfg = statusConfig[a.status];
+                            const Icon = cfg.icon;
+                            const rCfg = roleConfig[a.role];
+                            const RoleIcon = rCfg.icon;
+                            return (
+                              <tr
+                                key={a.assignmentId}
+                                className="border-b border-border/20 last:border-0 hover:bg-muted/10 transition-colors"
+                              >
+                                <td className="p-3 text-foreground font-medium">{a.subjectName}</td>
+                                <td className="p-3 text-muted-foreground">
+                                  {new Date(a.examDate).toLocaleDateString("en-US", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </td>
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                                      {a.teacherName.charAt(0)}
+                                    </div>
+                                    {a.teacherName}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${rCfg.color}`}>
+                                    <RoleIcon className="w-3 h-3" />
+                                    {rCfg.label}
+                                  </span>
+                                </td>
+                                <td className="p-3">
+                                  <Badge variant={cfg.variant} className="gap-1 text-xs">
+                                    <Icon className="w-3 h-3" />
+                                    {cfg.label}
+                                  </Badge>
+                                </td>
+                                <td className="p-3 text-muted-foreground">
+                                  {a.dueDate
+                                    ? new Date(a.dueDate).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                    })
+                                    : "—"}
+                                </td>
+                                <td className="p-3 text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleDeleteAssignment(a.assignmentId)}
+                                    title="Remove assignment"
+                                    disabled={deleteMutation.isPending}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Assign Staff Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign Teacher for Evaluation</DialogTitle>
+            <DialogTitle>Assign Staff for Evaluation</DialogTitle>
             <DialogDescription>
-              Select an exam schedule and assign a teacher to evaluate answer sheets.
+              Select an exam schedule, choose a role (Uploader or Evaluator), and assign a staff member.
             </DialogDescription>
           </DialogHeader>
 
@@ -269,6 +395,37 @@ export default function EvaluationAssignmentsPanel() {
               </div>
             )}
 
+            {/* Role Selector */}
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as EvaluationAssignmentRole)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EVALUATOR">
+                    <div className="flex items-center gap-2">
+                      <FileCheck className="w-3.5 h-3.5 text-violet-600" />
+                      <span>Evaluator</span>
+                      <span className="text-xs text-muted-foreground ml-1">— grades answer sheets</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="UPLOADER">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Uploader</span>
+                      <span className="text-xs text-muted-foreground ml-1">— scans & uploads only</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                {selectedRole === "UPLOADER"
+                  ? "Uploader can only upload answer sheet images. They cannot see marks or evaluate."
+                  : "Evaluator can grade answer sheets. If no uploader is assigned, they can also upload."}
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label>Teacher</Label>
               <Select value={teacherIdInput} onValueChange={setTeacherIdInput}>
@@ -303,11 +460,34 @@ export default function EvaluationAssignmentsPanel() {
             </Button>
             <Button onClick={handleAssign} disabled={assignMutation.isPending} className="gap-2">
               {assignMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Assign
+              Assign as {selectedRole === "UPLOADER" ? "Uploader" : "Evaluator"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Alert Dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Assignment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this staff assignment? The staff member will immediately lose access to evaluate or upload for this schedule. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Remove Assignment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

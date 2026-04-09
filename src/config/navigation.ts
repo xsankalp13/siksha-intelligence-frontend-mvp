@@ -12,9 +12,10 @@ import {
   CalendarDays,
   Home,
   Map,
-
   ClipboardCheck,
   FileCheck,
+  Award,
+  Archive,
 
   Clock,
   DoorOpen,
@@ -85,6 +86,11 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
     icon: BookOpen,
   },
   {
+    label: "My Results",
+    path: "/dashboard/student/results",
+    icon: Award,
+  },
+  {
     label: "Attendance",
     path: "/dashboard/student/attendance",
     icon: CalendarCheck,
@@ -103,6 +109,16 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
     label: "Notice Board",
     path: "/dashboard/student/notices",
     icon: Bell,
+  },
+  {
+    label: "Past Papers",
+    path: "/dashboard/student/past-papers",
+    icon: Archive,
+  },
+  {
+    label: "My Admit Cards",
+    path: "/dashboard/student/admit-cards",
+    icon: FileCheck,
   },
 ];
 
