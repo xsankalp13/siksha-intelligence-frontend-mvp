@@ -44,6 +44,7 @@ const StudentDashboard = lazy(() => import('@/pages/dashboard/student/page'))
 const StudentProfilePage = lazy(() => import('@/pages/dashboard/student/profile/page'))
 const StudentResultsPage = lazy(() => import('@/pages/dashboard/student/results/page'))
 const StudentPastPapersPage = lazy(() => import('@/pages/dashboard/student/past-papers/page'))
+const StudentAdmitCardsPage = lazy(() => import('@/pages/dashboard/student/admit-cards/page'))
 
 const SuperAdminOverviewPage = lazy(() => import('@/pages/dashboard/super-admin/overview/page'))
 const SuperAdminUsersPage = lazy(() => import('@/pages/dashboard/super-admin/users/page'))
@@ -177,6 +178,7 @@ export default function App() {
           <Route path="profile" element={withRouteSuspense(<StudentProfilePage />)} />
           <Route path="results" element={withRouteSuspense(<StudentResultsPage />)} />
           <Route path="past-papers" element={withRouteSuspense(<StudentPastPapersPage />)} />
+          <Route path="admit-cards" element={withRouteSuspense(<StudentAdmitCardsPage />)} />
         </Route>
 
         {/* Redirect all unknown routes to home (which will redirect to login if not authenticated) */}

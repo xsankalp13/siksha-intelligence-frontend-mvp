@@ -110,6 +110,11 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
     path: "/dashboard/student/past-papers",
     icon: Archive,
   },
+  {
+    label: "My Admit Cards",
+    path: "/dashboard/student/admit-cards",
+    icon: FileCheck,
+  },
 ];
 
 export const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [

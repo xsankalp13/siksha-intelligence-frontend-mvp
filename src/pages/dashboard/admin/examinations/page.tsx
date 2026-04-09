@@ -24,6 +24,7 @@ import InvigilationPanel from "@/features/examination/components/InvigilationPan
 import SeatingPlanPanel from "@/features/examination/components/SeatingPlanPanel";
 import EvaluationAssignmentsPanel from "@/features/examination/components/EvaluationAssignmentsPanel";
 import ResultsApprovalPanel from "@/features/examination/components/ResultsApprovalPanel";
+import AdmitCardPanel from "@/features/examination/components/AdmitCardPanel";
 import {
   useGetAllGradeSystems,
   useGetAllQuestions,
@@ -34,7 +35,7 @@ import type {
   ExamScheduleResponseDTO,
 } from "@/services/types/examination";
 
-type ActiveTab = "dashboard" | "exams" | "templates" | "grades" | "questions" | "papers" | "invigilation" | "seating" | "evaluation" | "results";
+type ActiveTab = "dashboard" | "exams" | "templates" | "grades" | "questions" | "papers" | "invigilation" | "seating" | "admitCards" | "evaluation" | "results";
 
 // Sub-view management for drill-down navigation
 type SubView =
@@ -90,6 +91,11 @@ const tabs: {
     id: "seating",
     label: "Seating Plan",
     icon: Armchair,
+  },
+  {
+    id: "admitCards",
+    label: "Admit Cards",
+    icon: FileText,
   },
   {
     id: "evaluation",
@@ -301,6 +307,17 @@ export default function ExaminationsPage() {
           transition={{ duration: 0.2 }}
         >
           <SeatingPlanPanel />
+        </motion.div>
+      )}
+
+      {activeTab === "admitCards" && (
+        <motion.div
+          key="admitCards"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <AdmitCardPanel />
         </motion.div>
       )}
 

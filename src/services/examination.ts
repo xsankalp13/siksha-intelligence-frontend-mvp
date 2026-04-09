@@ -21,6 +21,9 @@ import type {
   PastPaperRequestDTO,
   PastPaperResponseDTO,
   PastPaperQueryParams,
+  AdmitCardResponseDTO,
+  AdmitCardGenerationResponseDTO,
+  ScheduleAdmitCardStatusDTO,
 } from "./types/examination";
 import type {
   ExamTemplateRequestDTO,
@@ -342,4 +345,60 @@ export const examinationService = {
       `/auth/examination/schedules/${scheduleId}/evaluation-structure`
     );
   },
+
+  // ── Admit Cards ──────────────────────────────────────────────────
+  /** POST /admin/admit-cards/generate (full exam) */
+  generateAdmitCards(examUuid: string) {
+    return api.post<AdmitCardGenerationResponseDTO>(
+      `/admin/admit-cards/generate`,
+      { examId: examUuid }
+    );
+  },
+
+  /** POST /admin/admit-cards/generate (per-schedule) */
+  generateAdmitCardsForSchedule(examUuid: string, scheduleId: number) {
+    return api.post<AdmitCardGenerationResponseDTO>(
+      `/admin/admit-cards/generate/schedule/${scheduleId}`,
+      { examId: examUuid }
+    );
+  },
+
+  /** GET /admin/admit-cards/status/:examUuid */
+  getAdmitCardStatus(examUuid: string) {
+    return api.get<ScheduleAdmitCardStatusDTO[]>(
+      `/admin/admit-cards/status/${examUuid}`
+    );
+  },
+
+  /** POST /admin/admit-cards/publish/:examUuid */
+  publishAdmitCards(examUuid: string) {
+    return api.post(`/admin/admit-cards/publish/${examUuid}`);
+  },
+
+  /** POST /admin/admit-cards/publish/:examUuid/schedules */
+  publishAdmitCardsForSchedules(examUuid: string, scheduleIds: number[]) {
+    return api.post(`/admin/admit-cards/publish/${examUuid}/schedules`, {
+      scheduleIds,
+    });
+  },
+
+  /** GET /admin/admit-cards/download/:examUuid */
+  downloadAdminAdmitCardsZip(examUuid: string) {
+    return api.get(`/admin/admit-cards/download/${examUuid}`, {
+      responseType: "blob",
+    });
+  },
+
+  /** GET /student/admit-card/:examUuid */
+  getStudentAdmitCard(examUuid: string) {
+    return api.get<AdmitCardResponseDTO>(`/student/admit-card/${examUuid}`);
+  },
+
+  /** GET /student/admit-card/:examId/pdf */
+  downloadStudentAdmitCardPdf(examUuid: string) {
+    return api.get(`/student/admit-card/${examUuid}/pdf`, {
+      responseType: "blob",
+    });
+  },
 };
+

@@ -14,6 +14,9 @@ import type {
   PastPaperQueryParams,
   StudentMarkRequestDTO,
   ExamResponseDTO,
+  AdmitCardGenerationResponseDTO,
+  AdmitCardResponseDTO,
+  ScheduleAdmitCardStatusDTO,
 } from "@/services/types/examination";
 import type { ExamTemplateRequestDTO } from "@/services/types/examTemplate";
 
@@ -47,6 +50,12 @@ const keys = {
     ["examination", "templates", id, "preview"] as const,
   evaluationStructure: (scheduleId: number) =>
     ["examination", "evaluation-structure", scheduleId] as const,
+  admitCards: (examUuid: string) =>
+    ["examination", "admit-cards", examUuid] as const,
+  admitCardStatus: (examUuid: string) =>
+    ["examination", "admit-card-status", examUuid] as const,
+  studentAdmitCard: (examUuid: string) =>
+    ["examination", "student-admit-card", examUuid] as const,
 };
 
 // ── Exams ────────────────────────────────────────────────────────────
@@ -555,3 +564,74 @@ export const useGetEvaluationStructure = (scheduleId: number) =>
       (await examinationService.getEvaluationStructure(scheduleId)).data,
     enabled: !!scheduleId,
   });
+
+// ── Admit Cards ─────────────────────────────────────────────────────
+
+export const useGenerateAdmitCards = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (examUuid: string) => examinationService.generateAdmitCards(examUuid).then((r) => r.data),
+    onSuccess: (_, examUuid) => {
+      qc.invalidateQueries({ queryKey: ["examination", "admit-cards", examUuid] });
+      qc.invalidateQueries({ queryKey: ["examination", "admit-card-status", examUuid] });
+      qc.invalidateQueries({ queryKey: keys.exams });
+    },
+  });
+};
+
+export const useGenerateAdmitCardsForSchedule = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ examUuid, scheduleId }: { examUuid: string; scheduleId: number }) =>
+      examinationService.generateAdmitCardsForSchedule(examUuid, scheduleId).then((r) => r.data),
+    onSuccess: (_, { examUuid }) => {
+      qc.invalidateQueries({ queryKey: ["examination", "admit-cards", examUuid] });
+      qc.invalidateQueries({ queryKey: ["examination", "admit-card-status", examUuid] });
+      qc.invalidateQueries({ queryKey: keys.exams });
+    },
+  });
+};
+
+export const useGetAdmitCardStatus = (examUuid: string) =>
+  useQuery({
+    queryKey: keys.admitCardStatus(examUuid),
+    queryFn: async () => (await examinationService.getAdmitCardStatus(examUuid)).data,
+    enabled: !!examUuid,
+  });
+
+export const usePublishAdmitCards = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (examUuid: string) => examinationService.publishAdmitCards(examUuid).then((r) => r.data),
+    onSuccess: (_, examUuid) => {
+      qc.invalidateQueries({ queryKey: ["examination", "admit-cards", examUuid] });
+      qc.invalidateQueries({ queryKey: ["examination", "admit-card-status", examUuid] });
+      qc.invalidateQueries({ queryKey: keys.exams });
+    },
+  });
+};
+
+export const usePublishAdmitCardsForSchedules = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ examUuid, scheduleIds }: { examUuid: string; scheduleIds: number[] }) =>
+      examinationService.publishAdmitCardsForSchedules(examUuid, scheduleIds).then((r) => r.data),
+    onSuccess: (_, { examUuid }) => {
+      qc.invalidateQueries({ queryKey: ["examination", "admit-cards", examUuid] });
+      qc.invalidateQueries({ queryKey: ["examination", "admit-card-status", examUuid] });
+      qc.invalidateQueries({ queryKey: keys.exams });
+    },
+  });
+};
+
+export const useGetStudentAdmitCard = (examUuid: string | undefined) =>
+  useQuery({
+    queryKey: examUuid ? keys.studentAdmitCard(examUuid) : ["examination", "student-admit-card", "none"],
+    queryFn: async () => {
+      if (!examUuid) return null;
+      return (await examinationService.getStudentAdmitCard(examUuid)).data;
+    },
+    enabled: !!examUuid,
+    retry: 1,
+  });
+

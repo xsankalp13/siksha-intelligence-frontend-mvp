@@ -247,3 +247,55 @@ export interface PastPaperQueryParams {
   subjectId?: string;
   year?: number;
 }
+
+// Admit Cards
+export interface AdmitCardEntryResponseDTO {
+  examScheduleId: number;
+  subjectId: number;
+  subjectName: string;
+  examDate: string;
+  startTime: string;
+  endTime: string;
+  roomId: number;
+  roomName?: string;
+  seatId: number;
+  seatLabel?: string;
+}
+
+export interface AdmitCardResponseDTO {
+  admitCardId: number;
+  examId: number;
+  examName: string;
+  studentId: string;
+  studentName: string;
+  enrollmentNumber?: string;
+  generatedAt: string;
+  status: "DRAFT" | "PUBLISHED";
+  pdfUrl?: string;
+  publishedBy?: string;
+  publishedAt?: string;
+  entries: AdmitCardEntryResponseDTO[];
+}
+
+export interface AdmitCardGenerationResponseDTO {
+  examId: number;
+  examName: string;
+  generatedCount: number;
+  generatedAt: string;
+  message: string;
+}
+
+export interface ScheduleAdmitCardStatusDTO {
+  scheduleId: number;
+  className: string;
+  sectionName?: string;
+  subjectName: string;
+  examDate: string;
+  totalStudents: number;
+  generatedCount: number;
+  allGenerated: boolean;
+  publishedCount: number;
+  allPublished: boolean;
+  lastGeneratedAt?: string;
+}
+
