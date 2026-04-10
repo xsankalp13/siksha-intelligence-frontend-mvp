@@ -27,6 +27,7 @@ import {
   Lock,
   CreditCard,
   Briefcase,
+  UserCheck,
 } from "lucide-react";
 
 export type NavItem = {
@@ -152,6 +153,11 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
   },
   {
     label: "Attendance",
+    path: "/dashboard/teacher/self-attendance",
+    icon: UserCheck,
+  },
+  {
+    label: "Class Attendance",
     path: "/dashboard/teacher/attendance",
     icon: CalendarCheck,
   },

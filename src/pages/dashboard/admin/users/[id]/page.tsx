@@ -24,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import TeacherMyAttendance from "@/features/hrms/TeacherMyAttendance"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -447,9 +449,30 @@ export default function UserDetailsPage() {
           </Card>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left Column (Main Specs) */}
-          <div className="md:col-span-2 space-y-6">
+        <Tabs defaultValue="overview" className="w-full">
+          <div className="flex justify-start mb-6 border-b border-border/40 pb-2">
+            <TabsList className="bg-transparent space-x-2">
+              <TabsTrigger 
+                value="overview" 
+                className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none rounded-full px-5"
+              >
+                Profile Overview
+              </TabsTrigger>
+              {isStaff && (
+                <TabsTrigger 
+                  value="attendance" 
+                  className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none rounded-full px-5"
+                >
+                  Attendance History
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
+
+          <TabsContent value="overview" className="mt-0 outline-none">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Left Column (Main Specs) */}
+              <div className="md:col-span-2 space-y-6">
             
             {/* Role Specific Details Card */}
             <motion.div variants={itemVariants}>
@@ -746,6 +769,14 @@ export default function UserDetailsPage() {
 
           </div>
         </div>
+        </TabsContent>
+
+        {isStaff && (
+          <TabsContent value="attendance" className="mt-0 outline-none animate-in fade-in-50">
+            <TeacherMyAttendance staffUuid={id} />
+          </TabsContent>
+        )}
+      </Tabs>
       </motion.div>
 
       {/* Unlink Guardian Confirmation Dialog */}

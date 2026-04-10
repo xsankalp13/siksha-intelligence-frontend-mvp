@@ -1,12 +1,19 @@
 import { lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import HrmsDashboard from "@/features/hrms/HrmsDashboard";
 import LeaveCalendarDesigner from "@/features/hrms/LeaveCalendarDesigner";
 import LeaveTypeConfig from "@/features/hrms/LeaveTypeConfig";
 import StaffGradingTab from "@/features/hrms/StaffGradingTab";
 import StaffAttendanceTab from "@/features/hrms/StaffAttendanceTab";
 import DesignationManagement from "@/features/hrms/DesignationManagement";
+import ShiftManagement from "@/features/hrms/ShiftManagement";
+import StudentAttendanceReview from "@/features/hrms/StudentAttendanceReview";
+import AttendanceTrendDashboard from "@/features/hrms/AttendanceTrendDashboard";
+import {
+  LayoutDashboard, CalendarDays, CheckSquare, Building2, Award,
+  ClipboardCheck, GraduationCap, TrendingUp, Clock, Wallet, CreditCard,
+} from "lucide-react";
 
 const LeaveManagement = lazy(() => import("@/features/hrms/LeaveManagement"));
 const SalaryComponents = lazy(() => import("@/features/hrms/SalaryComponents"));
@@ -32,15 +39,18 @@ export default function AdminHrmsPage() {
       </div>
 
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:w-[1120px] md:grid-cols-8">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="leaves">Leaves</TabsTrigger>
-          <TabsTrigger value="leave-workflows">Leave Approval</TabsTrigger>
-          <TabsTrigger value="designations">Designations</TabsTrigger>
-          <TabsTrigger value="grades">Staff Grades</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="salary-setup">Salary Setup</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
+        <TabsList className="h-auto flex flex-wrap justify-start gap-1 bg-muted/60 p-1.5 rounded-xl">
+          <TabsTrigger value="dashboard" className="gap-1.5 text-xs"><LayoutDashboard className="h-3.5 w-3.5" />Dashboard</TabsTrigger>
+          <TabsTrigger value="leaves" className="gap-1.5 text-xs"><CalendarDays className="h-3.5 w-3.5" />Leaves</TabsTrigger>
+          <TabsTrigger value="leave-workflows" className="gap-1.5 text-xs"><CheckSquare className="h-3.5 w-3.5" />Leave Approval</TabsTrigger>
+          <TabsTrigger value="designations" className="gap-1.5 text-xs"><Building2 className="h-3.5 w-3.5" />Designations</TabsTrigger>
+          <TabsTrigger value="grades" className="gap-1.5 text-xs"><Award className="h-3.5 w-3.5" />Grades</TabsTrigger>
+          <TabsTrigger value="attendance" className="gap-1.5 text-xs"><ClipboardCheck className="h-3.5 w-3.5" />Attendance</TabsTrigger>
+          <TabsTrigger value="student-attendance" className="gap-1.5 text-xs"><GraduationCap className="h-3.5 w-3.5" />Students</TabsTrigger>
+          <TabsTrigger value="trends" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" />Trends</TabsTrigger>
+          <TabsTrigger value="shifts" className="gap-1.5 text-xs"><Clock className="h-3.5 w-3.5" />Shifts</TabsTrigger>
+          <TabsTrigger value="salary-setup" className="gap-1.5 text-xs"><Wallet className="h-3.5 w-3.5" />Salary</TabsTrigger>
+          <TabsTrigger value="payroll" className="gap-1.5 text-xs"><CreditCard className="h-3.5 w-3.5" />Payroll</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-4">
@@ -72,6 +82,18 @@ export default function AdminHrmsPage() {
           <StaffAttendanceTab />
         </TabsContent>
 
+        <TabsContent value="student-attendance" className="mt-4">
+          <StudentAttendanceReview />
+        </TabsContent>
+
+        <TabsContent value="trends" className="mt-4">
+          <AttendanceTrendDashboard />
+        </TabsContent>
+
+        <TabsContent value="shifts" className="mt-4">
+          <ShiftManagement />
+        </TabsContent>
+
         <TabsContent value="salary-setup" className="mt-4">
           <Suspense fallback={tabLoadingFallback}>
             <div className="space-y-8">
@@ -87,13 +109,7 @@ export default function AdminHrmsPage() {
             <div className="space-y-8">
               <PayrollProcessing />
               <Card>
-                <CardHeader>
-                  <CardTitle>Payslips</CardTitle>
-                  <CardDescription>
-                    Review generated payslips and download admin/self PDF variants.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="py-6">
                   <PayslipTable />
                 </CardContent>
               </Card>
@@ -101,20 +117,6 @@ export default function AdminHrmsPage() {
           </Suspense>
         </TabsContent>
       </Tabs>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Role Smoke Checklist</CardTitle>
-          <CardDescription>
-            Quick verification matrix for visibility and guarded payroll actions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-1">
-          <p>SUPER_ADMIN: verify all HRMS tabs are visible and payroll run/approve/disburse buttons are enabled by status.</p>
-          <p>ADMIN/SCHOOL_ADMIN: verify HRMS tabs are visible and payroll actions follow status guards (`PROCESSED` for Approve, `APPROVED` for Disburse).</p>
-          <p>TEACHER: verify access is limited to `/dashboard/teacher/my-hr` self-service and no admin payroll action controls are available.</p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
