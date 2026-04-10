@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { adminService } from '@/services/admin'
 import type { StaffSummaryDTO } from '@/services/admin'
@@ -6,7 +6,7 @@ import { sessionService, guardianService } from '@/features/super-admin/services
 import { api } from '@/lib/axios'
 import {
   Users, Search, UserX, Loader2, Plus, GraduationCap, Briefcase,
-  Heart, Phone, ChevronDown, ChevronRight, Printer, CreditCard, UploadCloud
+  Heart, Phone, ChevronDown, ChevronRight, Printer, CreditCard, UploadCloud, ShieldCheck, ArrowRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -276,12 +276,16 @@ function GuardianRow({ guardian }: { guardian: GuardianSummaryDto }) {
 export default function UsersSection() {
   const [createOpen, setCreateOpen] = useState(false)
   const [staffSearch, setStaffSearch] = useState('')
+  const [schoolAdminSearch, setSchoolAdminSearch] = useState('')
   const [studentSearch, setStudentSearch] = useState('')
   const [guardianSearch, setGuardianSearch] = useState('')
   const [guardianPage, setGuardianPage] = useState(0)
   const [batchDialogOpen, setBatchDialogOpen] = useState(false)
   const [bulkPhotoOpen, setBulkPhotoOpen] = useState(false)
   const [bulkPhotoType, setBulkPhotoType] = useState<'students' | 'staff'>('students')
+  const [promoteTarget, setPromoteTarget] = useState<StaffSummaryDTO | null>(null)
+  const [promoteStep, setPromoteStep] = useState<1 | 2>(1)
+  const [promoteConfirmText, setPromoteConfirmText] = useState('')
 
   const { data: staffPage, isLoading: staffLoading } = useQuery({
     queryKey: ['admin', 'staff', staffSearch],
@@ -291,6 +295,26 @@ export default function UsersSection() {
   const { data: studentPage, isLoading: studentLoading } = useQuery({
     queryKey: ['admin', 'students', studentSearch],
     queryFn: () => adminService.listStudents({ search: studentSearch || undefined, size: 30 }).then((r) => r.data),
+  })
+
+  const {
+    data: schoolAdminsPage,
+    isLoading: schoolAdminsLoading,
+    refetch: refetchSchoolAdmins,
+  } = useQuery({
+    queryKey: ['admin', 'school-admins', schoolAdminSearch],
+    queryFn: () =>
+      adminService
+        .listStaff({ search: schoolAdminSearch || undefined, staffType: 'SCHOOL_ADMIN', size: 30 })
+        .then((r) => r.data),
+  })
+
+  const { data: promotionCandidatesPage, refetch: refetchPromotionCandidates } = useQuery({
+    queryKey: ['admin', 'school-admin-candidates', schoolAdminSearch],
+    queryFn: () =>
+      adminService
+        .listStaff({ search: schoolAdminSearch || undefined, size: 200 })
+        .then((r) => r.data),
   })
 
   // Flat guardian list — single request, no N+1
@@ -306,9 +330,53 @@ export default function UsersSection() {
   })
 
   const staff     = staffPage?.content     ?? []
+  const schoolAdmins = schoolAdminsPage?.content ?? []
   const students  = studentPage?.content   ?? []
   const guardians = guardiansPage?.content ?? []
   const guardianTotalPages = guardiansPage?.totalPages ?? 1
+  const promotionCandidates = useMemo(
+    () =>
+      (promotionCandidatesPage?.content ?? []).filter(
+        (member) => member.active && String(member.staffType).toUpperCase() !== 'SCHOOL_ADMIN'
+      ),
+    [promotionCandidatesPage?.content],
+  )
+
+  const { mutate: promoteToSchoolAdmin, isPending: promoting } = useMutation({
+    mutationFn: async (staffUuid: string) => {
+      const attempts: Array<() => Promise<unknown>> = [
+        () => api.post(`/auth/admin/users/staff/${staffUuid}/promote-school-admin`),
+        () => api.post(`/auth/admin/users/school-admin/promote/${staffUuid}`),
+        () => api.post('/auth/admin/users/school-admin/promote', { staffUuid }),
+      ]
+
+      let lastError: unknown = null
+      for (const attempt of attempts) {
+        try {
+          return await attempt()
+        } catch (error) {
+          lastError = error
+        }
+      }
+      throw lastError
+    },
+    onSuccess: () => {
+      toast.success('Staff promoted to School Admin')
+      setPromoteTarget(null)
+      setPromoteStep(1)
+      setPromoteConfirmText('')
+      refetchSchoolAdmins()
+      refetchPromotionCandidates()
+    },
+    onError: (error: unknown) => {
+      const msg = (error as { response?: { data?: { message?: string } | string }; message?: string })
+      const serverMessage =
+        typeof msg?.response?.data === 'string'
+          ? msg.response.data
+          : msg?.response?.data?.message
+      toast.error(serverMessage ?? msg?.message ?? 'Promotion endpoint unavailable or failed')
+    },
+  })
 
   return (
     <div className="space-y-5">
@@ -361,6 +429,10 @@ export default function UsersSection() {
           <TabsTrigger value="guardians" className="gap-1.5">
             <Heart className="h-3.5 w-3.5" />
             Guardians ({guardiansPage?.totalElements ?? 0})
+          </TabsTrigger>
+          <TabsTrigger value="school-admins" className="gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            School Admins ({schoolAdminsPage?.totalElements ?? 0})
           </TabsTrigger>
         </TabsList>
 
@@ -526,7 +598,135 @@ export default function UsersSection() {
             )}
           </div>
         </TabsContent>
+
+        {/* ── School Admins ── */}
+        <TabsContent value="school-admins" className="mt-4">
+          <div className="space-y-4">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search school admins..."
+                className="pl-9"
+                value={schoolAdminSearch}
+                onChange={(e) => setSchoolAdminSearch(e.target.value)}
+              />
+            </div>
+
+            <div className="rounded-xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border px-5 py-3">
+                <p className="text-sm font-semibold">Existing School Admins</p>
+              </div>
+              {schoolAdminsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
+              ) : schoolAdmins.length === 0 ? (
+                <div className="py-10 text-center text-muted-foreground">
+                  <ShieldCheck className="mx-auto mb-2 h-8 w-8 opacity-30" />
+                  <p className="text-sm">No school admins found</p>
+                </div>
+              ) : (
+                schoolAdmins.map((member) => <StaffRow key={member.staffId} member={member} />)
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border px-5 py-3">
+                <p className="text-sm font-semibold">Promote Staff to School Admin</p>
+                <p className="text-xs text-muted-foreground mt-1">Requires two-step confirmation before promotion.</p>
+              </div>
+              {promotionCandidates.length === 0 ? (
+                <div className="py-8 px-5 text-sm text-muted-foreground">No eligible active staff found.</div>
+              ) : (
+                promotionCandidates.slice(0, 30).map((member) => (
+                  <div key={member.staffId} className="flex items-center gap-3 border-b border-border px-5 py-3 last:border-0 hover:bg-muted/30 transition-colors">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                      {member.firstName[0]}{member.lastName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{member.firstName} {member.lastName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{member.username} · {member.email}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">{member.staffType}</Badge>
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => {
+                      setPromoteTarget(member)
+                      setPromoteStep(1)
+                      setPromoteConfirmText('')
+                    }}>
+                      Promote <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
+
+      <Dialog
+        open={!!promoteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPromoteTarget(null)
+            setPromoteStep(1)
+            setPromoteConfirmText('')
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Promote To School Admin</DialogTitle>
+          </DialogHeader>
+          {promoteTarget && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="font-medium text-foreground">{promoteTarget.firstName} {promoteTarget.lastName}</p>
+                <p className="text-xs text-muted-foreground">{promoteTarget.username} · {promoteTarget.email}</p>
+                <p className="text-xs text-muted-foreground">Current Type: {promoteTarget.staffType}</p>
+              </div>
+
+              {promoteStep === 1 ? (
+                <p className="text-muted-foreground">
+                  Step 1/2: Review candidate details and continue to final confirmation.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground">Step 2/2: Type <span className="font-semibold text-foreground">PROMOTE</span> to confirm.</p>
+                  <Input
+                    placeholder="Type PROMOTE"
+                    value={promoteConfirmText}
+                    onChange={(e) => setPromoteConfirmText(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              if (promoteStep === 2) {
+                setPromoteStep(1)
+                setPromoteConfirmText('')
+              } else {
+                setPromoteTarget(null)
+              }
+            }}>
+              {promoteStep === 2 ? 'Back' : 'Cancel'}
+            </Button>
+            {promoteStep === 1 ? (
+              <Button onClick={() => setPromoteStep(2)}>Continue</Button>
+            ) : (
+              <Button
+                disabled={promoteConfirmText !== 'PROMOTE' || promoting || !promoteTarget}
+                onClick={() => {
+                  if (!promoteTarget) return
+                  promoteToSchoolAdmin(promoteTarget.uuid)
+                }}
+              >
+                {promoting ? 'Promoting...' : 'Confirm Promotion'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CreateSchoolAdminDialog open={createOpen} onClose={() => setCreateOpen(false)} />
       <IdCardBatchDialog open={batchDialogOpen} onClose={() => setBatchDialogOpen(false)} />

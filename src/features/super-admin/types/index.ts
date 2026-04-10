@@ -27,7 +27,7 @@ export interface RolePermissionLinkDTO {
 // ── App Settings ──────────────────────────────────────────────────────
 
 export type SettingType = 'STRING' | 'ENCRYPTED' | 'BOOLEAN' | 'INTEGER' | 'JSON'
-export type SettingGroup = 'SMTP' | 'STORAGE' | 'SECURITY' | 'WHITELABEL' | 'FEATURES'
+export type SettingGroup = 'SMTP' | 'STORAGE' | 'SECURITY' | 'WHITELABEL' | 'FEATURES' | 'ATTENDANCE'
 
 export interface AppSettingDTO {
   key: string
