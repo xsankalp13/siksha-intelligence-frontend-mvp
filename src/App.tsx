@@ -19,6 +19,7 @@ import ExaminationsPage from '@/pages/dashboard/admin/examinations/page'
 
 import AdminRoomsPage from '@/pages/dashboard/admin/rooms/page'
 import AdminFinancePage from './pages/dashboard/admin/finance/page'
+import AdminTransportPage from './pages/dashboard/admin/transport/page'
 
 import IdCardsPage from '@/pages/dashboard/admin/id-cards/page'
 import TeacherDashboard from '@/pages/dashboard/teacher/page'
@@ -112,6 +113,7 @@ export default function App() {
 
           <Route path="rooms" element={<AdminRoomsPage />} />
           <Route path="finance" element={<AdminFinancePage />} />
+          <Route path="transport" element={<AdminTransportPage />} />
 
           <Route path="id-cards" element={<IdCardsPage />} />
           <Route path="users/:type/:id" element={<UserDetailsPage />} />

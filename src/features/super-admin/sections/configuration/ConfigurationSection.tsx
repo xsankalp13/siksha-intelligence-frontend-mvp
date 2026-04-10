@@ -4,7 +4,7 @@ import { settingsService } from '@/features/super-admin/services/superAdminServi
 import {
   Mail, HardDrive, Lock, Palette, ToggleLeft,
   Save, Eye, EyeOff, AlertTriangle, Loader2, CheckCircle2, Settings2,
-  Cloud,
+  Cloud, Bot,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -19,6 +19,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import type { AppSettingDTO, SettingUpdateRequest } from '@/features/super-admin/types'
+import AiConfigTab from './AiConfigTab'
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -473,6 +474,7 @@ export default function ConfigurationSection() {
           <TabsTrigger value="security" className="gap-1.5"><Lock className="h-3.5 w-3.5" />Security</TabsTrigger>
           <TabsTrigger value="whitelabel" className="gap-1.5"><Palette className="h-3.5 w-3.5" />White-Label</TabsTrigger>
           <TabsTrigger value="features" className="gap-1.5"><ToggleLeft className="h-3.5 w-3.5" />Feature Flags</TabsTrigger>
+          <TabsTrigger value="ai" className="gap-1.5"><Bot className="h-3.5 w-3.5" />AI Assistant</TabsTrigger>
         </TabsList>
 
         <TabsContent value="smtp">
@@ -523,6 +525,10 @@ export default function ConfigurationSection() {
             onSave={saveSettings}
             isSaving={isSaving}
           />
+        </TabsContent>
+
+        <TabsContent value="ai">
+          <AiConfigTab />
         </TabsContent>
       </Tabs>
     </div>

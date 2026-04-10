@@ -23,6 +23,7 @@ import {
   Settings2,
   Lock,
   CreditCard,
+  Bus,
 } from "lucide-react";
 
 export type NavItem = {
@@ -54,6 +55,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "Rooms", path: "/dashboard/admin/rooms", icon: DoorOpen },
   { label: "Finance", path: "/dashboard/admin/finance", icon: Receipt },
 
+  { label: "Transport", path: "/dashboard/admin/transport", icon: Bus },
   { label: "Settings", path: "/dashboard/admin/settings", icon: Settings },
   { label: "ID Cards", path: "/dashboard/admin/id-cards", icon: CreditCard },
 ];
