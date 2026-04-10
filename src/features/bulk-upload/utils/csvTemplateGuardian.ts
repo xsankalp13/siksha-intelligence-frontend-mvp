@@ -166,8 +166,6 @@ export function downloadGuardiansTemplate(): void {
 // ─────────────────────────────────────────────────────────────────────────────
 // Staff Template
 // Columns must match STAFF_HEADERS in csvValidation.ts:
-//   firstName, lastName, middleName, email, dateOfBirth, gender,
-//   employeeId, joiningDate, jobTitle, department, staffType
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STAFF_TEMPLATE_ROWS: string[][] = [
@@ -183,6 +181,18 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "jobTitle",
     "department",
     "staffType",
+    "staffCategory",
+    "certifications",
+    "specializations",
+    "yearsOfExperience",
+    "educationLevel",
+    "stateLicenseNumber",
+    "administrativeCertifications",
+    "schoolLevelManaged",
+    "librarySystemPermissions",
+    "mlisDegree",
+    "assignedGate",
+    "shiftTiming",
   ],
   [
     "Priya",
@@ -194,8 +204,20 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "EMP001",
     "2020-06-01",
     "Mathematics Teacher",
-    "Science",
+    "ACADEMICS",
     "TEACHER",
+    "TEACHING",
+    "B.Ed",
+    "Mathematics",
+    "5",
+    "BACHELORS",
+    "LIC12345",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
   ],
   [
     "Rajesh",
@@ -209,6 +231,18 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "Vice Principal",
     "Administration",
     "PRINCIPAL",
+    "NON_TEACHING_ADMIN",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "School Admin Cert",
+    "HIGH",
+    "",
+    "",
+    "",
+    "",
   ],
   [
     "Anita",
@@ -222,6 +256,18 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "Librarian",
     "Library",
     "LIBRARIAN",
+    "NON_TEACHING_SUPPORT",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "ALL_ACCESS",
+    "true",
+    "",
+    "",
   ],
 ];
 
