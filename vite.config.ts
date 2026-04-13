@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), basicSsl()],
   build: {
     rollupOptions: {
       output: {
@@ -42,12 +43,19 @@ export default defineConfig({
     },
   },
   server: {
+    host: true, // Listen on all local IPs
     proxy: {
       // Proxies API calls to your Spring Boot backend
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Rewrite origin so the Spring Boot Dev server accepts it
+            proxyReq.setHeader('Origin', 'http://localhost:5173');
+          });
+        }
       },
     },
   },

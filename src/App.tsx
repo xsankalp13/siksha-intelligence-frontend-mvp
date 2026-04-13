@@ -47,7 +47,11 @@ const StudentTimetablePage = lazy(() => import('@/pages/dashboard/student/timeta
 
 const SecurityGuardDashboard = lazy(() => import('@/pages/dashboard/security-guard/page'))
 const SecurityGuardVisitorManagement = lazy(() => import('@/pages/dashboard/security-guard/visitor-management/page'))
+const SecurityGuardPickupScannerPage = lazy(() => import('@/pages/dashboard/security-guard/pickup-scanner/page'))
 const AdminVisitorLogsPage = lazy(() => import('@/pages/dashboard/admin/visitor-logs/page'))
+const AdminPickupLogsPage = lazy(() => import('@/pages/dashboard/admin/pickup-logs/page'))
+const StudentPickupPage = lazy(() => import('@/pages/dashboard/student/pickup/page'))
+
 
 const SuperAdminOverviewPage = lazy(() => import('@/pages/dashboard/super-admin/overview/page'))
 const SuperAdminUsersPage = lazy(() => import('@/pages/dashboard/super-admin/users/page'))
@@ -141,6 +145,7 @@ export default function App() {
           <Route path="id-cards" element={withRouteSuspense(<IdCardsPage />)} />
           <Route path="users/:type/:id" element={withRouteSuspense(<UserDetailsPage />)} />
           <Route path="visitor-logs" element={withRouteSuspense(<AdminVisitorLogsPage />)} />
+          <Route path="pickup-logs" element={withRouteSuspense(<AdminPickupLogsPage />)} />
           {/* Catch-all for unknown admin sub-routes */}
           <Route path="*" element={<Navigate to="/dashboard/admin" replace />} />
         </Route>
@@ -181,6 +186,7 @@ export default function App() {
           <Route index element={withRouteSuspense(<StudentDashboard />)} />
           <Route path="profile" element={withRouteSuspense(<StudentProfilePage />)} />
           <Route path="timetable" element={withRouteSuspense(<StudentTimetablePage />)} />
+          <Route path="pickup" element={withRouteSuspense(<StudentPickupPage />)} />
         </Route>
 
         {/* Security Guard Dashboard */}
@@ -196,6 +202,7 @@ export default function App() {
         >
           <Route index element={withRouteSuspense(<SecurityGuardDashboard />)} />
           <Route path="visitor-management" element={withRouteSuspense(<SecurityGuardVisitorManagement />)} />
+          <Route path="pickup-scanner" element={withRouteSuspense(<SecurityGuardPickupScannerPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/security-guard" replace />} />
         </Route>
 
