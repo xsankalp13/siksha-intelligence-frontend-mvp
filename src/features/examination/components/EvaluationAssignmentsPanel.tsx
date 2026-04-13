@@ -92,6 +92,7 @@ export default function EvaluationAssignmentsPanel() {
 
   // Assign form state
   const [selectedExamUuid, setSelectedExamUuid] = useState("");
+  const [selectedClassUuid, setSelectedClassUuid] = useState("");
   const [selectedScheduleId, setSelectedScheduleId] = useState("");
   const [teacherIdInput, setTeacherIdInput] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -106,6 +107,24 @@ export default function EvaluationAssignmentsPanel() {
   const { data: assignments = [], isLoading, isError } = useAdminEvaluationAssignments();
   const { data: exams = [] } = useGetAllExams();
   const { data: schedules = [] } = useGetSchedulesByExam(selectedExamUuid);
+
+  // Derive unique classes from schedules
+  const availableClasses = useMemo(() => {
+    const classMap = new Map<string, { uuid: string; name: string }>();
+    schedules.forEach((s) => {
+      if (s.classId && !classMap.has(s.classId)) {
+        classMap.set(s.classId, { uuid: s.classId, name: s.className });
+      }
+    });
+    return Array.from(classMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [schedules]);
+
+  // Filter schedules by selected class
+  const filteredSchedulesByClass = useMemo(() => {
+    if (!selectedClassUuid) return [];
+    return schedules.filter((s) => s.classId === selectedClassUuid);
+  }, [schedules, selectedClassUuid]);
+
   const { data: staffList = [] } = useStaffList();
   const assignMutation = useAssignTeacher();
   const deleteMutation = useDeleteAssignment();
@@ -158,6 +177,7 @@ export default function EvaluationAssignmentsPanel() {
 
   const resetForm = () => {
     setSelectedExamUuid("");
+    setSelectedClassUuid("");
     setSelectedScheduleId("");
     setTeacherIdInput("");
     setDueDate("");
@@ -363,7 +383,7 @@ export default function EvaluationAssignmentsPanel() {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Exam</Label>
-              <Select value={selectedExamUuid} onValueChange={(v) => { setSelectedExamUuid(v); setSelectedScheduleId(""); }}>
+              <Select value={selectedExamUuid} onValueChange={(v) => { setSelectedExamUuid(v); setSelectedClassUuid(""); setSelectedScheduleId(""); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select exam..." />
                 </SelectTrigger>
@@ -379,15 +399,33 @@ export default function EvaluationAssignmentsPanel() {
 
             {selectedExamUuid && (
               <div className="space-y-2">
+                <Label>Class</Label>
+                <Select value={selectedClassUuid} onValueChange={(v) => { setSelectedClassUuid(v); setSelectedScheduleId(""); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={availableClasses.length === 0 ? "No classes found" : "Select class..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableClasses.map((c) => (
+                      <SelectItem key={c.uuid} value={c.uuid}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {selectedClassUuid && (
+              <div className="space-y-2">
                 <Label>Schedule</Label>
                 <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select schedule..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {schedules.map((s) => (
+                    {filteredSchedulesByClass.map((s) => (
                       <SelectItem key={s.scheduleId} value={String(s.scheduleId)}>
-                        {s.subjectName} - {s.className}{s.sectionName ? `(${s.sectionName})` : ''} ({s.examDate})
+                        {s.subjectName} {s.sectionName ? `(${s.sectionName})` : ''} ({s.examDate})
                       </SelectItem>
                     ))}
                   </SelectContent>

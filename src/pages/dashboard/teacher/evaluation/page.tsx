@@ -130,7 +130,8 @@ export default function TeacherEvaluationPage() {
           </div>
           <p className="text-sm text-muted-foreground ml-11">
             {step === 1 && "Your assigned evaluation schedules"}
-            {step === 2 && "Upload answer sheets for students"}
+            {step === 2 && currentRole === "UPLOADER" && "Upload answer sheets for students"}
+            {step === 2 && currentRole === "EVALUATOR" && "Select a student to evaluate"}
             {step === 3 && "Evaluate answer sheet"}
           </p>
         </div>
@@ -365,11 +366,21 @@ function StudentsUploadPanel({
 
       {/* Stats ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Pending", value: stats.pending, color: "text-muted-foreground" },
+        {role === "UPLOADER" ? [
+          { label: "Pending Upload", value: stats.pending, color: "text-muted-foreground" },
           { label: "Uploaded", value: stats.uploaded, color: "text-sky-600" },
           { label: "Complete", value: stats.complete, color: "text-teal-600" },
           { label: "Published", value: stats.published, color: "text-emerald-600" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl border border-border/50 bg-card p-3 text-center">
+            <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground">{s.label}</p>
+          </div>
+        )) : [
+          { label: "Pending Evaluation", value: stats.complete, color: "text-amber-600" },
+          { label: "Checked", value: students.filter((s) => s.answerSheetStatus === "CHECKING" || s.answerSheetStatus === "DRAFT").length, color: "text-blue-600" },
+          { label: "Published", value: stats.published, color: "text-emerald-600" },
+          { label: "Awaiting Uploads", value: stats.pending + stats.uploaded, color: "text-muted-foreground" },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-border/50 bg-card p-3 text-center">
             <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
@@ -518,8 +529,8 @@ function StudentUploadCard({
     <div className="rounded-xl border border-border/60 bg-card overflow-hidden transition-all">
       {/* Header Row */}
       <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-3 p-3.5 hover:bg-muted/30 transition-colors text-left"
+        onClick={isUploader ? onToggle : undefined}
+        className={`w-full flex items-center gap-3 p-3.5 hover:bg-muted/30 transition-colors text-left ${!isUploader && 'cursor-default'}`}
       >
         {/* Avatar */}
         <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0">
@@ -545,7 +556,7 @@ function StudentUploadCard({
             <Button
               size="sm"
               variant={isFinal ? "outline" : "default"}
-              className="gap-1 text-xs h-7"
+              className="gap-1 text-xs h-7 ml-2"
               onClick={(e) => {
                 e.stopPropagation();
                 onEvaluate(student.studentId, student.answerSheetId!);
@@ -555,17 +566,19 @@ function StudentUploadCard({
               {isFinal ? "View" : "Evaluate"}
             </Button>
           )}
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          {isUploader && (
+            isExpanded ? (
+              <ChevronUp className="w-4 h-4 text-muted-foreground ml-2" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-muted-foreground ml-2" />
+            )
           )}
         </div>
       </button>
 
       {/* Expanded Content */}
       <AnimatePresence>
-        {isExpanded && (
+        {isExpanded && isUploader && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -633,7 +646,7 @@ function StudentUploadCard({
               )}
 
               {/* Upload Controls */}
-              {!isFinal && (
+              {!isFinal && isUploader && (
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* File Picker */}
                   <input

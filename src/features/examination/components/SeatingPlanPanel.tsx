@@ -65,6 +65,7 @@ import { api } from "@/lib/axios";
 import type { ExamResponseDTO } from "@/services/types/examination";
 import type { SeatAllocationResponseDTO } from "@/services/types/seatAllocation";
 import { toast } from "sonner";
+import { examinationService } from "@/services/examination";
 
 interface StudentSummary {
   uuid: string;
@@ -80,8 +81,10 @@ interface StudentPage {
 export default function SeatingPlanPanel() {
   // ── Selection state ─────────────────────────────────────────────
   const [selectedExamUuid, setSelectedExamUuid] = useState<string>("");
+  const [selectedClassUuid, setSelectedClassUuid] = useState<string>("");
   const [selectedScheduleId, setSelectedScheduleId] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isPrintingPdf, setIsPrintingPdf] = useState(false);
 
   // ── Bulk selection state ────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -128,6 +131,23 @@ export default function SeatingPlanPanel() {
   const selectedExam: ExamResponseDTO | undefined = exams.find(
     (e) => e.uuid === selectedExamUuid
   );
+
+  // Derive unique classes from schedules
+  const availableClasses = useMemo(() => {
+    const classMap = new Map<string, { uuid: string; name: string }>();
+    schedules.forEach((s) => {
+      if (s.classId && !classMap.has(s.classId)) {
+        classMap.set(s.classId, { uuid: s.classId, name: s.className });
+      }
+    });
+    return Array.from(classMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [schedules]);
+
+  // Filter schedules by selected class
+  const filteredSchedulesByClass = useMemo(() => {
+    if (!selectedClassUuid) return [];
+    return schedules.filter((s) => s.classId === selectedClassUuid);
+  }, [schedules, selectedClassUuid]);
 
   const filteredAllocations = useMemo(() => {
     if (!searchTerm) return allocations;
@@ -285,6 +305,14 @@ export default function SeatingPlanPanel() {
   // ── Handlers ────────────────────────────────────────────────────
   const handleExamChange = (uuid: string) => {
     setSelectedExamUuid(uuid);
+    setSelectedClassUuid("");
+    setSelectedScheduleId(0);
+    setSearchTerm("");
+    clearSelection();
+  };
+
+  const handleClassChange = (uuid: string) => {
+    setSelectedClassUuid(uuid);
     setSelectedScheduleId(0);
     setSearchTerm("");
     clearSelection();
@@ -391,6 +419,32 @@ export default function SeatingPlanPanel() {
   };
 
   const selectedCount = selectedIds.size;
+
+  const handlePrintPdf = useCallback(async () => {
+    if (!selectedScheduleId) return;
+    try {
+      setIsPrintingPdf(true);
+      const response = await examinationService.downloadSeatingPlanPdf(
+        selectedScheduleId
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data as any]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute(
+        "download",
+        `SeatingPlan_Schedule_${selectedScheduleId}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Seating plan PDF downloaded successfully.");
+    } catch {
+      toast.error("Failed to download seating plan PDF.");
+    } finally {
+      setIsPrintingPdf(false);
+    }
+  }, [selectedScheduleId]);
 
   return (
     <div className="space-y-5 relative" id="printable-seating-plan">
@@ -571,8 +625,7 @@ export default function SeatingPlanPanel() {
         )}
       </AnimatePresence>
 
-      {/* ── Selectors Row ───────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
         <div className="grid gap-1.5">
           <label className="text-sm font-medium text-muted-foreground">Select Exam</label>
           <Select value={selectedExamUuid} onValueChange={handleExamChange}>
@@ -590,19 +643,39 @@ export default function SeatingPlanPanel() {
         </div>
 
         <div className="grid gap-1.5">
+          <label className="text-sm font-medium text-muted-foreground">Select Class</label>
+          <Select
+            value={selectedClassUuid}
+            onValueChange={handleClassChange}
+            disabled={!selectedExamUuid || availableClasses.length === 0}
+          >
+            <SelectTrigger id="seating-class-select">
+              <SelectValue placeholder={availableClasses.length === 0 ? "No classes" : "Choose class…"} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableClasses.map((c) => (
+                <SelectItem key={c.uuid} value={c.uuid}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-1.5">
           <label className="text-sm font-medium text-muted-foreground">Select Schedule</label>
           <Select
             value={selectedScheduleId ? String(selectedScheduleId) : ""}
             onValueChange={handleScheduleChange}
-            disabled={!selectedExamUuid || schedules.length === 0}
+            disabled={!selectedClassUuid || filteredSchedulesByClass.length === 0}
           >
             <SelectTrigger id="seating-schedule-select">
-              <SelectValue placeholder={schedules.length === 0 ? "No schedules" : "Choose schedule…"} />
+              <SelectValue placeholder={filteredSchedulesByClass.length === 0 ? "No schedules" : "Choose schedule…"} />
             </SelectTrigger>
             <SelectContent>
-              {schedules.map((s) => (
+              {filteredSchedulesByClass.map((s) => (
                 <SelectItem key={s.scheduleId} value={String(s.scheduleId)}>
-                  {s.subjectName} — {s.className}
+                  {s.subjectName}
                   {s.sectionName ? ` (${s.sectionName})` : ""} ·{" "}
                   {new Date(s.examDate).toLocaleDateString("en-IN", {
                     day: "2-digit",
@@ -628,13 +701,17 @@ export default function SeatingPlanPanel() {
               />
             </div>
             <Button
-              onClick={() => window.print()}
+              onClick={handlePrintPdf}
               variant="outline"
               size="sm"
               className="gap-1.5 shrink-0 h-9"
-              disabled={!selectedScheduleId || allocations.length === 0}
+              disabled={isPrintingPdf || !selectedScheduleId || allocations.length === 0}
             >
-              <Printer className="w-4 h-4" />
+              {isPrintingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Printer className="w-4 h-4" />
+              )}
               Print
             </Button>
             <Button

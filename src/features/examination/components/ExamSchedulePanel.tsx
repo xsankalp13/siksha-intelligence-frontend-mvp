@@ -228,7 +228,7 @@ export default function ExamSchedulePanel({
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, examDate: exam.startDate, startTime: "10:00", endTime: "13:00", maxStudentsPerSeat: 1, seatSide: "" });
+    setForm({ ...emptyForm, examDate: exam.startDate, startTime: "10:00", endTime: "11:00", maxStudentsPerSeat: 1, seatSide: "" });
     setDialogOpen(true);
   };
 
@@ -398,7 +398,9 @@ export default function ExamSchedulePanel({
             </TableHeader>
             <TableBody>
               <AnimatePresence>
-                {schedules.map((s) => (
+                {[...schedules]
+                  .sort((a, b) => b.scheduleId - a.scheduleId)
+                  .map((s) => (
                   <motion.tr
                     key={s.scheduleId}
                     initial={{ opacity: 0 }}

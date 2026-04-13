@@ -155,6 +155,7 @@ export interface AdminResultReviewResponseDTO {
   enrollmentNumber: string;
   examName: string;
   subjectName: string;
+  className: string;
   totalMarks: number;
   status: EvaluationResultStatus;
   submittedAt: string | null;
@@ -191,4 +192,16 @@ export interface SubjectMarkDTO {
   subjectName: string;
   marksObtained: number;
   maxMarks: number;
+}
+
+export interface ClassResultSummaryResponseDTO {
+  classId: string;
+  className: string;
+  examId: string;
+  examName: string;
+  totalStudents: number;
+  evaluatedStudents: number;
+  absentStudents: number;
+  pendingStudents: number;
+  status: 'INCOMPLETE' | 'READY_FOR_APPROVAL' | 'APPROVED' | 'PUBLISHED';
 }

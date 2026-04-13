@@ -318,6 +318,49 @@ export const usePublishResult = () => {
   });
 };
 
+export const useClassResultSummary = (classId: string, examId: string) => {
+  return useQuery({
+    queryKey: ['class-result-summary', classId, examId],
+    queryFn: () => evaluationService.getClassResultSummary(classId, examId).then(r => r.data),
+    enabled: !!classId && !!examId
+  });
+};
+
+export const useApproveClass = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ classId, examId }: { classId: string; examId: string }) =>
+      evaluationService.approveClass(classId, examId).then((r) => r.data),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: evaluationKeys.all });
+      qc.invalidateQueries({ queryKey: ['class-result-summary', variables.classId, variables.examId] });
+    },
+  });
+};
+
+export const usePublishClass = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ classId, examId }: { classId: string; examId: string }) =>
+      evaluationService.publishClass(classId, examId).then((r) => r.data),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: evaluationKeys.all });
+      qc.invalidateQueries({ queryKey: ['class-result-summary', variables.classId, variables.examId] });
+    },
+  });
+};
+
+export const useBulkPublishResults = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (resultIds: number[]) =>
+      evaluationService.publishResultsBulk(resultIds).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: evaluationKeys.all });
+    },
+  });
+};
+
 // ── Student Result Hooks ────────────────────────────────────────────
 
 export const useStudentResults = () =>

@@ -15,6 +15,7 @@ import type {
   StudentResultResponseDTO,
   StudentResultDetailResponseDTO,
   EvaluationResultStatus,
+  ClassResultSummaryResponseDTO,
 } from "./types/evaluation";
 
 // ── Evaluation Service ──────────────────────────────────────────────
@@ -199,6 +200,40 @@ export const evaluationService = {
   publishResult(resultId: number) {
     return api.post<EvaluationResultResponseDTO>(
       `/admin/results/${resultId}/publish`
+    );
+  },
+
+  /** POST /admin/results/publish-bulk */
+  publishResultsBulk(resultIds: number[]) {
+    return api.post<{ publishedCount: number }>(
+      `/admin/results/publish-bulk`,
+      resultIds
+    );
+  },
+
+  /** GET /admin/results/summary */
+  getClassResultSummary(classId: string, examId: string) {
+    return api.get<ClassResultSummaryResponseDTO>(
+      `/admin/results/summary`,
+      { params: { classId, examId } }
+    );
+  },
+
+  /** POST /admin/results/approve-class */
+  approveClass(classId: string, examId: string) {
+    return api.post<{ approvedCount: number }>(
+      `/admin/results/approve-class`,
+      null,
+      { params: { classId, examId } }
+    );
+  },
+
+  /** POST /admin/results/publish-class */
+  publishClass(classId: string, examId: string) {
+    return api.post<{ publishedCount: number }>(
+      `/admin/results/publish-class`,
+      null,
+      { params: { classId, examId } }
     );
   },
 

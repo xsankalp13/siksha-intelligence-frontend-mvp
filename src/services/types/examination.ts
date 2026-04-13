@@ -26,6 +26,7 @@ export interface ExamResponseDTO {
   createdBy: string;
   updatedBy: string;
   published: boolean;
+  timetablePublished: boolean;
 }
 
 // Exam Schedules
@@ -249,6 +250,18 @@ export interface PastPaperQueryParams {
 }
 
 // Admit Cards
+export type AdmitCardStatusEnum = "DRAFT" | "GENERATING" | "GENERATED" | "FAILED" | "PUBLISHED";
+
+export interface AdmitCardGenerationProgressDTO {
+  examId: number;
+  totalJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  pendingJobs: number;
+  progressPercent: number;
+  status: AdmitCardStatusEnum;
+  updatedAt: string;
+}
 export interface AdmitCardEntryResponseDTO {
   examScheduleId: number;
   subjectId: number;
@@ -270,7 +283,7 @@ export interface AdmitCardResponseDTO {
   studentName: string;
   enrollmentNumber?: string;
   generatedAt: string;
-  status: "DRAFT" | "PUBLISHED";
+  status: AdmitCardStatusEnum;
   pdfUrl?: string;
   publishedBy?: string;
   publishedAt?: string;

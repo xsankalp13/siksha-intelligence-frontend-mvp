@@ -23,6 +23,7 @@ import type {
   PastPaperQueryParams,
   AdmitCardResponseDTO,
   AdmitCardGenerationResponseDTO,
+  AdmitCardGenerationProgressDTO,
   ScheduleAdmitCardStatusDTO,
 } from "./types/examination";
 import type {
@@ -68,6 +69,11 @@ export const examinationService = {
       publish: true,
       status: true
     });
+  },
+
+  /** PATCH /auth/examination/exams/:uuid/publish-timetable */
+  publishTimetable(uuid: string) {
+    return api.patch<ExamResponseDTO>(`/auth/examination/exams/${uuid}/publish-timetable`);
   },
 
   // ── Exam Schedules ───────────────────────────────────────────────
@@ -370,6 +376,13 @@ export const examinationService = {
     );
   },
 
+  /** GET /admin/admit-cards/status/:examUuid/progress */
+  getGenerationProgress(examUuid: string) {
+    return api.get<AdmitCardGenerationProgressDTO>(
+      `/admin/admit-cards/status/${examUuid}/progress`
+    );
+  },
+
   /** POST /admin/admit-cards/publish/:examUuid */
   publishAdmitCards(examUuid: string) {
     return api.post(`/admin/admit-cards/publish/${examUuid}`);
@@ -389,6 +402,13 @@ export const examinationService = {
     });
   },
 
+  /** POST /admin/admit-cards/generate-batch */
+  downloadBatchAdmitCards(data: { examId: string; scheduleId?: number }) {
+    return api.post(`/admin/admit-cards/generate-batch`, data, {
+      responseType: "blob",
+    });
+  },
+
   /** GET /student/admit-card/:examUuid */
   getStudentAdmitCard(examUuid: string) {
     return api.get<AdmitCardResponseDTO>(`/student/admit-card/${examUuid}`);
@@ -399,6 +419,16 @@ export const examinationService = {
     return api.get(`/student/admit-card/${examUuid}/pdf`, {
       responseType: "blob",
     });
+  },
+
+  /** GET /admin/examination/seat-allocation/schedule/:examScheduleId/print */
+  downloadSeatingPlanPdf(examScheduleId: number) {
+    return api.get(
+      `/admin/examination/seat-allocation/schedule/${examScheduleId}/print`,
+      {
+        responseType: "blob",
+      }
+    );
   },
 };
 

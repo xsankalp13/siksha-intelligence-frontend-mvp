@@ -104,13 +104,16 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
     endDate: "",
   });
 
-  const filtered = exams.filter((e) => {
-    const matchesSearch = e.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
-    const matchesType = typeFilter === "ALL" || e.examType === typeFilter;
-    return matchesSearch && matchesType;
-  });
+  const filtered = exams
+    .filter((e) => {
+      const matchesSearch = e.name.toLowerCase().includes(search.toLowerCase());
+      const matchesType = typeFilter === "ALL" || e.examType === typeFilter;
+      return matchesSearch && matchesType;
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
   const openCreate = () => {
     setEditingExam(null);

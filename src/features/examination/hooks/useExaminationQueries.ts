@@ -16,6 +16,7 @@ import type {
   ExamResponseDTO,
   AdmitCardGenerationResponseDTO,
   AdmitCardResponseDTO,
+  AdmitCardGenerationProgressDTO,
   ScheduleAdmitCardStatusDTO,
 } from "@/services/types/examination";
 import type { ExamTemplateRequestDTO } from "@/services/types/examTemplate";
@@ -56,6 +57,8 @@ const keys = {
     ["examination", "admit-card-status", examUuid] as const,
   studentAdmitCard: (examUuid: string) =>
     ["examination", "student-admit-card", examUuid] as const,
+  generationProgress: (examUuid: string) =>
+    ["examination", "generation-progress", examUuid] as const,
 };
 
 // ── Exams ────────────────────────────────────────────────────────────
@@ -132,6 +135,15 @@ export const usePublishExam = () => {
     },
     // Always refetch after error or success to synchronize with the backend
     onSettled: () => qc.invalidateQueries({ queryKey: keys.exams }),
+  });
+};
+
+export const usePublishTimetable = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      examinationService.publishTimetable(uuid).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.exams }),
   });
 };
 
@@ -633,5 +645,20 @@ export const useGetStudentAdmitCard = (examUuid: string | undefined) =>
     },
     enabled: !!examUuid,
     retry: 1,
+  });
+
+/** Poll generation progress every 2.5s while `isPolling` is true.
+ *  The consumer should use `useEffect` to stop polling once status reaches GENERATED/FAILED. */
+export const useGetGenerationProgress = (
+  examUuid: string,
+  isPolling: boolean
+) =>
+  useQuery({
+    queryKey: keys.generationProgress(examUuid),
+    queryFn: async () =>
+      (await examinationService.getGenerationProgress(examUuid)).data,
+    enabled: !!examUuid && isPolling,
+    refetchInterval: isPolling ? 2500 : false,
+    refetchIntervalInBackground: false,
   });
 
