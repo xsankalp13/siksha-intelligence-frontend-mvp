@@ -3,6 +3,12 @@ import type { PayloadAction } from '@reduxjs/toolkit'
 import { api } from '@/lib/axios'
 import { getStoredRefreshToken, clearStoredRefreshToken, setStoredRefreshToken } from '@/lib/refreshToken'
 
+// Lazy registration from main.tsx to avoid importing app bootstrap code here.
+let _queryClient: { clear: () => void } | null = null
+export function registerQueryClient(qc: { clear: () => void }) {
+  _queryClient = qc
+}
+
 export interface User {
   /** Backend user identifier (from `userDetailsDto.userId`). */
   userId: string
@@ -190,6 +196,9 @@ export const authSlice = createSlice({
       } catch {
         // ignore
       }
+
+      // Prevent stale cross-user data from React Query cache.
+      _queryClient?.clear()
     },
 
     /**
@@ -205,6 +214,9 @@ export const authSlice = createSlice({
       state.sessionExpired = true
       clearStoredRefreshToken()
       try { localStorage.removeItem('si_auth_state') } catch { /* ignore */ }
+
+      // Prevent stale cross-user data from React Query cache.
+      _queryClient?.clear()
     },
 
     /** Called after the user dismisses the session-expired dialog. */

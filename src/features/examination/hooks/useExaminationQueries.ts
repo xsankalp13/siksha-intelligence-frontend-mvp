@@ -13,7 +13,13 @@ import type {
   PastPaperRequestDTO,
   PastPaperQueryParams,
   StudentMarkRequestDTO,
+  ExamResponseDTO,
+  AdmitCardGenerationResponseDTO,
+  AdmitCardResponseDTO,
+  AdmitCardGenerationProgressDTO,
+  ScheduleAdmitCardStatusDTO,
 } from "@/services/types/examination";
+import type { ExamTemplateRequestDTO } from "@/services/types/examTemplate";
 
 // ── Query Keys ──────────────────────────────────────────────────────
 const keys = {
@@ -38,6 +44,21 @@ const keys = {
     ["examination", "grade-scales", systemUuid] as const,
   pastPapers: (params?: PastPaperQueryParams) =>
     ["examination", "past-papers", params] as const,
+  templates: ["examination", "templates"] as const,
+  template: (id: string) =>
+    ["examination", "templates", id] as const,
+  templatePreview: (id: string) =>
+    ["examination", "templates", id, "preview"] as const,
+  evaluationStructure: (scheduleId: number) =>
+    ["examination", "evaluation-structure", scheduleId] as const,
+  admitCards: (examUuid: string) =>
+    ["examination", "admit-cards", examUuid] as const,
+  admitCardStatus: (examUuid: string) =>
+    ["examination", "admit-card-status", examUuid] as const,
+  studentAdmitCard: (examUuid: string) =>
+    ["examination", "student-admit-card", examUuid] as const,
+  generationProgress: (examUuid: string) =>
+    ["examination", "generation-progress", examUuid] as const,
 };
 
 // ── Exams ────────────────────────────────────────────────────────────
@@ -86,6 +107,42 @@ export const usePublishExam = () => {
   return useMutation({
     mutationFn: (uuid: string) =>
       examinationService.publishExam(uuid).then((r) => r.data),
+    onMutate: async (uuid) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await qc.cancelQueries({ queryKey: keys.exams });
+
+      // Snapshot the previous value
+      const previousExams = qc.getQueryData<ExamResponseDTO[]>(keys.exams);
+
+      // Optimistically update to the new value
+      if (previousExams) {
+        qc.setQueryData<ExamResponseDTO[]>(keys.exams, (old) => {
+          if (!old) return old;
+          return old.map((exam) =>
+            exam.uuid === uuid ? { ...exam, published: true } : exam
+          );
+        });
+      }
+
+      // Return a context object with the snapshotted value
+      return { previousExams };
+    },
+    // If the mutation fails, use the context returned from onMutate to roll back
+    onError: (_err, _uuid, context) => {
+      if (context?.previousExams) {
+        qc.setQueryData(keys.exams, context.previousExams);
+      }
+    },
+    // Always refetch after error or success to synchronize with the backend
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.exams }),
+  });
+};
+
+export const usePublishTimetable = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (uuid: string) =>
+      examinationService.publishTimetable(uuid).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.exams }),
   });
 };
@@ -448,3 +505,160 @@ export const useDeletePastPaper = () => {
       qc.invalidateQueries({ queryKey: ["examination", "past-papers"] }),
   });
 };
+
+// ── Exam Templates ──────────────────────────────────────────────────
+
+export const useGetAllTemplates = () =>
+  useQuery({
+    queryKey: keys.templates,
+    queryFn: async () =>
+      (await examinationService.getAllTemplates()).data,
+  });
+
+export const useGetTemplateById = (id: string) =>
+  useQuery({
+    queryKey: keys.template(id),
+    queryFn: async () =>
+      (await examinationService.getTemplateById(id)).data,
+    enabled: !!id,
+  });
+
+export const useCreateTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ExamTemplateRequestDTO) =>
+      examinationService.createTemplate(data).then((r) => r.data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: keys.templates }),
+  });
+};
+
+export const useUpdateTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: ExamTemplateRequestDTO;
+    }) =>
+      examinationService.updateTemplate(id, data).then((r) => r.data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: keys.templates }),
+  });
+};
+
+export const useDeleteTemplate = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      examinationService.deleteTemplate(id),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: keys.templates }),
+  });
+};
+
+export const useGetTemplatePreview = (id: string) =>
+  useQuery({
+    queryKey: keys.templatePreview(id),
+    queryFn: async () =>
+      (await examinationService.getTemplatePreview(id)).data,
+    enabled: !!id,
+  });
+
+// ── Evaluation Structure ────────────────────────────────────────────
+
+export const useGetEvaluationStructure = (scheduleId: number) =>
+  useQuery({
+    queryKey: keys.evaluationStructure(scheduleId),
+    queryFn: async () =>
+      (await examinationService.getEvaluationStructure(scheduleId)).data,
+    enabled: !!scheduleId,
+  });
+
+// ── Admit Cards ─────────────────────────────────────────────────────
+
+export const useGenerateAdmitCards = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (examUuid: string) => examinationService.generateAdmitCards(examUuid).then((r) => r.data),
+    onSuccess: (_, examUuid) => {
+      qc.invalidateQueries({ queryKey: ["examination", "admit-cards", examUuid] });
+      qc.invalidateQueries({ queryKey: ["examination", "admit-card-status", examUuid] });
+      qc.invalidateQueries({ queryKey: keys.exams });
+    },
+  });
+};
+
+export const useGenerateAdmitCardsForSchedule = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ examUuid, scheduleId }: { examUuid: string; scheduleId: number }) =>
+      examinationService.generateAdmitCardsForSchedule(examUuid, scheduleId).then((r) => r.data),
+    onSuccess: (_, { examUuid }) => {
+      qc.invalidateQueries({ queryKey: ["examination", "admit-cards", examUuid] });
+      qc.invalidateQueries({ queryKey: ["examination", "admit-card-status", examUuid] });
+      qc.invalidateQueries({ queryKey: keys.exams });
+    },
+  });
+};
+
+export const useGetAdmitCardStatus = (examUuid: string) =>
+  useQuery({
+    queryKey: keys.admitCardStatus(examUuid),
+    queryFn: async () => (await examinationService.getAdmitCardStatus(examUuid)).data,
+    enabled: !!examUuid,
+  });
+
+export const usePublishAdmitCards = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (examUuid: string) => examinationService.publishAdmitCards(examUuid).then((r) => r.data),
+    onSuccess: (_, examUuid) => {
+      qc.invalidateQueries({ queryKey: ["examination", "admit-cards", examUuid] });
+      qc.invalidateQueries({ queryKey: ["examination", "admit-card-status", examUuid] });
+      qc.invalidateQueries({ queryKey: keys.exams });
+    },
+  });
+};
+
+export const usePublishAdmitCardsForSchedules = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ examUuid, scheduleIds }: { examUuid: string; scheduleIds: number[] }) =>
+      examinationService.publishAdmitCardsForSchedules(examUuid, scheduleIds).then((r) => r.data),
+    onSuccess: (_, { examUuid }) => {
+      qc.invalidateQueries({ queryKey: ["examination", "admit-cards", examUuid] });
+      qc.invalidateQueries({ queryKey: ["examination", "admit-card-status", examUuid] });
+      qc.invalidateQueries({ queryKey: keys.exams });
+    },
+  });
+};
+
+export const useGetStudentAdmitCard = (examUuid: string | undefined) =>
+  useQuery({
+    queryKey: examUuid ? keys.studentAdmitCard(examUuid) : ["examination", "student-admit-card", "none"],
+    queryFn: async () => {
+      if (!examUuid) return null;
+      return (await examinationService.getStudentAdmitCard(examUuid)).data;
+    },
+    enabled: !!examUuid,
+    retry: 1,
+  });
+
+/** Poll generation progress every 2.5s while `isPolling` is true.
+ *  The consumer should use `useEffect` to stop polling once status reaches GENERATED/FAILED. */
+export const useGetGenerationProgress = (
+  examUuid: string,
+  isPolling: boolean
+) =>
+  useQuery({
+    queryKey: keys.generationProgress(examUuid),
+    queryFn: async () =>
+      (await examinationService.getGenerationProgress(examUuid)).data,
+    enabled: !!examUuid && isPolling,
+    refetchInterval: isPolling ? 2500 : false,
+    refetchIntervalInBackground: false,
+  });
+

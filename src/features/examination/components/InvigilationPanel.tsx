@@ -11,6 +11,8 @@ import {
   Users,
   Calendar,
   BookOpen,
+  DoorOpen,
+  Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,12 +48,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  useGetInvigilationsByExam,
-  useAssignInvigilator,
-  useRemoveInvigilator,
-} from "../hooks/useInvigilationQueries";
+import { useGetInvigilationsByExam, useAssignInvigilator, useRemoveInvigilator } from "../hooks/useInvigilationQueries";
 import { useGetAllExams, useGetSchedulesByExam } from "../hooks/useExaminationQueries";
+import { useGetAvailableRooms } from "../hooks/useSeatAllocationQueries";
+import { useGetRooms } from "@/features/academics/room_management/queries/useRoomQueries";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
 import type { InvigilationResponseDTO, InvigilationRole } from "@/services/types/invigilation";
@@ -60,12 +60,11 @@ import { toast } from "sonner";
 
 // ── Lightweight staff DTO for the selector ──────────────────────────
 interface StaffSummary {
-  staffId: string;
+  uuid: string;
   firstName: string;
   lastName: string;
   jobTitle?: string;
   employeeId?: string;
-  userId: number;
 }
 
 interface StaffPage {
@@ -76,6 +75,7 @@ interface StaffPage {
 export default function InvigilationPanel() {
   // ── Exam selection state ────────────────────────────────────────
   const [selectedExamUuid, setSelectedExamUuid] = useState<string>("");
+  const [selectedClassUuid, setSelectedClassUuid] = useState<string>("");
   const [selectedScheduleId, setSelectedScheduleId] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -83,6 +83,7 @@ export default function InvigilationPanel() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<InvigilationResponseDTO | null>(null);
   const [formStaffId, setFormStaffId] = useState<string>("");
+  const [formRoomId, setFormRoomId] = useState<string>("");
   const [formRole, setFormRole] = useState<InvigilationRole>("PRIMARY");
 
   // ── Queries ─────────────────────────────────────────────────────
@@ -92,6 +93,16 @@ export default function InvigilationPanel() {
     data: invigilations = [],
     isLoading,
   } = useGetInvigilationsByExam(selectedScheduleId);
+  const { data: allRooms = [] } = useGetRooms();
+  const { data: roomsAvailability = [] } = useGetAvailableRooms(selectedScheduleId);
+
+  // Derive rooms where students are actually sitting
+  const mappedRooms = useMemo(() => {
+    return roomsAvailability
+      .filter((r) => r.occupiedCapacity > 0)
+      .map((r) => ({ uuid: r.roomUuid, name: r.roomName }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [roomsAvailability]);
 
   const { data: staffPage } = useQuery<StaffPage>({
     queryKey: ["staff", "teachers", "all"],
@@ -110,9 +121,31 @@ export default function InvigilationPanel() {
   const removeMutation = useRemoveInvigilator();
 
   // ── Derived ─────────────────────────────────────────────────────
+  const selectedSchedule = useMemo(
+    () => schedules.find((s) => s.scheduleId === selectedScheduleId),
+    [schedules, selectedScheduleId]
+  );
+  
   const selectedExam: ExamResponseDTO | undefined = exams.find(
     (e) => e.uuid === selectedExamUuid
   );
+
+  // Derive unique classes from schedules
+  const availableClasses = useMemo(() => {
+    const classMap = new Map<string, { uuid: string; name: string }>();
+    schedules.forEach((s) => {
+      if (s.classId && !classMap.has(s.classId)) {
+        classMap.set(s.classId, { uuid: s.classId, name: s.className });
+      }
+    });
+    return Array.from(classMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [schedules]);
+
+  // Filter schedules by selected class
+  const filteredSchedulesByClass = useMemo(() => {
+    if (!selectedClassUuid) return [];
+    return schedules.filter((s) => s.classId === selectedClassUuid);
+  }, [schedules, selectedClassUuid]);
 
   const filteredInvigilations = useMemo(() => {
     if (!searchTerm) return invigilations;
@@ -120,13 +153,21 @@ export default function InvigilationPanel() {
     return invigilations.filter(
       (i) =>
         i.staffName.toLowerCase().includes(q) ||
-        i.role.toLowerCase().includes(q)
+        i.role.toLowerCase().includes(q) ||
+        i.roomName?.toLowerCase().includes(q)
     );
   }, [invigilations, searchTerm]);
 
   // ── Handlers ────────────────────────────────────────────────────
   const handleExamChange = (uuid: string) => {
     setSelectedExamUuid(uuid);
+    setSelectedClassUuid("");
+    setSelectedScheduleId(0);
+    setSearchTerm("");
+  };
+
+  const handleClassChange = (uuid: string) => {
+    setSelectedClassUuid(uuid);
     setSelectedScheduleId(0);
     setSearchTerm("");
   };
@@ -138,19 +179,21 @@ export default function InvigilationPanel() {
 
   const openAssign = () => {
     setFormStaffId("");
+    setFormRoomId("");
     setFormRole("PRIMARY");
     setAssignOpen(true);
   };
 
   const handleAssign = () => {
-    if (!formStaffId || !selectedScheduleId) {
-      toast.error("Please select a staff member");
+    if (!formStaffId || !selectedScheduleId || !formRoomId) {
+      toast.error("Please select a staff member and room");
       return;
     }
     assignMutation.mutate(
       {
         examScheduleId: selectedScheduleId,
-        staffId: Number(formStaffId),
+        staffId: formStaffId,
+        roomId: formRoomId,
         role: formRole,
       },
       {
@@ -158,7 +201,7 @@ export default function InvigilationPanel() {
           toast.success("Invigilator assigned");
           setAssignOpen(false);
         },
-        onError: () => toast.error("Failed to assign invigilator"),
+        onError: (err: any) => toast.error(err.response?.data?.message || "Failed to assign invigilator"),
       }
     );
   };
@@ -182,9 +225,31 @@ export default function InvigilationPanel() {
   const secondaryCount = invigilations.filter((i) => i.role === "SECONDARY").length;
 
   return (
-    <div className="space-y-5">
-      {/* ── Selectors Row ───────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="space-y-5" id="printable-invigilation-plan">
+      {/* ── Print Header (Only visible during print) ───────────────── */}
+      <div className="hidden print:block mb-8 text-center">
+        <h2 className="text-2xl font-bold border-b pb-2">Invigilator Shift Report</h2>
+        {selectedSchedule && (
+          <p className="text-muted-foreground mt-2 font-mono">
+            Exam Schedule: {selectedSchedule.subjectName} — {selectedSchedule.className} 
+            {selectedSchedule.sectionName ? ` (${selectedSchedule.sectionName})` : ""}
+            {selectedSchedule.examDate && (
+              <>
+                <br/>
+                Date: {new Date(selectedSchedule.examDate).toLocaleDateString("en-IN")}
+              </>
+            )}
+            {selectedSchedule.startTime && selectedSchedule.endTime && (
+              <>
+                <span className="mx-2">•</span>
+                Time Block: {selectedSchedule.startTime.substring(0, 5)} – {selectedSchedule.endTime.substring(0, 5)}
+              </>
+            )}
+          </p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
         {/* Exam selector */}
         <div className="grid gap-1.5">
           <label className="text-sm font-medium text-muted-foreground">
@@ -195,9 +260,32 @@ export default function InvigilationPanel() {
               <SelectValue placeholder="Choose an exam…" />
             </SelectTrigger>
             <SelectContent>
-              {exams.map((e) => (
+              {exams.filter(e => e.published).map((e) => (
                 <SelectItem key={e.uuid} value={e.uuid}>
                   {e.name} ({e.academicYear})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Class selector */}
+        <div className="grid gap-1.5">
+          <label className="text-sm font-medium text-muted-foreground">
+            Select Class
+          </label>
+          <Select
+            value={selectedClassUuid}
+            onValueChange={handleClassChange}
+            disabled={!selectedExamUuid || availableClasses.length === 0}
+          >
+            <SelectTrigger id="invigilation-class-select">
+              <SelectValue placeholder={availableClasses.length === 0 ? "No classes" : "Choose class…"} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableClasses.map((c) => (
+                <SelectItem key={c.uuid} value={c.uuid}>
+                  {c.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -212,15 +300,15 @@ export default function InvigilationPanel() {
           <Select
             value={selectedScheduleId ? String(selectedScheduleId) : ""}
             onValueChange={handleScheduleChange}
-            disabled={!selectedExamUuid || schedules.length === 0}
+            disabled={!selectedClassUuid || filteredSchedulesByClass.length === 0}
           >
             <SelectTrigger id="invigilation-schedule-select">
-              <SelectValue placeholder={schedules.length === 0 ? "No schedules" : "Choose schedule…"} />
+              <SelectValue placeholder={filteredSchedulesByClass.length === 0 ? "No schedules" : "Choose schedule…"} />
             </SelectTrigger>
             <SelectContent>
-              {schedules.map((s) => (
+              {filteredSchedulesByClass.map((s) => (
                 <SelectItem key={s.scheduleId} value={String(s.scheduleId)}>
-                  {s.subjectName} — {s.className}
+                  {s.subjectName}
                   {s.sectionName ? ` (${s.sectionName})` : ""} ·{" "}
                   {new Date(s.examDate).toLocaleDateString("en-IN", {
                     day: "2-digit",
@@ -241,13 +329,23 @@ export default function InvigilationPanel() {
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search invigilators…"
+                placeholder="Search resources…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8"
                 disabled={!selectedScheduleId}
               />
             </div>
+            <Button
+              onClick={() => window.print()}
+              variant="outline"
+              size="sm"
+              className="gap-1.5 shrink-0 h-9"
+              disabled={!selectedScheduleId || invigilations.length === 0}
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </Button>
             <Button
               onClick={openAssign}
               size="sm"
@@ -270,21 +368,21 @@ export default function InvigilationPanel() {
         >
           <Badge variant="secondary" className="gap-1.5 px-3 py-1">
             <Users className="w-3.5 h-3.5" />
-            {invigilations.length} Total
+            {invigilations.length} Total Room Shifts
           </Badge>
           <Badge
             variant="outline"
             className="gap-1.5 px-3 py-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            {primaryCount} Primary
+            {primaryCount} Lead Staff
           </Badge>
           <Badge
             variant="outline"
             className="gap-1.5 px-3 py-1 border-amber-500/30 text-amber-600 dark:text-amber-400"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            {secondaryCount} Secondary
+            {secondaryCount} Supporting Staff
           </Badge>
           {selectedExam && (
             <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
@@ -324,7 +422,7 @@ export default function InvigilationPanel() {
           <p className="text-sm text-muted-foreground">
             {searchTerm
               ? "Try a different search term"
-              : 'Click "Assign" to assign staff members as invigilators'}
+              : 'Click "Assign" to map staff members to examination rooms'}
           </p>
         </div>
       ) : (
@@ -338,8 +436,9 @@ export default function InvigilationPanel() {
               <TableRow className="bg-muted/40">
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Staff Name</TableHead>
+                <TableHead>Assigned Resource</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right print:hidden">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -369,19 +468,29 @@ export default function InvigilationPanel() {
                       </div>
                     </TableCell>
                     <TableCell>
+                      {inv.roomName ? (
+                        <Badge variant="outline" className="gap-1 bg-background border-border/50 font-medium">
+                          <DoorOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                          {inv.roomName}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Legacy Unmapped</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {inv.role === "PRIMARY" ? (
                         <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1">
                           <ShieldCheck className="w-3 h-3" />
-                          Primary
+                          Lead
                         </Badge>
                       ) : (
-                        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 gap-1">
+                        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 gap-1 mt-0.5">
                           <ShieldAlert className="w-3 h-3" />
-                          Secondary
+                          Supporting
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right print:hidden">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -408,18 +517,18 @@ export default function InvigilationPanel() {
               Assign Invigilator
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
+          <div className="grid gap-5 py-2">
             <div className="grid gap-1.5">
               <label className="text-sm font-medium">
                 Staff Member <span className="text-destructive">*</span>
               </label>
               <Select value={formStaffId} onValueChange={setFormStaffId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select staff member" />
+                  <SelectValue placeholder="Select target staff member" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
                   {staffList.map((s) => (
-                    <SelectItem key={s.userId} value={String(s.userId)}>
+                    <SelectItem key={s.uuid} value={s.uuid}>
                       <span className="flex items-center gap-2">
                         <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
                         {s.firstName} {s.lastName}
@@ -434,9 +543,39 @@ export default function InvigilationPanel() {
                 </SelectContent>
               </Select>
             </div>
+            
             <div className="grid gap-1.5">
               <label className="text-sm font-medium">
-                Role <span className="text-destructive">*</span>
+                Target Physical Room <span className="text-destructive">*</span>
+              </label>
+              <Select value={formRoomId} onValueChange={setFormRoomId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select duty room" />
+                </SelectTrigger>
+                <SelectContent position="popper" className="max-h-[150px] overflow-y-auto">
+                  {mappedRooms.length > 0 ? (
+                    mappedRooms.map((r) => (
+                      <SelectItem key={r.uuid} value={r.uuid}>
+                        <span className="flex items-center gap-2">
+                          <DoorOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                          {r.name}
+                        </span>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-3 text-sm text-center text-muted-foreground">
+                      {selectedScheduleId 
+                        ? "No students mapped in any room for this schedule." 
+                        : "Please select a schedule first."}
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium">
+                Security Policy Role <span className="text-destructive">*</span>
               </label>
               <Select
                 value={formRole}
@@ -449,20 +588,21 @@ export default function InvigilationPanel() {
                   <SelectItem value="PRIMARY">
                     <span className="flex items-center gap-2">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                      Primary Invigilator
+                      Lead Representative
                     </span>
                   </SelectItem>
                   <SelectItem value="SECONDARY">
                     <span className="flex items-center gap-2">
                       <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-                      Secondary Invigilator
+                      Supporting Staff Member
                     </span>
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setAssignOpen(false)}>
+            
+            <div className="flex justify-end gap-2 pt-2 border-t mt-1">
+              <Button variant="ghost" onClick={() => setAssignOpen(false)}>
                 Cancel
               </Button>
               <Button
@@ -472,7 +612,7 @@ export default function InvigilationPanel() {
                 {assignMutation.isPending && (
                   <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
                 )}
-                Assign
+                Lock Assignment
               </Button>
             </div>
           </div>
@@ -486,10 +626,9 @@ export default function InvigilationPanel() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Invigilator</AlertDialogTitle>
+            <AlertDialogTitle>Revoke Shift Assignment</AlertDialogTitle>
             <AlertDialogDescription>
-              Remove <strong>{deleteTarget?.staffName}</strong> from this
-              schedule? This action cannot be undone.
+              Revoke duty for <strong>{deleteTarget?.staffName}</strong> in <strong>{deleteTarget?.roomName || "room"}</strong>? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -501,7 +640,7 @@ export default function InvigilationPanel() {
               {removeMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                "Remove"
+                "Revoke Clearances"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

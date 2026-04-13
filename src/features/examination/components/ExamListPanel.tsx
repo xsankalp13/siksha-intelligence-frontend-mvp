@@ -86,6 +86,7 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
   const deleteExam = useDeleteExam();
   const publishExam = usePublishExam();
 
+
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -103,13 +104,16 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
     endDate: "",
   });
 
-  const filtered = exams.filter((e) => {
-    const matchesSearch = e.name
-      .toLowerCase()
-      .includes(search.toLowerCase());
-    const matchesType = typeFilter === "ALL" || e.examType === typeFilter;
-    return matchesSearch && matchesType;
-  });
+  const filtered = exams
+    .filter((e) => {
+      const matchesSearch = e.name.toLowerCase().includes(search.toLowerCase());
+      const matchesType = typeFilter === "ALL" || e.examType === typeFilter;
+      return matchesSearch && matchesType;
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
   const openCreate = () => {
     setEditingExam(null);
@@ -280,6 +284,12 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
                         {formatDate(exam.startDate)} — {formatDate(exam.endDate)}
                       </span>
                       <span>AY: {exam.academicYear}</span>
+                      {exam.templateName && (
+                        <span className="flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5" />
+                          {exam.templateName}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -411,6 +421,7 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
                 />
               </div>
             </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 variant="outline"

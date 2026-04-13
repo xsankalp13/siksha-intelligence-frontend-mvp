@@ -70,6 +70,7 @@ export function TimetableGrid({ readOnly = false, sectionId, rooms = [], onEditC
     // Use the backend-provided default room for this section
     const commonRoomId = selectedSection?.defaultRoom?.uuid || '';
     const commonRoomName = selectedSection?.defaultRoom?.name;
+    const classTeacherName = editorContext?.section?.classTeacherName;
 
     if (isLoading) {
         return (
@@ -101,16 +102,26 @@ export function TimetableGrid({ readOnly = false, sectionId, rooms = [], onEditC
 
     return (
         <div className="w-full overflow-x-auto custom-scrollbar">
-            {/* Header info bar for common room */}
-            {commonRoomName && (
-                <div className="mb-4 flex items-center gap-2 px-1">
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                        <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Main Classroom</span>
-                        <span className="text-xs font-black text-blue-900 ml-1">{commonRoomName}</span>
-                    </div>
+            {/* Header info bar for common room + class teacher */}
+            {(commonRoomName || classTeacherName) && (
+                <div className="mb-4 flex items-center gap-2 px-1 flex-wrap">
+                    {commonRoomName && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full">
+                            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                            <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Main Classroom</span>
+                            <span className="text-xs font-black text-blue-900 ml-1">{commonRoomName}</span>
+                        </div>
+                    )}
+                    {classTeacherName && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Class Teacher</span>
+                            <span className="text-xs font-black text-emerald-900 ml-1">{classTeacherName}</span>
+                        </div>
+                    )}
                 </div>
             )}
+
 
             <div className="min-w-[max-content] pb-2">
                 {/* Grid Header - Days */}

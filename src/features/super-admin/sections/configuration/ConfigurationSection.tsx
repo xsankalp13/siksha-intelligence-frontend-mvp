@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { settingsService } from '@/features/super-admin/services/superAdminService'
 import {
   Mail, HardDrive, Lock, Palette, ToggleLeft,
   Save, Eye, EyeOff, AlertTriangle, Loader2, CheckCircle2, Settings2,
+<<<<<<< HEAD
   Cloud, Bot,
+=======
+  Cloud,
+  Clock3,
+  MapPin,
+>>>>>>> 1f1b964236b0dce6e94015b1812c32813d5b0748
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -12,12 +18,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui/tabs'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Circle, MapContainer, Marker, TileLayer } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import type { AppSettingDTO, SettingUpdateRequest } from '@/features/super-admin/types'
 import AiConfigTab from './AiConfigTab'
 
@@ -123,6 +133,7 @@ function SettingsGroupCard({
   onSave,
   isSaving,
   onChangeDraft,
+  enableGeoLocationHelper = false,
 }: {
   settings: AppSettingDTO[]
   title: string
@@ -130,9 +141,36 @@ function SettingsGroupCard({
   onSave: (updates: SettingUpdateRequest[]) => void
   isSaving: boolean
   onChangeDraft: (key: string, value: string) => void
+  enableGeoLocationHelper?: boolean
 }) {
   const { revealed, toggle } = useRevealedPasswords()
   const [localDraft, setLocalDraft] = useState<Record<string, string>>({})
+  const [locating, setLocating] = useState(false)
+  const [geoModalOpen, setGeoModalOpen] = useState(false)
+  const [pendingGeo, setPendingGeo] = useState<{ lat: number; lng: number } | null>(null)
+  const minRadius = 0
+
+  const hasGeoFields = settings.some((s) => s.key === 'attendance.geofence.latitude')
+    && settings.some((s) => s.key === 'attendance.geofence.longitude')
+
+  const radiusKey = 'attendance.geofence.radius.meters'
+  const radiusSetting = settings.find((s) => s.key === radiusKey)
+  const backendRadiusRaw = radiusSetting?.value ?? '200'
+  const draftRadiusRaw = localDraft[radiusKey] ?? backendRadiusRaw
+  const parsedRadius = Number(draftRadiusRaw)
+  const backendRadiusParsed = Number(backendRadiusRaw)
+  const radiusMeters = Number.isFinite(parsedRadius)
+    ? Math.max(minRadius, Math.round(parsedRadius))
+    : (Number.isFinite(backendRadiusParsed) ? Math.max(minRadius, Math.round(backendRadiusParsed)) : 200)
+  const maxRadius = Math.max(2000, radiusMeters)
+
+  const radiusAreaSqm = Math.PI * radiusMeters * radiusMeters
+  const pinpointIcon = useMemo(() => L.divIcon({
+    html: '<div style="font-size:22px;line-height:1;">📍</div>',
+    className: '',
+    iconSize: [22, 22],
+    iconAnchor: [11, 22],
+  }), [])
 
   // Initialize draft from settings
   useEffect(() => {
@@ -160,6 +198,55 @@ function SettingsGroupCard({
       return
     }
     onSave(updates)
+  }
+
+  const setDraftValue = (key: string, value: string) => {
+    setLocalDraft((prev) => ({ ...prev, [key]: value }))
+    onChangeDraft(key, value)
+  }
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by this browser')
+      return
+    }
+
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setPendingGeo({ lat: position.coords.latitude, lng: position.coords.longitude })
+        setGeoModalOpen(true)
+        setLocating(false)
+      },
+      (error) => {
+        let msg = 'Unable to fetch current location'
+        if (error.code === error.PERMISSION_DENIED) msg = 'Location permission denied'
+        if (error.code === error.POSITION_UNAVAILABLE) msg = 'Location unavailable'
+        if (error.code === error.TIMEOUT) msg = 'Location request timed out'
+        toast.error(msg)
+        setLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
+  }
+
+  const handleConfirmCurrentLocation = () => {
+    if (!pendingGeo) return
+    setDraftValue('attendance.geofence.latitude', pendingGeo.lat.toFixed(6))
+    setDraftValue('attendance.geofence.longitude', pendingGeo.lng.toFixed(6))
+    setDraftValue(radiusKey, String(radiusMeters))
+    toast.success('Latitude and longitude applied from map location')
+    setGeoModalOpen(false)
+  }
+
+  const handleDenyCurrentLocation = () => {
+    setGeoModalOpen(false)
+    toast.info('You can continue with manual latitude/longitude entry')
+  }
+
+  const handleRadiusChange = (value: number) => {
+    const next = Math.min(maxRadius, Math.max(minRadius, Math.round(value)))
+    setDraftValue(radiusKey, String(next))
   }
 
   const isDirty = settings.some((s) => {
@@ -191,6 +278,96 @@ function SettingsGroupCard({
       </div>
 
       <div className="space-y-4 p-5">
+        {enableGeoLocationHelper && hasGeoFields ? (
+          <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-muted/20 px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              You can enter latitude/longitude manually, or open map preview using your current location.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-3 shrink-0"
+              onClick={handleUseCurrentLocation}
+              disabled={locating}
+            >
+              {locating ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <MapPin className="mr-1 h-3.5 w-3.5" />}
+              Current Location
+            </Button>
+          </div>
+        ) : null}
+
+        <Dialog open={geoModalOpen} onOpenChange={setGeoModalOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Confirm Geo-Fence Location</DialogTitle>
+              <DialogDescription>
+                Verify the detected location on map. Confirm to apply coordinates, or deny and enter manually.
+              </DialogDescription>
+            </DialogHeader>
+
+            {pendingGeo ? (
+              <div className="space-y-3">
+                <div className="h-72 overflow-hidden rounded-lg border border-border">
+                  <MapContainer
+                    center={[pendingGeo.lat, pendingGeo.lng]}
+                    zoom={16}
+                    style={{ height: '100%', width: '100%' }}
+                    zoomControl={false}
+                  >
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    <Marker position={[pendingGeo.lat, pendingGeo.lng]} icon={pinpointIcon} />
+                    <Circle
+                      center={[pendingGeo.lat, pendingGeo.lng]}
+                      radius={radiusMeters}
+                      pathOptions={{ color: '#16a34a', fillColor: '#16a34a', fillOpacity: 0.25 }}
+                    />
+                  </MapContainer>
+                </div>
+
+                <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-foreground">Geo-Fence Radius</p>
+                    <p className="text-xs font-mono text-foreground">{radiusMeters} m</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleRadiusChange(radiusMeters - 10)}>-</Button>
+                    <input
+                      type="range"
+                      min={minRadius}
+                      max={maxRadius}
+                      step={5}
+                      value={radiusMeters}
+                      onChange={(e) => handleRadiusChange(Number(e.target.value))}
+                      className="h-2 w-full cursor-pointer accent-primary"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleRadiusChange(radiusMeters + 10)}>+</Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Approx coverage area: {Math.round(radiusAreaSqm).toLocaleString()} sq.m
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
+                    <p className="text-muted-foreground">Latitude</p>
+                    <p className="font-mono text-foreground">{pendingGeo.lat.toFixed(6)}</p>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-xs">
+                    <p className="text-muted-foreground">Longitude</p>
+                    <p className="font-mono text-foreground">{pendingGeo.lng.toFixed(6)}</p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleDenyCurrentLocation}>Deny (Manual Entry)</Button>
+              <Button type="button" onClick={handleConfirmCurrentLocation}>Confirm Location</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {settings.map((s) => {
           // Conditional visibility for ID card header image URL
           if (s.key === 'school.id_card_header_image_url') {
@@ -435,11 +612,73 @@ export default function ConfigurationSection() {
         setRestartKeys((prev) => [...new Set([...prev, ...data.restartRequiredFor])])
       }
     },
-    onError: () => toast.error('Failed to save settings'),
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || 'Failed to save settings'
+      toast.error(msg)
+    },
   })
 
   const getGroup = (group: string): AppSettingDTO[] =>
     (settings as Record<string, AppSettingDTO[]> | undefined)?.[group] ?? []
+
+  const attendanceSettingTemplate: Record<string, { value: string; type: AppSettingDTO['type']; description: string }> = {
+    'attendance.edit.window.enabled': {
+      value: 'true',
+      type: 'BOOLEAN',
+      description: 'Enable attendance edit window policy',
+    },
+    'attendance.edit.window.teacher.hours': {
+      value: '24',
+      type: 'INTEGER',
+      description: 'Teacher edit window in hours',
+    },
+    'attendance.edit.window.school_admin.hours': {
+      value: '0',
+      type: 'INTEGER',
+      description: 'School Admin edit window in hours (0 = unlimited)',
+    },
+    'attendance.geofence.enabled': {
+      value: 'false',
+      type: 'BOOLEAN',
+      description: 'Enable geo-fence validation for staff self check-in',
+    },
+    'attendance.geofence.latitude': {
+      value: '0',
+      type: 'STRING',
+      description: 'Geo-fence latitude',
+    },
+    'attendance.geofence.longitude': {
+      value: '0',
+      type: 'STRING',
+      description: 'Geo-fence longitude',
+    },
+    'attendance.geofence.radius.meters': {
+      value: '200',
+      type: 'INTEGER',
+      description: 'Allowed radius in meters',
+    },
+  }
+
+  const pickAttendanceSettings = (keys: string[]) => {
+    const existing = getGroup('ATTENDANCE')
+    const existingByKey = new Map(existing.map((setting) => [setting.key, setting]))
+
+    return keys.map((key) => {
+      const found = existingByKey.get(key)
+      if (found) return found
+
+      const template = attendanceSettingTemplate[key]
+      return {
+        key,
+        value: template?.value ?? '',
+        type: template?.type ?? 'STRING',
+        group: 'ATTENDANCE',
+        description: template?.description ?? key,
+        requiresRestart: false,
+        sensitive: false,
+      } satisfies AppSettingDTO
+    })
+  }
 
   if (isLoading) {
     return (
@@ -474,7 +713,11 @@ export default function ConfigurationSection() {
           <TabsTrigger value="security" className="gap-1.5"><Lock className="h-3.5 w-3.5" />Security</TabsTrigger>
           <TabsTrigger value="whitelabel" className="gap-1.5"><Palette className="h-3.5 w-3.5" />White-Label</TabsTrigger>
           <TabsTrigger value="features" className="gap-1.5"><ToggleLeft className="h-3.5 w-3.5" />Feature Flags</TabsTrigger>
+<<<<<<< HEAD
           <TabsTrigger value="ai" className="gap-1.5"><Bot className="h-3.5 w-3.5" />AI Assistant</TabsTrigger>
+=======
+          <TabsTrigger value="attendance" className="gap-1.5"><Clock3 className="h-3.5 w-3.5" />Attendance</TabsTrigger>
+>>>>>>> 1f1b964236b0dce6e94015b1812c32813d5b0748
         </TabsList>
 
         <TabsContent value="smtp">
@@ -527,8 +770,38 @@ export default function ConfigurationSection() {
           />
         </TabsContent>
 
+<<<<<<< HEAD
         <TabsContent value="ai">
           <AiConfigTab />
+=======
+        <TabsContent value="attendance" className="space-y-4">
+          <SettingsGroupCard
+            title="Attendance Edit Window"
+            icon={Clock3}
+            settings={pickAttendanceSettings([
+              'attendance.edit.window.enabled',
+              'attendance.edit.window.teacher.hours',
+              'attendance.edit.window.school_admin.hours',
+            ])}
+            onSave={saveSettings}
+            isSaving={isSaving}
+            onChangeDraft={() => undefined}
+          />
+          <SettingsGroupCard
+            title="Geo-Fence - Staff Self Check-In"
+            icon={MapPin}
+            settings={pickAttendanceSettings([
+              'attendance.geofence.enabled',
+              'attendance.geofence.latitude',
+              'attendance.geofence.longitude',
+              'attendance.geofence.radius.meters',
+            ])}
+            onSave={saveSettings}
+            isSaving={isSaving}
+            onChangeDraft={() => undefined}
+            enableGeoLocationHelper
+          />
+>>>>>>> 1f1b964236b0dce6e94015b1812c32813d5b0748
         </TabsContent>
       </Tabs>
     </div>

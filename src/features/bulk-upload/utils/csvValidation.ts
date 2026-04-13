@@ -26,6 +26,18 @@ export const STAFF_HEADERS: string[] = [
   "jobTitle",
   "department",
   "staffType",
+  "staffCategory",
+  "certifications",
+  "specializations",
+  "yearsOfExperience",
+  "educationLevel",
+  "stateLicenseNumber",
+  "administrativeCertifications",
+  "schoolLevelManaged",
+  "librarySystemPermissions",
+  "mlisDegree",
+  "assignedGate",
+  "shiftTiming",
 ];
 
 const EMAIL_PATTERN = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
@@ -145,6 +157,11 @@ export function validateCsvData(
       const staffType = row[headerIndices["staffType"]];
       if (!validateString(staffType)) {
         return `Row ${rowNum}: staffType cannot be empty.`;
+      }
+
+      const staffCategory = row[headerIndices["staffCategory"]];
+      if (!validateString(staffCategory)) {
+        return `Row ${rowNum}: staffCategory cannot be empty.`;
       }
     }
   }

@@ -66,6 +66,8 @@ const staffSchema = z.object({
   middleName: z.string().optional(),
   lastName: z.string().min(1, "Required"),
   jobTitle: z.string().min(1, "Required"),
+  category: z.enum(["TEACHING", "NON_TEACHING_SUPPORT", "NON_TEACHING_ADMIN"]),
+  department: z.string().min(1, "Required"),
   hireDate: z.string().min(1, "Required"),
   staffType: z.enum(["TEACHER", "PRINCIPAL", "LIBRARIAN"]),
   gender: z.string().optional(),
@@ -101,6 +103,7 @@ export default function StaffPage() {
   // ── Dialog state ──────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkUploadPhase, setBulkUploadPhase] = useState<"idle" | "validating" | "ready" | "uploading" | "success" | "error">("idle");
   const [editingStaff, setEditingStaff] = useState<StaffSummaryDTO | null>(null);
   const [pendingEditData, setPendingEditData] = useState<StaffFormData | null>(null);
   const [actionTarget, setActionTarget] = useState<{ staff: StaffSummaryDTO; action: 'activate' | 'block' } | null>(null);
@@ -114,6 +117,7 @@ export default function StaffPage() {
     defaultValues: {
       username: "", email: "", firstName: "", middleName: "", lastName: "",
       jobTitle: "", hireDate: "", staffType: "TEACHER", gender: "",
+      category: "TEACHING", department: "",
       dateOfBirth: "", officeLocation: "", initialPassword: "",
     },
   });
@@ -244,6 +248,8 @@ export default function StaffPage() {
           gender: data.gender as never,
           dateOfBirth: data.dateOfBirth,
           staffType: data.staffType,
+          category: data.category as any,
+          department: data.department as any,
           specializations: data.specializations ? [data.specializations] : [],
           certifications: data.certifications ? [data.certifications] : [],
           yearsOfExperience: data.yearsOfExperience,
@@ -263,6 +269,8 @@ export default function StaffPage() {
           gender: data.gender as never,
           dateOfBirth: data.dateOfBirth,
           staffType: data.staffType,
+          category: data.category as any,
+          department: data.department as any,
           schoolLevelManaged: data.schoolLevelManaged as never,
           administrativeCertifications: data.adminCertifications ? [data.adminCertifications] : [],
         });
@@ -280,6 +288,8 @@ export default function StaffPage() {
           gender: data.gender as never,
           dateOfBirth: data.dateOfBirth,
           staffType: data.staffType,
+          category: data.category as any,
+          department: data.department as any,
           hasMlisDegree: data.hasMlisDegree,
         });
       }
@@ -317,13 +327,15 @@ export default function StaffPage() {
   };
 
   const handleBulkUploadComplete = async () => {
-    setBulkOpen(false);
+    // Keep dialog open so users can review row-level result details after import.
     setPage(0);
     setSearch("");
     setSearchInput("");
     await fetchStaff(0, "", staffTypeFilter);
     toast.success("Bulk import complete — table refreshed");
   };
+
+  const isBulkUploading = bulkUploadPhase === "uploading";
 
   return (
     <motion.div
@@ -559,8 +571,29 @@ export default function StaffPage() {
       )}
 
       {/* Bulk Upload Dialog */}
-      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <Dialog
+        open={bulkOpen}
+        onOpenChange={(open) => {
+          if (!open && isBulkUploading) {
+            toast.info("Import is in progress. Use Minimize to continue in the background.");
+            return;
+          }
+          setBulkOpen(open);
+          if (!open) setBulkUploadPhase("idle");
+        }}
+      >
+        <DialogContent
+          className="max-w-4xl max-h-[85vh] overflow-y-auto"
+          onInteractOutside={(event) => {
+            if (isBulkUploading) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            if (isBulkUploading) event.preventDefault();
+          }}
+          onEscapeKeyDown={(event) => {
+            if (isBulkUploading) event.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Bulk Staff Upload</DialogTitle>
             <DialogDescription>
@@ -571,6 +604,7 @@ export default function StaffPage() {
             defaultUserType="staff"
             hideTypeSelector
             onUploadComplete={handleBulkUploadComplete}
+            onPhaseChange={setBulkUploadPhase}
           />
         </DialogContent>
       </Dialog>
@@ -591,26 +625,65 @@ export default function StaffPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Staff Type (create only) */}
+            {/* Staff Classification Row (create only) */}
             {!editingStaff && (
-              <div className="space-y-2">
-                <Label>Staff Type *</Label>
-                <Select
-                  value={selectedStaffType}
-                  onValueChange={(val) => {
-                    setSelectedStaffType(val as StaffType);
-                    form.setValue("staffType", val as StaffType);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STAFF_TYPE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Staff Type *</Label>
+                  <Select
+                    value={selectedStaffType}
+                    onValueChange={(val) => {
+                      setSelectedStaffType(val as StaffType);
+                      form.setValue("staffType", val as StaffType);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STAFF_TYPE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Category *</Label>
+                  <Select value={form.watch("category")} onValueChange={(val) => form.setValue("category", val as any)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TEACHING">Teaching</SelectItem>
+                      <SelectItem value="NON_TEACHING_SUPPORT">Non-Teaching Support</SelectItem>
+                      <SelectItem value="NON_TEACHING_ADMIN">Non-Teaching Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {form.formState.errors.category && (
+                    <p className="text-xs text-destructive">{form.formState.errors.category.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Department *</Label>
+                  <Select value={form.watch("department")} onValueChange={(val) => form.setValue("department", val as any)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select dept" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACADEMICS">Academics</SelectItem>
+                      <SelectItem value="ADMINISTRATION">Administration</SelectItem>
+                      <SelectItem value="FINANCE">Finance</SelectItem>
+                      <SelectItem value="ADMISSION">Admission</SelectItem>
+                      <SelectItem value="IT">IT</SelectItem>
+                      <SelectItem value="FACILITIES">Facilities</SelectItem>
+                      <SelectItem value="HUMAN_RESOURCE">Human Resource</SelectItem>
+                      <SelectItem value="LIBRARY">Library</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {form.formState.errors.department && (
+                    <p className="text-xs text-destructive">{form.formState.errors.department.message}</p>
+                  )}
+                </div>
               </div>
             )}
 

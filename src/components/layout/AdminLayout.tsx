@@ -10,17 +10,21 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} navItems={ADMIN_NAV_ITEMS} />
+      <div className="print:hidden">
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} navItems={ADMIN_NAV_ITEMS} />
+      </div>
 
       <div
         className={cn(
-          "flex min-h-screen flex-col transition-all duration-300 ease-in-out",
+          "flex min-h-screen flex-col transition-all duration-300 ease-in-out print:ml-0 print:block",
           collapsed ? "ml-[68px]" : "ml-[260px]"
         )}
       >
-        <Topbar />
+        <div className="print:hidden">
+          <Topbar />
+        </div>
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 print:p-0 print:overflow-visible text-foreground bg-background">
           <Outlet />
         </main>
       </div>

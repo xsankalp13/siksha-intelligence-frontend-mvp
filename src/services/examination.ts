@@ -21,7 +21,16 @@ import type {
   PastPaperRequestDTO,
   PastPaperResponseDTO,
   PastPaperQueryParams,
+  AdmitCardResponseDTO,
+  AdmitCardGenerationResponseDTO,
+  AdmitCardGenerationProgressDTO,
+  ScheduleAdmitCardStatusDTO,
 } from "./types/examination";
+import type {
+  ExamTemplateRequestDTO,
+  ExamTemplateResponseDTO,
+  EvaluationStructureDTO,
+} from "./types/examTemplate";
 
 // ── Examination Service ──────────────────────────────────────────────
 
@@ -54,7 +63,17 @@ export const examinationService = {
 
   /** PATCH /auth/examination/exams/:uuid/publish */
   publishExam(uuid: string) {
-    return api.patch<ExamResponseDTO>(`/auth/examination/exams/${uuid}/publish`);
+    return api.patch<ExamResponseDTO>(`/auth/examination/exams/${uuid}/publish`, {
+      published: true,
+      isPublished: true,
+      publish: true,
+      status: true
+    });
+  },
+
+  /** PATCH /auth/examination/exams/:uuid/publish-timetable */
+  publishTimetable(uuid: string) {
+    return api.patch<ExamResponseDTO>(`/auth/examination/exams/${uuid}/publish-timetable`);
   },
 
   // ── Exam Schedules ───────────────────────────────────────────────
@@ -293,4 +312,123 @@ export const examinationService = {
   deletePastPaper(uuid: string) {
     return api.delete(`/auth/examination/past-papers/${uuid}`);
   },
+
+  // ── Exam Templates ────────────────────────────────────────────────
+  /** GET /auth/examination/templates */
+  getAllTemplates() {
+    return api.get<ExamTemplateResponseDTO[]>("/auth/examination/templates");
+  },
+
+  /** GET /auth/examination/templates/:id */
+  getTemplateById(id: string) {
+    return api.get<ExamTemplateResponseDTO>(`/auth/examination/templates/${id}`);
+  },
+
+  /** POST /auth/examination/templates */
+  createTemplate(data: ExamTemplateRequestDTO) {
+    return api.post<ExamTemplateResponseDTO>("/auth/examination/templates", data);
+  },
+
+  /** PUT /auth/examination/templates/:id (only if unused) */
+  updateTemplate(id: string, data: ExamTemplateRequestDTO) {
+    return api.put<ExamTemplateResponseDTO>(`/auth/examination/templates/${id}`, data);
+  },
+
+  /** DELETE /auth/examination/templates/:id (only if unused) */
+  deleteTemplate(id: string) {
+    return api.delete(`/auth/examination/templates/${id}`);
+  },
+
+  /** GET /auth/examination/templates/:id/preview (optional) */
+  getTemplatePreview(id: string) {
+    return api.get(`/auth/examination/templates/${id}/preview`);
+  },
+
+  // ── Evaluation Structure ──────────────────────────────────────────
+  /** GET /auth/examination/schedules/:scheduleId/evaluation-structure */
+  getEvaluationStructure(scheduleId: number) {
+    return api.get<EvaluationStructureDTO>(
+      `/auth/examination/schedules/${scheduleId}/evaluation-structure`
+    );
+  },
+
+  // ── Admit Cards ──────────────────────────────────────────────────
+  /** POST /admin/admit-cards/generate (full exam) */
+  generateAdmitCards(examUuid: string) {
+    return api.post<AdmitCardGenerationResponseDTO>(
+      `/admin/admit-cards/generate`,
+      { examId: examUuid }
+    );
+  },
+
+  /** POST /admin/admit-cards/generate (per-schedule) */
+  generateAdmitCardsForSchedule(examUuid: string, scheduleId: number) {
+    return api.post<AdmitCardGenerationResponseDTO>(
+      `/admin/admit-cards/generate/schedule/${scheduleId}`,
+      { examId: examUuid }
+    );
+  },
+
+  /** GET /admin/admit-cards/status/:examUuid */
+  getAdmitCardStatus(examUuid: string) {
+    return api.get<ScheduleAdmitCardStatusDTO[]>(
+      `/admin/admit-cards/status/${examUuid}`
+    );
+  },
+
+  /** GET /admin/admit-cards/status/:examUuid/progress */
+  getGenerationProgress(examUuid: string) {
+    return api.get<AdmitCardGenerationProgressDTO>(
+      `/admin/admit-cards/status/${examUuid}/progress`
+    );
+  },
+
+  /** POST /admin/admit-cards/publish/:examUuid */
+  publishAdmitCards(examUuid: string) {
+    return api.post(`/admin/admit-cards/publish/${examUuid}`);
+  },
+
+  /** POST /admin/admit-cards/publish/:examUuid/schedules */
+  publishAdmitCardsForSchedules(examUuid: string, scheduleIds: number[]) {
+    return api.post(`/admin/admit-cards/publish/${examUuid}/schedules`, {
+      scheduleIds,
+    });
+  },
+
+  /** GET /admin/admit-cards/download/:examUuid */
+  downloadAdminAdmitCardsZip(examUuid: string) {
+    return api.get(`/admin/admit-cards/download/${examUuid}`, {
+      responseType: "blob",
+    });
+  },
+
+  /** POST /admin/admit-cards/generate-batch */
+  downloadBatchAdmitCards(data: { examId: string; scheduleId?: number }) {
+    return api.post(`/admin/admit-cards/generate-batch`, data, {
+      responseType: "blob",
+    });
+  },
+
+  /** GET /student/admit-card/:examUuid */
+  getStudentAdmitCard(examUuid: string) {
+    return api.get<AdmitCardResponseDTO>(`/student/admit-card/${examUuid}`);
+  },
+
+  /** GET /student/admit-card/:examId/pdf */
+  downloadStudentAdmitCardPdf(examUuid: string) {
+    return api.get(`/student/admit-card/${examUuid}/pdf`, {
+      responseType: "blob",
+    });
+  },
+
+  /** GET /admin/examination/seat-allocation/schedule/:examScheduleId/print */
+  downloadSeatingPlanPdf(examScheduleId: number) {
+    return api.get(
+      `/admin/examination/seat-allocation/schedule/${examScheduleId}/print`,
+      {
+        responseType: "blob",
+      }
+    );
+  },
 };
+
