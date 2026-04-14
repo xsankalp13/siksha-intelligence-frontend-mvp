@@ -153,9 +153,11 @@ export interface AdminResultReviewResponseDTO {
   studentId: string;    // UUID
   studentName: string;
   enrollmentNumber: string;
+  examId: string;
   examName: string;
-  subjectName: string;
+  classId: string;
   className: string;
+  subjectName: string;
   totalMarks: number;
   status: EvaluationResultStatus;
   submittedAt: string | null;

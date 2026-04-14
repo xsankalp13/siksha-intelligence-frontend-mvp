@@ -4,6 +4,14 @@ export interface OccupiedByDTO {
   count: number;
 }
 
+export interface OccupiedSlotDTO {
+  positionIndex: number;
+  positionLabel: string; // "LEFT" | "MIDDLE" | "RIGHT"
+  subjectName: string;
+  className: string;
+  studentName: string;
+}
+
 export interface RoomAvailabilityDTO {
   roomId: number;
   roomUuid: string;
@@ -22,7 +30,7 @@ export interface RoomAvailabilityDTO {
   maxStudentsPerSeat: number;
   totalStudentsToSeat: number;
   floorNumber: number | null;
-  mode?: "SINGLE" | "DOUBLE" | "SHARED";
+  mode?: "SINGLE" | "DOUBLE" | "TRIPLE";
   occupiedBy?: OccupiedByDTO[];
 
   // ── Backward-compatible aliases (serialized from backend) ──
@@ -49,8 +57,9 @@ export interface SeatAvailabilityDTO {
 
   /** Backward compat: true if seat has capacity left */
   available: boolean;
-  occupiedByStudentName?: string;
-  occupiedPositions: ("LEFT" | "RIGHT" | "SINGLE")[];
+
+  /** Rich per-slot info: positionIndex, subject, class, student */
+  occupiedSlots: OccupiedSlotDTO[];
 }
 
 export interface SeatAllocationResponseDTO {
@@ -59,7 +68,12 @@ export interface SeatAllocationResponseDTO {
   enrollmentNumber: string;
   rollNo: number;
   seatLabel: string;
-  position: "LEFT" | "RIGHT" | "SINGLE";
+
+  /** 0-based position index: 0=LEFT, 1=MIDDLE, 2=RIGHT */
+  positionIndex: number;
+  /** Human-readable: "LEFT" | "MIDDLE" | "RIGHT" | "" */
+  positionLabel: string;
+
   seatId: number;
   studentId: string;
   roomName: string;
@@ -67,12 +81,17 @@ export interface SeatAllocationResponseDTO {
   columnNumber: number;
   startTime: string;
   endTime: string;
+
+  /** Subject name for this allocation */
+  subjectName: string;
+  /** Class name for this allocation */
+  className: string;
 }
 
 export interface SingleSeatAllocationRequestDTO {
   examScheduleId: number;
   studentId: string;
-  roomId: string; // The UUID or ID type the backend expects
+  roomId: string;
   seatId: number;
 }
 

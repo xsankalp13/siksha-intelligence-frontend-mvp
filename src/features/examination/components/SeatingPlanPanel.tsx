@@ -51,6 +51,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   useGetAllocationsForSchedule,
   useGetAvailableRooms,
   useGetSeatGrid,
@@ -66,6 +72,10 @@ import type { ExamResponseDTO } from "@/services/types/examination";
 import type { SeatAllocationResponseDTO } from "@/services/types/seatAllocation";
 import { toast } from "sonner";
 import { examinationService } from "@/services/examination";
+
+// ── Position label mapping (UI only) ────────────────────────────────
+const POSITION_LABELS: Record<number, string> = { 0: "L", 1: "M", 2: "R" };
+const POSITION_FULL_LABELS: Record<number, string> = { 0: "LEFT", 1: "MIDDLE", 2: "RIGHT" };
 
 interface StudentSummary {
   uuid: string;
@@ -193,15 +203,14 @@ export default function SeatingPlanPanel() {
         batch: selectedExam?.academicYear || "-",
         programme: `${selectedSchedule?.className || ""} ${selectedSchedule?.sectionName ? `(${selectedSchedule.sectionName})` : ""}`.trim(),
         rollRange,
-        minRollNo, // we use this for sorting the table rows
+        minRollNo,
         count: allocs.length,
         room: roomName,
-        area: "Main Campus", // Placeholder as area is not in DB
+        area: "Main Campus",
         floor: roomInfo?.floorNumber != null ? `Floor ${roomInfo.floorNumber}` : "-"
       };
     });
 
-    // Sort the table rows logically by lowest roll number first, then by room
     rows.sort((a, b) => {
        if (a.minRollNo !== Infinity && b.minRollNo !== Infinity) {
            return a.minRollNo - b.minRollNo;
@@ -209,12 +218,14 @@ export default function SeatingPlanPanel() {
        return a.room.localeCompare(b.room);
     });
 
-    // Finally assign logical S.No after sorting
     return rows.map((r, index) => ({
       ...r,
       sno: index + 1
     }));
   }, [allocations, selectedSchedule, selectedExam, availableRooms]);
+
+  // ── Print Room Grids (Dynamic Multi-Slot) ───────────────────────
+  const currentMaxPerSeat = selectedSchedule?.maxStudentsPerSeat || 1;
 
   const printRoomGrids = useMemo(() => {
     const roomGroups: Record<string, SeatAllocationResponseDTO[]> = {};
@@ -230,7 +241,8 @@ export default function SeatingPlanPanel() {
       const maxRow = Math.max(...allocs.map(a => a.rowNumber));
       const maxCol = Math.max(...allocs.map(a => a.columnNumber));
 
-      const grid: Record<number, Record<number, { left?: number; right?: number; single?: number }>> = {};
+      // Grid: row → col → positionIndex → rollNo
+      const grid: Record<number, Record<number, Record<number, number | null>>> = {};
       
       for (let r = 1; r <= maxRow; r++) {
         grid[r] = {};
@@ -242,10 +254,7 @@ export default function SeatingPlanPanel() {
       allocs.forEach(a => {
         if (!grid[a.rowNumber]) grid[a.rowNumber] = {};
         if (!grid[a.rowNumber][a.columnNumber]) grid[a.rowNumber][a.columnNumber] = {};
-        
-        if (a.position === "LEFT") grid[a.rowNumber][a.columnNumber].left = a.rollNo;
-        else if (a.position === "RIGHT") grid[a.rowNumber][a.columnNumber].right = a.rollNo;
-        else grid[a.rowNumber][a.columnNumber].single = a.rollNo;
+        grid[a.rowNumber][a.columnNumber][a.positionIndex] = a.rollNo;
       });
 
       return { roomName, floorNumber, maxRow, maxCol, grid, studentCount: allocs.length };
@@ -255,8 +264,6 @@ export default function SeatingPlanPanel() {
   const totalStudents = availableRooms.length > 0 ? availableRooms[0].totalStudentsToSeat : (selectedSchedule?.totalStudents ?? 0);
   const seatedCount = allocations.length;
   const remainingToSeat = Math.max(0, totalStudents - seatedCount);
-
-  const currentMaxPerSeat = selectedSchedule?.maxStudentsPerSeat || 1;
 
   const targetAutoFillRoom = availableRooms.find(r => r.roomUuid === autoFillRoomUuid);
   const willSeatCount = targetAutoFillRoom 
@@ -446,6 +453,13 @@ export default function SeatingPlanPanel() {
     }
   }, [selectedScheduleId]);
 
+  // ── Format label for print grid ─────────────────────────────────
+  const formatLabel = () => {
+    if (currentMaxPerSeat === 1) return "Single seating per bench";
+    const labels = Array.from({ length: currentMaxPerSeat }, (_, i) => POSITION_FULL_LABELS[i] || `POS_${i}`);
+    return `Format: [ ${labels.join(" | ")} ] sharing per bench`;
+  };
+
   return (
     <div className="space-y-5 relative" id="printable-seating-plan">
       {/* ── Print Header (Only visible during print) ───────────────── */}
@@ -513,7 +527,7 @@ export default function SeatingPlanPanel() {
         </div>
       </div>
       
-      {/* ── Print Room Grids (Level 2) ───────────────────────────── */}
+      {/* ── Print Room Grids (Dynamic Multi-Slot) ─────────────────── */}
       <div className="hidden print:block font-serif text-black printable-grids" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
         {printRoomGrids.map((room) => (
           <div key={room.roomName} style={{ pageBreakBefore: 'always', paddingTop: '20px' }}>
@@ -524,7 +538,7 @@ export default function SeatingPlanPanel() {
                 {room.floorNumber != null && ` — Floor : ${room.floorNumber}`}
               </h2>
               <div style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                {selectedSchedule?.subjectName} | {room.studentCount} Students
+                {selectedSchedule?.subjectName} | {room.studentCount} Students | {currentMaxPerSeat === 1 ? "Single" : currentMaxPerSeat === 2 ? "Double" : "Triple"} Seating
               </div>
             </div>
 
@@ -551,9 +565,12 @@ export default function SeatingPlanPanel() {
                       {Array.from({ length: room.maxCol }, (_, ci) => {
                         const col = ci + 1;
                         const cell = room.grid[row]?.[col] || {};
-                        const left = cell.left != null ? String(cell.left).padStart(2, '0') : '—';
-                        const right = cell.right != null ? String(cell.right).padStart(2, '0') : '—';
-                        const single = cell.single != null ? String(cell.single).padStart(2, '0') : null;
+                        
+                        // Build dynamic slot display
+                        const slots = Array.from({ length: currentMaxPerSeat }, (_, posIdx) => {
+                          const rollNo = cell[posIdx];
+                          return rollNo != null ? String(rollNo).padStart(2, '0') : '—';
+                        });
                         
                         return (
                           <td key={col} style={{
@@ -565,9 +582,9 @@ export default function SeatingPlanPanel() {
                             fontSize: '14px',
                             letterSpacing: '2px'
                           }}>
-                            {single != null
-                              ? single
-                              : `${left} | ${right}`
+                            {currentMaxPerSeat === 1
+                              ? slots[0]
+                              : slots.join(' | ')
                             }
                           </td>
                         );
@@ -581,7 +598,7 @@ export default function SeatingPlanPanel() {
             {/* Grid Footer Signature */}
             <div style={{ marginTop: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', fontStyle: 'italic' }}>
               <span>* Numbers represent Roll Numbers</span>
-              <span>Format: [ LEFT | RIGHT ] sharing alignment per bench</span>
+              <span>{formatLabel()}</span>
             </div>
           </div>
         ))}
@@ -750,8 +767,8 @@ export default function SeatingPlanPanel() {
           </Badge>
           <Badge variant="outline" className="gap-1.5 px-3 py-1 border-primary/20 text-primary bg-primary/5">
             <Armchair className="w-3.5 h-3.5" />
-            Config: {selectedSchedule?.maxStudentsPerSeat || 1} per seat
-            {selectedSchedule?.seatSide && ` (${selectedSchedule.seatSide})`}
+            Config: {currentMaxPerSeat} per seat
+            {currentMaxPerSeat > 1 && ` (${currentMaxPerSeat === 2 ? "Double" : "Triple"})`}
           </Badge>
           {selectedExam && (
             <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
@@ -924,10 +941,8 @@ export default function SeatingPlanPanel() {
                     </SelectTrigger>
                     <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
                       {availableRooms.map((r) => {
-                        // Truly full = has seats but all are occupied.
-                        // Uninitialized = totalSeats is 0.
                         const isTrulyFull = r.totalSeats > 0 && r.isFull;
-                        if (isTrulyFull) return null; // Don't render full rooms per user request
+                        if (isTrulyFull) return null;
                         
                         return (
                           <SelectItem key={r.roomUuid} value={r.roomUuid} disabled={r.totalSeats === 0 || r.isFull}>
@@ -941,10 +956,10 @@ export default function SeatingPlanPanel() {
                                 ) : (
                                   <div className="flex gap-2 items-center">
                                     <Badge variant={r.isFull ? "destructive" : "secondary"} className="text-[10px] ml-2 font-mono">
-                                      {r.availableCapacity ?? (r.availableSeats * currentMaxPerSeat)} / {r.totalCapacity ?? (r.totalSeats * currentMaxPerSeat)} free
+                                      {r.availableCapacity} / {r.totalCapacity} free
                                     </Badge>
                                     {r.mode && (
-                                      <Badge variant={r.mode === "SHARED" ? "default" : "outline"} className="text-[10px] font-mono">
+                                      <Badge variant={r.mode === "TRIPLE" ? "default" : "outline"} className="text-[10px] font-mono">
                                         {r.mode}
                                       </Badge>
                                     )}
@@ -992,51 +1007,68 @@ export default function SeatingPlanPanel() {
                         gridTemplateRows: `repeat(${maxRow}, minmax(0, 1fr))` 
                       }}
                     >
-                      {seatGrid.map((seat) => {
-                        const isSelected = formSeatId === seat.seatId;
-                        const seatCapacity = seat.capacity ?? currentMaxPerSeat;
-                        const defaultOccupancy = seat.available ? 0 : 1; 
-                        const occupiedCount = seat.occupiedCount ?? defaultOccupancy;
-                        
-                        const examSeatSide = selectedSchedule?.seatSide;
-                        const occupiedPositions = seat.occupiedPositions || [];
-                        const sideOccupied = examSeatSide ? occupiedPositions.includes(examSeatSide) : false;
-                        
-                        const isFull = (seat.isFull ?? (occupiedCount >= seatCapacity)) || sideOccupied;
+                      <TooltipProvider delayDuration={200}>
+                        {seatGrid.map((seat) => {
+                          const isSelected = formSeatId === seat.seatId;
+                          const seatCapacity = seat.capacity ?? currentMaxPerSeat;
+                          const occupiedCount = seat.occupiedCount ?? 0;
+                          const isFull = seat.isFull ?? (occupiedCount >= seatCapacity);
+                          const isEmpty = occupiedCount === 0;
+                          const isPartiallyFilled = occupiedCount > 0 && !isFull;
 
-                        const isEmpty = occupiedCount === 0;
-                        const isPartiallyFilled = occupiedCount > 0 && !isFull;
+                          let bgClass = "bg-white dark:bg-zinc-800 border-border/80 text-foreground";
+                          if (isSelected) {
+                            bgClass = "bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20 scale-105";
+                          } else if (isFull) {
+                            bgClass = "bg-red-50 text-red-700/60 border-red-200 cursor-not-allowed text-xs";
+                          } else if (isPartiallyFilled) {
+                            bgClass = "bg-amber-100 text-amber-800 border-amber-400 hover:border-primary/50 cursor-pointer shadow-inner";
+                          } else if (isEmpty) {
+                            bgClass = "bg-green-100/50 text-green-700 border-green-400 hover:border-primary/50 cursor-pointer shadow-sm";
+                          }
 
-                        let bgClass = "bg-white dark:bg-zinc-800 border-border/80 text-foreground";
-                        if (isSelected) {
-                          bgClass = "bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20 scale-105";
-                        } else if (isFull) {
-                          bgClass = "bg-red-50 text-red-700/60 border-red-200 cursor-not-allowed text-xs";
-                        } else if (isPartiallyFilled) {
-                          bgClass = "bg-amber-100 text-amber-800 border-amber-400 hover:border-primary/50 cursor-pointer shadow-inner";
-                        } else if (isEmpty) {
-                          bgClass = "bg-green-100/50 text-green-700 border-green-400 hover:border-primary/50 cursor-pointer shadow-sm";
-                        }
+                          // Build tooltip content from occupied slots
+                          const slots = seat.occupiedSlots || [];
+                          const tooltipLines = slots.map(s =>
+                            `${POSITION_FULL_LABELS[s.positionIndex] || `POS ${s.positionIndex}`}: ${s.studentName} (${s.subjectName} / ${s.className})`
+                          );
+                          // Add available slots info
+                          for (let i = 0; i < seatCapacity; i++) {
+                            if (!slots.find(s => s.positionIndex === i)) {
+                              tooltipLines.push(`${POSITION_FULL_LABELS[i] || `POS ${i}`}: Available`);
+                            }
+                          }
 
-                        return (
-                          <button
-                            key={seat.seatId}
-                            disabled={isFull}
-                            onClick={() => setFormSeatId(seat.seatId)}
-                            title={isFull ? "Seat is full" : `${seat.label} (${occupiedCount}/${seatCapacity} slots)`}
-                            className={`w-10 h-10 rounded-md flex flex-col items-center justify-center text-[10px] font-mono transition-all border-2 ${bgClass}`}
-                            style={{
-                              gridColumn: seat.columnNumber,
-                              gridRow: seat.rowNumber
-                            }}
-                          >
-                            <span className="font-bold">{seat.label.split("-")[1]}</span>
-                            <span className={`text-[8px] leading-[8px] tracking-tighter ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground/80'}`}>
-                              {occupiedCount}/{seatCapacity}
-                            </span>
-                          </button>
-                        );
-                      })}
+                          return (
+                            <Tooltip key={seat.seatId}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  disabled={isFull}
+                                  onClick={() => setFormSeatId(seat.seatId)}
+                                  className={`w-10 h-10 rounded-md flex flex-col items-center justify-center text-[10px] font-mono transition-all border-2 ${bgClass}`}
+                                  style={{
+                                    gridColumn: seat.columnNumber,
+                                    gridRow: seat.rowNumber
+                                  }}
+                                >
+                                  <span className="font-bold">{seat.label.split("-")[1]}</span>
+                                  <span className={`text-[8px] leading-[8px] tracking-tighter ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground/80'}`}>
+                                    {occupiedCount}/{seatCapacity}
+                                  </span>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs max-w-[250px]">
+                                <p className="font-semibold mb-1">{seat.label} ({occupiedCount}/{seatCapacity})</p>
+                                {tooltipLines.map((line, i) => (
+                                  <p key={i} className={line.includes("Available") ? "text-green-600" : "text-muted-foreground"}>
+                                    {line}
+                                  </p>
+                                ))}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </TooltipProvider>
                     </div>
                   </div>
                 )}
@@ -1078,7 +1110,7 @@ export default function SeatingPlanPanel() {
                       <DoorOpen className="w-4 h-4" /> Room Safety Limit:
                     </span>
                     <Badge variant="outline" className="border-blue-500/30 text-blue-600 bg-blue-500/5">
-                      {targetAutoFillRoom.availableCapacity ?? (targetAutoFillRoom.availableSeats * currentMaxPerSeat)} slots open
+                      {targetAutoFillRoom.availableCapacity} slots open
                     </Badge>
                   </div>
                   <div className="pt-2 border-t border-primary/10 mt-1">
@@ -1113,7 +1145,7 @@ export default function SeatingPlanPanel() {
                   <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
                     {availableRooms.map((r) => {
                         const isTrulyFull = r.totalSeats > 0 && r.isFull;
-                        if (isTrulyFull) return null; // Hide truly full rooms
+                        if (isTrulyFull) return null;
                         
                         return (
                           <SelectItem key={r.roomUuid} value={r.roomUuid} disabled={r.totalSeats === 0 || r.isFull}>
@@ -1122,13 +1154,13 @@ export default function SeatingPlanPanel() {
                                 {r.roomName}
                                 {r.totalSeats === 0 && <span className="text-[10px] uppercase text-destructive font-bold bg-destructive/10 px-1 rounded">No Config</span>}
                                 {r.mode && r.totalSeats > 0 && (
-                                   <Badge variant={r.mode === "SHARED" ? "default" : "outline"} className="text-[9px] h-4 font-mono ml-auto">
+                                   <Badge variant={r.mode === "TRIPLE" ? "default" : "outline"} className="text-[9px] h-4 font-mono ml-auto">
                                      {r.mode}
                                    </Badge>
                                 )}
                               </span>
                               <span className="text-xs text-muted-foreground mt-0.5">
-                                {r.totalSeats === 0 ? "Generate seats in infrastructure first" : `${r.occupiedCapacity ?? (r.occupiedSeats * currentMaxPerSeat)} in-use • ${r.availableCapacity ?? (r.availableSeats * currentMaxPerSeat)} available slots`}
+                                {r.totalSeats === 0 ? "Generate seats in infrastructure first" : `${r.occupiedCapacity} in-use • ${r.availableCapacity} available slots`}
                               </span>
                               {r.occupiedBy && r.occupiedBy.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">

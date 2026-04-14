@@ -16,7 +16,7 @@ import {
   useApproveClass,
   usePublishClass
 } from "@/features/examination/hooks/useEvaluationQueries";
-import type { EvaluationResultStatus } from "@/services/types/evaluation";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
