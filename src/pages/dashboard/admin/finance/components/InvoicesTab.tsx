@@ -22,6 +22,20 @@ import { adminService } from "@/services/admin";
 const formatINR = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if ((window as any).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 function InvoiceStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string; icon: React.ElementType }> = {
     PAID: { label: "Paid", cls: "bg-emerald-500/10 text-emerald-700", icon: CheckCircle2 },
@@ -185,6 +199,13 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
   const handlePayOnline = async (invoice: InvoiceResponseDTO) => {
     try {
       setIsGenerating(true);
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        toast.error("Razorpay SDK failed to load. Please check your connection or turn off adblockers.");
+        setIsGenerating(false);
+        return;
+      }
+
       const { data: orderData } = await financeService.initiatePayment({
         invoiceId: invoice.invoiceId,
         amount: invoice.totalAmount - (invoice.paidAmount || 0),

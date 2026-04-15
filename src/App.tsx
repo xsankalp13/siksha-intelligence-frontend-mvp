@@ -3,7 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { Toaster } from '@/components/ui/sonner'
 import AdminLayout from '@/components/layout/AdminLayout'
-import TeacherLayout from '@/components/layout/TeacherLayout'
+
+import TeacherDashboard from '@/pages/dashboard/teacher/page'
 import StudentLayout from '@/components/layout/StudentLayout'
 import { GuestOnly } from '@/routes/GuestOnly'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
@@ -12,6 +13,8 @@ import SessionExpiredDialog from '@/components/common/SessionExpiredDialog'
 // SuperAdmin
 import SuperAdminLayout from '@/components/layout/SuperAdminLayout';
 import SecurityGuardLayout from '@/components/layout/SecurityGuardLayout';
+import TeacherLayout from './components/layout/TeacherLayout'
+import AdminTransportPage from './pages/dashboard/admin/transport/page'
 
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const HomePage = lazy(() => import('@/pages/HomePage'))
@@ -35,15 +38,20 @@ const AdminHrmsPage = lazy(() => import('@/pages/dashboard/admin/hrms/page'))
 const TeacherDashboardPage = lazy(() => import('@/pages/dashboard/teacher/page'))
 const TeacherProfilePage = lazy(() => import('@/pages/dashboard/teacher/profile/page'))
 const TeacherSchedulePage = lazy(() => import('@/pages/dashboard/teacher/schedule/page'))
+const TeacherSelfAttendancePage = lazy(() => import('@/pages/dashboard/teacher/self-attendance/page'))
 const TeacherAttendancePage = lazy(() => import('@/pages/dashboard/teacher/attendance/page'))
 const TeacherClassesPage = lazy(() => import('@/pages/dashboard/teacher/classes/page'))
 const TeacherMyHrPage = lazy(() => import('@/pages/dashboard/teacher/my-hr/page'))
+const TeacherEvaluationPage = lazy(() => import('@/pages/dashboard/teacher/evaluation/page'))
 const TeacherMyClassPage = lazy(() => import('@/pages/dashboard/teacher/my-class/page'))
 const TeacherLectureLogsPage = lazy(() => import('@/pages/dashboard/teacher/lecture-logs/page'))
 
 const StudentDashboard = lazy(() => import('@/pages/dashboard/student/page'))
 const StudentProfilePage = lazy(() => import('@/pages/dashboard/student/profile/page'))
 const StudentTimetablePage = lazy(() => import('@/pages/dashboard/student/timetable/page'))
+const StudentResultsPage = lazy(() => import('@/pages/dashboard/student/results/page'))
+const StudentPastPapersPage = lazy(() => import('@/pages/dashboard/student/past-papers/page'))
+const StudentAdmitCardsPage = lazy(() => import('@/pages/dashboard/student/admit-cards/page'))
 
 const SecurityGuardDashboard = lazy(() => import('@/pages/dashboard/security-guard/page'))
 const SecurityGuardVisitorManagement = lazy(() => import('@/pages/dashboard/security-guard/visitor-management/page'))
@@ -142,6 +150,8 @@ export default function App() {
           <Route path="rooms" element={withRouteSuspense(<AdminRoomsPage />)} />
           <Route path="finance" element={withRouteSuspense(<AdminFinancePage />)} />
           <Route path="hrms" element={withRouteSuspense(<AdminHrmsPage />)} />
+          <Route path="transport" element={<AdminTransportPage />} />
+
           <Route path="id-cards" element={withRouteSuspense(<IdCardsPage />)} />
           <Route path="users/:type/:id" element={withRouteSuspense(<UserDetailsPage />)} />
           <Route path="visitor-logs" element={withRouteSuspense(<AdminVisitorLogsPage />)} />
@@ -163,12 +173,14 @@ export default function App() {
         >
           <Route index element={withRouteSuspense(<TeacherDashboardPage />)} />
           <Route path="my-class" element={withRouteSuspense(<TeacherMyClassPage />)} />
+          <Route path="self-attendance" element={withRouteSuspense(<TeacherSelfAttendancePage />)} />
           <Route path="attendance" element={withRouteSuspense(<TeacherAttendancePage />)} />
           <Route path="classes" element={withRouteSuspense(<TeacherClassesPage />)} />
           <Route path="profile" element={withRouteSuspense(<TeacherProfilePage />)} />
           <Route path="schedule" element={withRouteSuspense(<TeacherSchedulePage />)} />
           <Route path="my-hr" element={withRouteSuspense(<TeacherMyHrPage />)} />
           <Route path="lecture-logs" element={withRouteSuspense(<TeacherLectureLogsPage />)} />
+          <Route path="evaluation" element={withRouteSuspense(<TeacherEvaluationPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/teacher" replace />} />
         </Route>
 
@@ -204,6 +216,9 @@ export default function App() {
           <Route path="visitor-management" element={withRouteSuspense(<SecurityGuardVisitorManagement />)} />
           <Route path="pickup-scanner" element={withRouteSuspense(<SecurityGuardPickupScannerPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/security-guard" replace />} />
+          <Route path="results" element={withRouteSuspense(<StudentResultsPage />)} />
+          <Route path="past-papers" element={withRouteSuspense(<StudentPastPapersPage />)} />
+          <Route path="admit-cards" element={withRouteSuspense(<StudentAdmitCardsPage />)} />
         </Route>
 
         {/* Redirect all unknown routes to home (which will redirect to login if not authenticated) */}

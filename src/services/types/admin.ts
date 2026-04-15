@@ -47,10 +47,14 @@ export interface CreateStudentRequestDTO extends CreateUserRequestDTO {
   initialAllergies?: string[];
 }
 
+export type StaffCategory = "TEACHING" | "NON_TEACHING_SUPPORT" | "NON_TEACHING_ADMIN";
+
 // Teacher
 export interface CreateTeacherRequestDTO extends CreateUserRequestDTO {
   jobTitle: string;
   hireDate: string;
+  category: StaffCategory;
+  department: Department;
   officeLocation?: string;
   stateLicenseNumber?: string;
   educationLevel?: string;
@@ -67,6 +71,8 @@ export interface CreateTeacherRequestDTO extends CreateUserRequestDTO {
 export interface CreatePrincipalRequestDTO extends CreateUserRequestDTO {
   jobTitle: string;
   hireDate: string;
+  category: StaffCategory;
+  department: Department;
   officeLocation?: string;
   administrativeCertifications?: string[];
   schoolLevelManaged?: SchoolLevel;
@@ -79,6 +85,8 @@ export interface CreatePrincipalRequestDTO extends CreateUserRequestDTO {
 export interface CreateLibrarianRequestDTO extends CreateUserRequestDTO {
   jobTitle: string;
   hireDate: string;
+  category: StaffCategory;
+  department: Department;
   officeLocation?: string;
   librarySystemPermissions?: string[];
   hasMlisDegree?: boolean;

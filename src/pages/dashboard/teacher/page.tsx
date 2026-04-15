@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { motion, useReducedMotion } from "framer-motion";
-import { RefreshCcw, AlertTriangle, X } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { RefreshCcw, AlertTriangle, X, CheckCircle2, LogIn } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,7 @@ import WeeklyTeachingChart from "@/features/teacher/components/WeeklyTeachingCha
 import AttendanceTrendChart from "@/features/teacher/components/AttendanceTrendChart";
 import ClassDistributionChart from "@/features/teacher/components/ClassDistributionChart";
 import DashboardSkeleton from "@/features/teacher/skeletons/DashboardSkeleton";
+import { attendanceService } from "@/services/attendance";
 import type { TeacherScheduleEntry } from "@/services/types/teacher";
 
 const dayName = (d: Date) => d.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
@@ -47,6 +49,7 @@ function ServiceUnreachableState() {
 
 export default function TeacherDashboardPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const reduce = useReducedMotion();
   const dismissKey = `teacher-alerts-dismissed-${dateKey()}`;
   const [alertsDismissed, setAlertsDismissed] = useState(false);
@@ -66,6 +69,20 @@ export default function TeacherDashboardPage() {
   }, [schedule?.entries]);
 
   const alerts = useComputedAlerts(summary, schedule, homeroom);
+
+  const { data: todayStaffAttendance } = useQuery({
+    queryKey: ["ams", "staff", "my-attendance", "today", schedule?.staffUuid],
+    queryFn: () =>
+      attendanceService
+        .listStaffAttendance({
+          staffUuid: schedule?.staffUuid,
+          fromDate: dateKey(),
+          toDate: dateKey(),
+          size: 1,
+        })
+        .then((r) => r.data.content[0]),
+    enabled: Boolean(schedule?.staffUuid),
+  });
 
   useEffect(() => {
     const dismissed = localStorage.getItem(dismissKey) === "1";
@@ -99,20 +116,50 @@ export default function TeacherDashboardPage() {
     return <DashboardSkeleton />;
   }
 
+  const isCheckedIn = Boolean(todayStaffAttendance?.timeIn);
+  const checkInHoverLabel = todayStaffAttendance?.timeIn
+    ? `Checked in at ${todayStaffAttendance.timeIn.slice(0, 5)}`
+    : "Open My Attendance panel";
+
   return (
     <div className="mx-auto max-w-[1600px] space-y-6 pb-12 pt-2">
-      <DailyBriefing
-        teacherName={schedule?.teacherName}
-        summary={summary}
-        schedule={schedule}
-        homeroom={homeroom}
-      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+        <DailyBriefing
+          teacherName={schedule?.teacherName}
+          summary={summary}
+          schedule={schedule}
+          homeroom={homeroom}
+        />
 
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={refresh} disabled={isFetching}>
-          <RefreshCcw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          {isFetching ? "Syncing..." : "Refresh"}
-        </Button>
+        <div className="flex items-center justify-end gap-2 lg:pt-2">
+          <Button variant="outline" size="sm" onClick={refresh} disabled={isFetching}>
+            <RefreshCcw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            {isFetching ? "Syncing..." : "Refresh"}
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={() => navigate("/dashboard/teacher/self-attendance")}
+            title={checkInHoverLabel}
+            className={isCheckedIn
+              ? "border-emerald-500 text-emerald-700 hover:bg-emerald-50"
+              : "bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md hover:from-emerald-600 hover:to-green-700"
+            }
+            variant={isCheckedIn ? "outline" : "default"}
+          >
+            {isCheckedIn ? (
+              <>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Checked In {todayStaffAttendance?.timeIn ? `(${todayStaffAttendance.timeIn.slice(0, 5)})` : ""}
+              </>
+            ) : (
+              <>
+                <LogIn className="mr-2 h-4 w-4" />
+                Check In
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <motion.div
@@ -136,6 +183,37 @@ export default function TeacherDashboardPage() {
             </ErrorBoundary>
           </div>
         ) : null}
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-8">
+            <ErrorBoundary fallback={<ServiceUnreachableState />}>
+              <WeeklyTeachingChart entries={schedule?.entries ?? []} />
+            </ErrorBoundary>
+          </div>
+          <div className="lg:col-span-4">
+            <ErrorBoundary fallback={<ServiceUnreachableState />}>
+              <AttendanceTrendChart />
+            </ErrorBoundary>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <ErrorBoundary fallback={<ServiceUnreachableState />}>
+              <ClassDistributionChart classes={classes ?? []} />
+            </ErrorBoundary>
+          </div>
+          <div className="lg:col-span-4">
+            <ErrorBoundary fallback={<ServiceUnreachableState />}>
+              <LeaveBalanceSummary />
+            </ErrorBoundary>
+          </div>
+          <div className="lg:col-span-4">
+            <ErrorBoundary fallback={<ServiceUnreachableState />}>
+              <AttendanceHeatmapCalendar />
+            </ErrorBoundary>
+          </div>
+        </div>
 
         {homeroom?.classTeacher ? (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -182,37 +260,6 @@ export default function TeacherDashboardPage() {
             </div>
           </div>
         )}
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-8">
-            <ErrorBoundary fallback={<ServiceUnreachableState />}>
-              <WeeklyTeachingChart entries={schedule?.entries ?? []} />
-            </ErrorBoundary>
-          </div>
-          <div className="lg:col-span-4">
-            <ErrorBoundary fallback={<ServiceUnreachableState />}>
-              <AttendanceTrendChart />
-            </ErrorBoundary>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            <ErrorBoundary fallback={<ServiceUnreachableState />}>
-              <ClassDistributionChart classes={classes ?? []} />
-            </ErrorBoundary>
-          </div>
-          <div className="lg:col-span-4">
-            <ErrorBoundary fallback={<ServiceUnreachableState />}>
-              <LeaveBalanceSummary />
-            </ErrorBoundary>
-          </div>
-          <div className="lg:col-span-4">
-            <ErrorBoundary fallback={<ServiceUnreachableState />}>
-              <AttendanceHeatmapCalendar />
-            </ErrorBoundary>
-          </div>
-        </div>
       </motion.div>
     </div>
   );

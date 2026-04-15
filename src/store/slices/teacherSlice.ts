@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import { attendanceService } from "@/services/attendance";
 import type { StudentAttendanceRequestDTO } from "@/services/types/attendance";
+import { getAttendanceErrorMessage } from "@/features/attendance/utils/attendanceError";
 
 export interface AttendanceEntry {
   studentId: string;
@@ -38,8 +39,8 @@ export const submitAttendance = createAsyncThunk(
     try {
       const response = await attendanceService.createStudentAttendanceBatch(records);
       return response.data;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || "Failed to submit attendance");
+    } catch (error: unknown) {
+      return rejectWithValue(getAttendanceErrorMessage(error, "Failed to submit attendance"));
     }
   }
 );

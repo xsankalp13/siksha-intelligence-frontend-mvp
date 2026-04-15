@@ -106,6 +106,7 @@ export interface TeacherDashboardSummaryResponseDto {
     startTime: string;
     endTime: string;
   } | null;
+  isOnLeaveToday?: boolean;
 }
 
 export interface TeacherHomeroomResponseDto {

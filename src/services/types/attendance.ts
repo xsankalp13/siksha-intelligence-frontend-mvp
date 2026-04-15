@@ -78,7 +78,7 @@ export interface StudentAttendanceQueryParams {
 }
 
 // Staff Attendance
-export type AttendanceSource = "MANUAL" | "BIOMETRIC" | "SYSTEM";
+export type AttendanceSource = "MANUAL" | "BIOMETRIC" | "SYSTEM" | "WEB" | "MOBILE" | "SELF_CAPTURE";
 
 export interface StaffAttendanceRequestDTO {
   staffUuid?: string;
@@ -92,6 +92,8 @@ export interface StaffAttendanceRequestDTO {
   totalHours?: number;
   source: AttendanceSource;
   notes?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface StaffAttendanceResponseDTO {
@@ -112,6 +114,13 @@ export interface StaffAttendanceResponseDTO {
   totalHours?: number;
   source: AttendanceSource;
   notes?: string;
+  latitude?: number;
+  longitude?: number;
+  geoVerified?: boolean;
+  
+  // Option B: Early Leave tracking
+  earlyLeave?: boolean;
+  earlyOutMinutes?: number;
 }
 
 export interface StaffAttendanceQueryParams {
@@ -123,6 +132,53 @@ export interface StaffAttendanceQueryParams {
   // Deprecated fallback query field.
   staffId?: number;
   date?: string;
+  fromDate?: string;
+  toDate?: string;
+  status?: string;
+  search?: string;
+}
+
+export interface StaffDailyStatsResponseDTO {
+  date: string;
+  totalMarked: number;
+  present: number;
+  absent: number;
+  late: number;
+  onLeave: number;
+  unmarkedCount: number;
+}
+
+// ── Staff Attendance Completion ───────────────────────────────────────
+
+export interface UnmarkedStaffItem {
+  staffUuid: string;
+  staffName: string;
+  employeeId: string;
+  missingDates: string[];
+}
+
+export interface AttendanceCompletionDTO {
+  month: number;
+  year: number;
+  totalActiveStaff: number;
+  totalWorkingDays: number;
+  totalExpectedRecords: number;
+  totalActualRecords: number;
+  completionPercentage: number;
+  isComplete: boolean;
+  unmarkedStaff: UnmarkedStaffItem[];
+}
+
+// ── Student Attendance Completion ─────────────────────────────────────
+
+export interface StudentAttendanceCompletionDTO {
+  classUuid: string;
+  sectionUuid?: string;
+  fromDate: string;
+  toDate: string;
+  totalStudents: number;
+  datesWithRecords: string[];
+  datesWithoutRecords: string[];
 }
 
 // Absence Documentation

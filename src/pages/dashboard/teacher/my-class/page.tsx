@@ -5,9 +5,11 @@ import { useTeacherHomeroom, useTeacherStudents } from "@/features/teacher/queri
 import QuickAttendanceGrid from "@/features/teacher/components/QuickAttendanceGrid";
 import StudentQuickView from "@/features/teacher/components/StudentQuickView";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { useAppSelector } from "@/store/hooks";
 
 export default function TeacherMyClassPage() {
   const { data: homeroom } = useTeacherHomeroom();
+  const user = useAppSelector((state) => state.auth.user);
   const [search, setSearch] = useState("");
 
   const { data: students } = useTeacherStudents(
@@ -41,7 +43,7 @@ export default function TeacherMyClassPage() {
 
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <h2 className="mb-3 text-base font-semibold">Today&apos;s Attendance</h2>
-        <QuickAttendanceGrid students={students?.content ?? []} sectionUuid={homeroom.sectionUuid ?? ""} staffUuid={""} />
+        <QuickAttendanceGrid students={students?.content ?? []} sectionUuid={homeroom.sectionUuid ?? ""} staffUuid={user?.userId || ""} />
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">

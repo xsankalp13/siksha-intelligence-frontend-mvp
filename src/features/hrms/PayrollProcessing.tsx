@@ -47,6 +47,12 @@ export default function PayrollProcessing() {
         .then((res) => res.data),
   });
 
+  const { data: preflight, isLoading: preflightLoading } = useQuery({
+    queryKey: ["hrms", "payroll", "preflight", form.payMonth, form.payYear],
+    queryFn: () => hrmsService.getPayrollPreflight(form.payMonth, form.payYear).then((res) => res.data),
+    enabled: !!form.payMonth && !!form.payYear,
+  });
+
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["hrms", "payroll", "runs"] });
 
   const normalizeRole = (role: string): string => {
@@ -230,7 +236,9 @@ export default function PayrollProcessing() {
             onClick={() => setIsProcessDialogOpen(true)}
             disabled={
               !canManagePayroll ||
+              (preflight?.canProcess === false) ||
               createMutation.isPending ||
+              preflightLoading ||
               form.payMonth < 1 ||
               form.payMonth > 12 ||
               form.payYear < 2000
@@ -239,6 +247,46 @@ export default function PayrollProcessing() {
             Run Payroll
           </Button>
         </div>
+
+        {preflight && (
+          <div
+            className={
+              preflight.canProcess
+                ? "space-y-2 rounded-md border border-emerald-200 bg-emerald-50 p-3"
+                : "space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3"
+            }
+          >
+            <p className={preflight.canProcess ? "text-sm text-emerald-700" : "text-sm text-destructive"}>
+              {preflight.canProcess
+                ? "Payroll preflight passed. You can run payroll for the selected period."
+                : "Payroll preflight blocked. Resolve blockers before processing payroll."}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Attendance completion: {preflight.summary.attendanceCompletionPercent}% | Staff with mapping: {preflight.summary.staffWithSalaryMapping}/{preflight.summary.totalStaff}
+            </p>
+            {preflight.blockers.map((blocker) => {
+              const details = blocker.details as {
+                completionPercentage?: number;
+                unmarkedStaff?: { staffName: string; missingDays: number }[];
+              };
+              return (
+                <div key={blocker.type} className="rounded border border-destructive/30 bg-background/90 p-2 text-xs text-destructive">
+                  <p className="font-semibold">{blocker.type}</p>
+                  <p>{blocker.message}</p>
+                  {typeof details.completionPercentage === "number" ? (
+                    <p className="mt-1 text-muted-foreground">Completion: {details.completionPercentage}%</p>
+                  ) : null}
+                </div>
+              );
+            })}
+            {preflight.warnings.map((warning) => (
+              <div key={warning.type} className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                <p className="font-semibold">{warning.type}</p>
+                <p>{warning.message} ({warning.count})</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {createError && (
           <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 p-3">

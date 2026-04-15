@@ -38,6 +38,7 @@ import type {
   StaffSalaryMappingCreateDTO,
   StaffSalaryMappingResponseDTO,
 } from "./types/hrms";
+import type { PayrollPreflightDTO } from "./types/payrollPreflight";
 
 const HRMS = "/auth/hrms";
 
@@ -78,7 +79,12 @@ export const hrmsService = {
   // ── Calendar ─────────────────────────────────────────────────────
   listCalendarEvents(params?: HrmsListParams) {
     return api.get<CalendarEventResponseDTO[]>(`${HRMS}/calendar/events`, {
-      params: { academicYear: params?.academicYear, month: params?.month },
+      params: {
+        academicYear: params?.academicYear,
+        month: params?.month,
+        fromDate: params?.fromDate,
+        toDate: params?.toDate,
+      },
     });
   },
 
@@ -356,6 +362,13 @@ export const hrmsService = {
 
   createPayrollRun(payload: PayrollRunCreateDTO) {
     return api.post<PayrollRunResponseDTO>(`${HRMS}/payroll/runs`, payload);
+  },
+
+  /** GET /auth/hrms/payroll/preflight?month=&year= */
+  getPayrollPreflight(month: number, year: number) {
+    return api.get<PayrollPreflightDTO>(`${HRMS}/payroll/preflight`, {
+      params: { month, year },
+    });
   },
 
   approvePayrollRun(runIdentifier: string) {

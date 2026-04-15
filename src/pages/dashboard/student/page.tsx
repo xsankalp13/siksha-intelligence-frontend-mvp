@@ -14,6 +14,7 @@ import {
   NoticeBoardWidget 
 } from "@/features/student/dashboard/components/DashboardWidgets";
 import { DashboardBentoSkeleton } from "@/features/student/dashboard/components/DashboardSkeletons";
+import { ShikshaAIChatWidget } from "@/features/student/dashboard/components/ShikshaAIChatWidget";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -123,6 +124,9 @@ export default function StudentDashboardPage() {
           </div>
         </motion.div>
       )}
+
+      {/* Floating Interactive Widget */}
+      <ShikshaAIChatWidget />
     </div>
   );
 }

@@ -50,6 +50,7 @@ import {
   useCreateSchedule,
   useUpdateSchedule,
   useDeleteSchedule,
+  useGetAllTemplates,
 } from "../hooks/useExaminationQueries";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
@@ -76,6 +77,7 @@ interface Props {
   exam: ExamResponseDTO;
   onBack: () => void;
   onEnterMarks: (schedule: ExamScheduleResponseDTO) => void;
+  onNavigateToTemplates?: () => void;
 }
 
 /* ── internal form state (keeps the original Start / End UI) ── */
@@ -83,22 +85,22 @@ interface ScheduleFormState {
   classId: string;
   sectionId: string;
   subjectId: string;
+  templateId: string;
   examDate: string;
   startTime: string;
   endTime: string;
   maxStudentsPerSeat: number;
-  seatSide: "LEFT" | "RIGHT" | "";
 }
 
 const emptyForm: ScheduleFormState = {
   classId: "",
   sectionId: "",
   subjectId: "",
+  templateId: "",
   examDate: "",
   startTime: "",
   endTime: "",
   maxStudentsPerSeat: 1,
-  seatSide: "",
 };
 
 function calcDuration(start: string, end: string): number {
@@ -191,8 +193,10 @@ export default function ExamSchedulePanel({
   exam,
   onBack,
   onEnterMarks: _onEnterMarks,
+  onNavigateToTemplates,
 }: Props) {
   const { data: schedules = [], isLoading } = useGetSchedulesByExam(exam.uuid);
+  const { data: templates = [] } = useGetAllTemplates();
   const createSchedule = useCreateSchedule();
   const updateSchedule = useUpdateSchedule();
   const deleteSchedule = useDeleteSchedule();
@@ -222,7 +226,7 @@ export default function ExamSchedulePanel({
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...emptyForm, examDate: exam.startDate, startTime: "10:00", endTime: "13:00", maxStudentsPerSeat: 1, seatSide: "" });
+    setForm({ ...emptyForm, examDate: exam.startDate, startTime: "10:00", endTime: "11:00", maxStudentsPerSeat: 1 });
     setDialogOpen(true);
   };
 
@@ -232,11 +236,11 @@ export default function ExamSchedulePanel({
       classId: s.classId,
       sectionId: s.sectionId || "",
       subjectId: s.subjectId,
+      templateId: s.templateId || "",
       examDate: s.examDate,
       startTime: s.startTime ? s.startTime.substring(0, 5) : "",
       endTime: s.endTime ? s.endTime.substring(0, 5) : "",
       maxStudentsPerSeat: s.maxStudentsPerSeat ?? 1,
-      seatSide: s.seatSide ?? "",
     });
     setDialogOpen(true);
   };
@@ -247,6 +251,7 @@ export default function ExamSchedulePanel({
     if (
       !form.classId ||
       !form.subjectId ||
+      !form.templateId ||
       !form.examDate ||
       !form.startTime ||
       !form.endTime
@@ -255,10 +260,7 @@ export default function ExamSchedulePanel({
       return;
     }
 
-    if (form.maxStudentsPerSeat === 2 && !form.seatSide) {
-      toast.error("Please select a seat side (LEFT/RIGHT) for double seating.");
-      return;
-    }
+
 
     const duration = calcDuration(form.startTime, form.endTime);
     if (duration <= 0) {
@@ -268,18 +270,20 @@ export default function ExamSchedulePanel({
 
     const formatTimeForBackend = (t: string) => (t && t.length === 5 ? `${t}:00` : t);
 
+    const selectedTpl = templates.find(t => t.id === form.templateId);
+
     const payload: ExamScheduleRequestDTO = {
       classId: form.classId,
       sectionId: form.sectionId || undefined,
       subjectId: form.subjectId,
+      templateId: form.templateId,
       examDate: form.examDate,
       startTime: formatTimeForBackend(form.startTime),
       endTime: formatTimeForBackend(form.endTime),
       duration,
-      maxMarks: 100,
+      maxMarks: selectedTpl?.totalMarks || 100,
       passingMarks: 33,
       maxStudentsPerSeat: form.maxStudentsPerSeat,
-      ...(form.maxStudentsPerSeat === 2 && { seatSide: form.seatSide as "LEFT" | "RIGHT" }),
     };
 
     console.log("[DEBUG] Schedule form state:", JSON.stringify(form));
@@ -327,6 +331,8 @@ export default function ExamSchedulePanel({
       }
     );
   };
+
+
 
   return (
     <div className="space-y-4">
@@ -385,7 +391,9 @@ export default function ExamSchedulePanel({
             </TableHeader>
             <TableBody>
               <AnimatePresence>
-                {schedules.map((s) => (
+                {[...schedules]
+                  .sort((a, b) => b.scheduleId - a.scheduleId)
+                  .map((s) => (
                   <motion.tr
                     key={s.scheduleId}
                     initial={{ opacity: 0 }}
@@ -528,6 +536,53 @@ export default function ExamSchedulePanel({
               </Select>
             </div>
 
+            {/* Template Selector */}
+            <div className="grid gap-1.5 pt-2 border-t border-border/40">
+              <label className="text-sm font-medium">
+                Exam Template <span className="text-destructive">*</span>
+              </label>
+              <Select
+                value={form.templateId}
+                onValueChange={(v) => setForm({ ...form, templateId: v })}
+                disabled={!!editing}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select examination template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name} ({t.totalQuestions}Q · {t.totalMarks} marks)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.templateId && (() => {
+                const sel = templates.find(t => t.id === form.templateId);
+                return sel ? (
+                  <div className="mt-1 p-3 bg-muted/30 rounded-lg text-sm text-muted-foreground flex gap-4">
+                    <span>Sections: <strong className="text-foreground">{sel.sections.length}</strong></span>
+                    <span>Questions: <strong className="text-foreground">{sel.totalQuestions}</strong></span>
+                    <span>Total Marks: <strong className="text-foreground">{sel.totalMarks}</strong></span>
+                  </div>
+                ) : null;
+              })()}
+              {onNavigateToTemplates && (
+                <div className="flex justify-end mt-1">
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs text-primary"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      onNavigateToTemplates();
+                    }}
+                  >
+                    + Create New Template
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <div className="bg-muted/20 p-5 rounded-2xl border border-border/40 space-y-4">
               <div className="grid gap-1.5">
                 <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
@@ -559,7 +614,6 @@ export default function ExamSchedulePanel({
               </div>
 
               {/* Seating Type & Side */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-1.5">
                   <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
                     Seating Type
@@ -567,8 +621,7 @@ export default function ExamSchedulePanel({
                   <Select
                     value={String(form.maxStudentsPerSeat)}
                     onValueChange={(v) => {
-                      const max = Number(v);
-                      setForm({ ...form, maxStudentsPerSeat: max, seatSide: max === 1 ? "" : form.seatSide });
+                      setForm({ ...form, maxStudentsPerSeat: Number(v) });
                     }}
                   >
                     <SelectTrigger className="h-11 border-transparent bg-background shadow-inner focus-visible:ring-primary/20 rounded-xl">
@@ -587,30 +640,15 @@ export default function ExamSchedulePanel({
                           Double Seating (2 per seat)
                         </span>
                       </SelectItem>
+                      <SelectItem value="3">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          Triple Seating (3 per seat)
+                        </span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                {form.maxStudentsPerSeat === 2 && (
-                  <div className="grid gap-1.5 animate-in fade-in zoom-in-95 duration-200">
-                    <label className="text-[11px] font-bold text-primary/70 uppercase tracking-widest px-1">
-                      Seat Side <span className="text-destructive">*</span>
-                    </label>
-                    <Select
-                      value={form.seatSide}
-                      onValueChange={(v) => setForm({ ...form, seatSide: v as "LEFT" | "RIGHT" })}
-                    >
-                      <SelectTrigger className="h-11 border-transparent bg-background shadow-inner focus-visible:ring-primary/20 rounded-xl">
-                        <SelectValue placeholder="Select side" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="LEFT">Left Side</SelectItem>
-                        <SelectItem value="RIGHT">Right Side</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setDialogOpen(false)}>

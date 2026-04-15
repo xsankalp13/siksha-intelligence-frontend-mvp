@@ -11,7 +11,11 @@ import type {
   StaffAttendanceQueryParams,
   SubmitExcuseRequestDTO,
   AbsenceDocumentationResponseDTO,
+  AttendanceCompletionDTO,
+  StudentAttendanceCompletionDTO,
+  StaffDailyStatsResponseDTO,
 } from "./types/attendance";
+import type { StaffSummaryDTO } from "./admin";
 
 // ── Attendance Service ───────────────────────────────────────────────
 
@@ -106,6 +110,13 @@ export const attendanceService = {
     return api.delete(`/auth/ams/staff/${recordUuid}`);
   },
 
+  /** GET /auth/ams/staff/stats/daily */
+  getDailyStaffStats(date?: string) {
+    return api.get<StaffDailyStatsResponseDTO>("/auth/ams/staff/stats/daily", {
+      params: { date },
+    });
+  },
+
   // ── Absence Documentation ────────────────────────────────────────
   /** POST /auth/ams/excuses/submit */
   submitExcuse(data: SubmitExcuseRequestDTO) {
@@ -139,5 +150,35 @@ export const attendanceService = {
       "/auth/ams/excuses/pending",
       { params: { page, size } }
     );
+  },
+
+  // ── Staff Attendance — New Endpoints ────────────────────────────────
+
+  /** GET /auth/ams/staff/attendance-completion?month=&year= */
+  getStaffAttendanceCompletion(month: number, year: number) {
+    return api.get<AttendanceCompletionDTO>("/auth/ams/staff/attendance-completion", {
+      params: { month, year },
+    });
+  },
+
+  /** GET /auth/ams/staff/unmarked?date=&category= */
+  getUnmarkedStaff(date: string, category?: string) {
+    return api.get<StaffSummaryDTO[]>("/auth/ams/staff/unmarked", {
+      params: { date, category },
+    });
+  },
+
+  // ── Student Attendance — New Endpoint ───────────────────────────────
+
+  /** GET /auth/ams/records/completion?classUuid=&sectionUuid=&fromDate=&toDate= */
+  getStudentAttendanceCompletion(params: {
+    classUuid: string;
+    sectionUuid?: string;
+    fromDate: string;
+    toDate: string;
+  }) {
+    return api.get<StudentAttendanceCompletionDTO>("/auth/ams/records/completion", {
+      params,
+    });
   },
 };
