@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -52,12 +52,18 @@ const initialForm: SalaryTemplateCreateDTO = {
 
 export default function SalaryTemplateBuilder() {
   const queryClient = useQueryClient();
+  const originalFormRef = useRef<SalaryTemplateCreateDTO | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<SalaryTemplateResponseDTO | null>(null);
   const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SalaryTemplateResponseDTO | null>(null);
   const [form, setForm] = useState<SalaryTemplateCreateDTO>(initialForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  const isDirty = useMemo(
+    () => !editing || JSON.stringify(form) !== JSON.stringify(originalFormRef.current),
+    [form, editing],
+  );
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["hrms", "salary", "templates"],
@@ -144,14 +150,16 @@ export default function SalaryTemplateBuilder() {
       .filter((item): item is { componentRef: string; value: number } => item !== null);
 
     setEditing(row);
-    setForm({
+    const editForm: SalaryTemplateCreateDTO = {
       templateName: row.templateName,
       description: row.description,
       gradeRef,
       applicableCategory: row.applicableCategory,
       academicYear: row.academicYear,
       components: mappedComponents,
-    });
+    };
+    originalFormRef.current = editForm;
+    setForm(editForm);
     setFieldErrors({});
     setFormOpen(true);
   };
@@ -365,7 +373,7 @@ export default function SalaryTemplateBuilder() {
             <Button variant="outline" onClick={closeForm}>Cancel</Button>
             <Button
               onClick={() => setSaveReviewOpen(true)}
-              disabled={createMutation.isPending || updateMutation.isPending || !form.templateName}
+              disabled={createMutation.isPending || updateMutation.isPending || !form.templateName || !isDirty}
             >
               {editing ? "Save Changes" : "Create"}
             </Button>
