@@ -47,6 +47,7 @@ const TeacherMyHrPage = lazy(() => import('@/pages/dashboard/teacher/my-hr/page'
 const TeacherEvaluationPage = lazy(() => import('@/pages/dashboard/teacher/evaluation/page'))
 const TeacherMyClassPage = lazy(() => import('@/pages/dashboard/teacher/my-class/page'))
 const TeacherLectureLogsPage = lazy(() => import('@/pages/dashboard/teacher/lecture-logs/page'))
+const TeacherDisciplinePage = lazy(() => import('@/pages/dashboard/teacher/discipline/page'))
 
 const StudentDashboard = lazy(() => import('@/pages/dashboard/student/page'))
 const StudentProfilePage = lazy(() => import('@/pages/dashboard/student/profile/page'))
@@ -61,6 +62,7 @@ const SecurityGuardPickupScannerPage = lazy(() => import('@/pages/dashboard/secu
 const AdminVisitorLogsPage = lazy(() => import('@/pages/dashboard/admin/visitor-logs/page'))
 const AdminPickupLogsPage = lazy(() => import('@/pages/dashboard/admin/pickup-logs/page'))
 const StudentPickupPage = lazy(() => import('@/pages/dashboard/student/pickup/page'))
+const StudentDisciplinePage = lazy(() => import('@/pages/dashboard/student/discipline/page'))
 
 
 const SuperAdminOverviewPage = lazy(() => import('@/pages/dashboard/super-admin/overview/page'))
@@ -76,8 +78,8 @@ const ApplicantOverviewPage = lazy(() => import('@/pages/dashboard/applicant/pag
 const AdmissionEnquiryPage = lazy(() => import('@/pages/dashboard/applicant/enquiry/page'))
 const AdmissionFormPage = lazy(() => import('@/pages/dashboard/applicant/form/page'))
 const AdmissionPaymentPage = lazy(() => import('@/pages/dashboard/applicant/payment/page'))
-
 const AdminAdmissionDashboard = lazy(() => import('@/pages/dashboard/admin/admission/page'))
+const AdminDisciplinePage = lazy(() => import('@/pages/dashboard/admin/discipline/page'))
 
 function withRouteSuspense(node: ReactNode) {
   return (
@@ -174,6 +176,7 @@ export default function App() {
           <Route path="visitor-logs" element={withRouteSuspense(<AdminVisitorLogsPage />)} />
           <Route path="pickup-logs" element={withRouteSuspense(<AdminPickupLogsPage />)} />
           <Route path="admission" element={withRouteSuspense(<AdminAdmissionDashboard />)} />
+          <Route path="discipline" element={withRouteSuspense(<AdminDisciplinePage />)} />
           {/* Catch-all for unknown admin sub-routes */}
           <Route path="*" element={<Navigate to="/dashboard/admin" replace />} />
         </Route>
@@ -217,6 +220,7 @@ export default function App() {
           <Route path="my-hr" element={withRouteSuspense(<TeacherMyHrPage />)} />
           <Route path="lecture-logs" element={withRouteSuspense(<TeacherLectureLogsPage />)} />
           <Route path="evaluation" element={withRouteSuspense(<TeacherEvaluationPage />)} />
+          <Route path="discipline" element={withRouteSuspense(<TeacherDisciplinePage />)} />
           <Route path="*" element={<Navigate to="/dashboard/teacher" replace />} />
         </Route>
 
@@ -235,6 +239,7 @@ export default function App() {
           <Route path="profile" element={withRouteSuspense(<StudentProfilePage />)} />
           <Route path="timetable" element={withRouteSuspense(<StudentTimetablePage />)} />
           <Route path="pickup" element={withRouteSuspense(<StudentPickupPage />)} />
+          <Route path="discipline" element={withRouteSuspense(<StudentDisciplinePage />)} />
         </Route>
 
         {/* Security Guard Dashboard */}
