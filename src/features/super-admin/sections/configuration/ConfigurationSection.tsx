@@ -4,9 +4,13 @@ import { settingsService } from '@/features/super-admin/services/superAdminServi
 import {
   Mail, HardDrive, Lock, Palette, ToggleLeft,
   Save, Eye, EyeOff, AlertTriangle, Loader2, CheckCircle2, Settings2,
+<<<<<<< HEAD
+  Cloud, Bot,
+=======
   Cloud,
   Clock3,
   MapPin,
+>>>>>>> 1f1b964236b0dce6e94015b1812c32813d5b0748
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -25,6 +29,7 @@ import { Circle, MapContainer, Marker, TileLayer } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { AppSettingDTO, SettingUpdateRequest } from '@/features/super-admin/types'
+import AiConfigTab from './AiConfigTab'
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -708,7 +713,11 @@ export default function ConfigurationSection() {
           <TabsTrigger value="security" className="gap-1.5"><Lock className="h-3.5 w-3.5" />Security</TabsTrigger>
           <TabsTrigger value="whitelabel" className="gap-1.5"><Palette className="h-3.5 w-3.5" />White-Label</TabsTrigger>
           <TabsTrigger value="features" className="gap-1.5"><ToggleLeft className="h-3.5 w-3.5" />Feature Flags</TabsTrigger>
+<<<<<<< HEAD
+          <TabsTrigger value="ai" className="gap-1.5"><Bot className="h-3.5 w-3.5" />AI Assistant</TabsTrigger>
+=======
           <TabsTrigger value="attendance" className="gap-1.5"><Clock3 className="h-3.5 w-3.5" />Attendance</TabsTrigger>
+>>>>>>> 1f1b964236b0dce6e94015b1812c32813d5b0748
         </TabsList>
 
         <TabsContent value="smtp">
@@ -761,6 +770,10 @@ export default function ConfigurationSection() {
           />
         </TabsContent>
 
+<<<<<<< HEAD
+        <TabsContent value="ai">
+          <AiConfigTab />
+=======
         <TabsContent value="attendance" className="space-y-4">
           <SettingsGroupCard
             title="Attendance Edit Window"
@@ -788,6 +801,7 @@ export default function ConfigurationSection() {
             onChangeDraft={() => undefined}
             enableGeoLocationHelper
           />
+>>>>>>> 1f1b964236b0dce6e94015b1812c32813d5b0748
         </TabsContent>
       </Tabs>
     </div>
