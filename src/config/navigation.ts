@@ -30,6 +30,8 @@ import {
   QrCode,
   UserCheck,
   Bus,
+  MessageSquare,
+  ClipboardSignature,
 } from "lucide-react";
 
 export type NavItem = {
@@ -63,10 +65,30 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "Finance", path: "/dashboard/admin/finance", icon: Receipt },
 
   { label: "Transport", path: "/dashboard/admin/transport", icon: Bus },
+  { label: "Admission", path: "/dashboard/admin/admission", icon: ClipboardSignature },
   { label: "Settings", path: "/dashboard/admin/settings", icon: Settings },
   { label: "ID Cards", path: "/dashboard/admin/id-cards", icon: CreditCard },
   { label: "Visitor Logs", path: "/dashboard/admin/visitor-logs", icon: ClipboardList },
   { label: "Pickup Logs", path: "/dashboard/admin/pickup-logs", icon: QrCode },
+];
+
+export const APPLICANT_NAV_ITEMS: NavItem[] = [
+  {
+    label: "Overview",
+    path: "/dashboard/applicant",
+    icon: LayoutDashboard,
+    end: true,
+  },
+  {
+    label: "Admission Enquiry",
+    path: "/dashboard/applicant/enquiry",
+    icon: MessageSquare,
+  },
+  {
+    label: "Admission Form",
+    path: "/dashboard/applicant/form",
+    icon: ClipboardSignature,
+  },
 ];
 
 export const STUDENT_NAV_ITEMS: NavItem[] = [

@@ -15,8 +15,10 @@ import SuperAdminLayout from '@/components/layout/SuperAdminLayout';
 import SecurityGuardLayout from '@/components/layout/SecurityGuardLayout';
 import TeacherLayout from './components/layout/TeacherLayout'
 import AdminTransportPage from './pages/dashboard/admin/transport/page'
+import ApplicantLayout from './components/layout/ApplicantLayout'
 
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
+const ApplicantSignupPage = lazy(() => import('@/features/auth/ApplicantSignupPage'))
 const HomePage = lazy(() => import('@/pages/HomePage'))
 
 const AdminOverview = lazy(() => import('@/pages/dashboard/admin/page'))
@@ -70,6 +72,13 @@ const SuperAdminLogsPage = lazy(() => import('@/pages/dashboard/super-admin/logs
 const SuperAdminConfigPage = lazy(() => import('@/pages/dashboard/super-admin/configuration/page'))
 const SuperAdminSecurityPage = lazy(() => import('@/pages/dashboard/super-admin/security/page'))
 
+const ApplicantOverviewPage = lazy(() => import('@/pages/dashboard/applicant/page'))
+const AdmissionEnquiryPage = lazy(() => import('@/pages/dashboard/applicant/enquiry/page'))
+const AdmissionFormPage = lazy(() => import('@/pages/dashboard/applicant/form/page'))
+const AdmissionPaymentPage = lazy(() => import('@/pages/dashboard/applicant/payment/page'))
+
+const AdminAdmissionDashboard = lazy(() => import('@/pages/dashboard/admin/admission/page'))
+
 function withRouteSuspense(node: ReactNode) {
   return (
     <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading...</div>}>
@@ -88,6 +97,14 @@ export default function App() {
           element={
             <GuestOnly>
               {withRouteSuspense(<LoginPage />)}
+            </GuestOnly>
+          }
+        />
+        <Route
+          path="/admission/signup"
+          element={
+            <GuestOnly>
+              {withRouteSuspense(<ApplicantSignupPage />)}
             </GuestOnly>
           }
         />
@@ -156,8 +173,27 @@ export default function App() {
           <Route path="users/:type/:id" element={withRouteSuspense(<UserDetailsPage />)} />
           <Route path="visitor-logs" element={withRouteSuspense(<AdminVisitorLogsPage />)} />
           <Route path="pickup-logs" element={withRouteSuspense(<AdminPickupLogsPage />)} />
+          <Route path="admission" element={withRouteSuspense(<AdminAdmissionDashboard />)} />
           {/* Catch-all for unknown admin sub-routes */}
           <Route path="*" element={<Navigate to="/dashboard/admin" replace />} />
+        </Route>
+
+        {/* Applicant Dashboard */}
+        <Route
+          path="/dashboard/applicant"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={['APPLICANT', 'ADMIN', 'SUPER_ADMIN']}>
+                <ApplicantLayout />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={withRouteSuspense(<ApplicantOverviewPage />)} />
+          <Route path="enquiry" element={withRouteSuspense(<AdmissionEnquiryPage />)} />
+          <Route path="form" element={withRouteSuspense(<AdmissionFormPage />)} />
+          <Route path="payment" element={withRouteSuspense(<AdmissionPaymentPage />)} />
+          <Route path="*" element={<Navigate to="/dashboard/applicant" replace />} />
         </Route>
 
         {/* Teacher Dashboard — nested layout with sidebar */}
