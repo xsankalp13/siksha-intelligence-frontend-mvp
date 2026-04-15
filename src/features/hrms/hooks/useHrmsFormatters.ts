@@ -30,10 +30,10 @@ function formatDateFromPattern(date: Date, pattern: string, timezone: string): s
   }).format(date);
 
   return pattern
-    .replace("yyyy", year)
-    .replace("MMM", monthShort)
-    .replace("MM", month)
-    .replace("dd", day);
+    .replace(/yyyy|YYYY/g, year)
+    .replace(/MMM/g, monthShort)
+    .replace(/MM/g, month)
+    .replace(/dd|DD/g, day);
 }
 
 export function useHrmsFormatters() {

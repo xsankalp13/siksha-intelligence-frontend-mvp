@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarX, ChevronLeft, ChevronRight, Clock, Sun } from "lucide-react";
-import { format, endOfMonth, getDaysInMonth, startOfMonth } from "date-fns";
+import { format, endOfMonth, getDaysInMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
