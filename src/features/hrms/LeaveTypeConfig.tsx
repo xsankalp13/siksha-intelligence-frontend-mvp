@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useRef, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import DataTable, { type Column } from "@/components/common/DataTable";
@@ -31,6 +31,27 @@ const STAFF_CATEGORY_OPTIONS: Array<{ value: StaffCategory; label: string }> = [
   { value: "NON_TEACHING_SUPPORT", label: "Non-teaching Support" },
 ];
 
+const CATEGORY_CHIP_COLORS: Record<StaffCategory, string> = {
+  TEACHING: "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300",
+  NON_TEACHING_ADMIN: "bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-300",
+  NON_TEACHING_SUPPORT: "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300",
+};
+
+const CATEGORY_TOGGLE_COLORS: Record<StaffCategory, { base: string; selected: string }> = {
+  TEACHING: {
+    base: "border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/30",
+    selected: "border-blue-500 bg-blue-100 text-blue-800 dark:border-blue-500 dark:bg-blue-900/60 dark:text-blue-300",
+  },
+  NON_TEACHING_ADMIN: {
+    base: "border-purple-200 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400 dark:hover:bg-purple-900/30",
+    selected: "border-purple-500 bg-purple-100 text-purple-800 dark:border-purple-500 dark:bg-purple-900/60 dark:text-purple-300",
+  },
+  NON_TEACHING_SUPPORT: {
+    base: "border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/30",
+    selected: "border-amber-500 bg-amber-100 text-amber-800 dark:border-amber-500 dark:bg-amber-900/60 dark:text-amber-300",
+  },
+};
+
 const initialForm: LeaveTypeConfigCreateUpdateDTO = {
   leaveCode: "",
   displayName: "",
@@ -49,12 +70,18 @@ const initialForm: LeaveTypeConfigCreateUpdateDTO = {
 
 export default function LeaveTypeConfig() {
   const queryClient = useQueryClient();
+  const originalFormRef = useRef<LeaveTypeConfigCreateUpdateDTO | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<LeaveTypeConfigResponseDTO | null>(null);
   const [editing, setEditing] = useState<LeaveTypeConfigResponseDTO | null>(null);
   const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [form, setForm] = useState<LeaveTypeConfigCreateUpdateDTO>(initialForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  const isDirty = useMemo(
+    () => !editing || JSON.stringify(form) !== JSON.stringify(originalFormRef.current),
+    [form, editing],
+  );
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["hrms", "leave-types"],
@@ -107,7 +134,7 @@ export default function LeaveTypeConfig() {
 
   const openEdit = (row: LeaveTypeConfigResponseDTO) => {
     setEditing(row);
-    setForm({
+    const editForm: LeaveTypeConfigCreateUpdateDTO = {
       leaveCode: row.leaveCode,
       displayName: row.displayName,
       description: row.description,
@@ -123,7 +150,9 @@ export default function LeaveTypeConfig() {
       applicableCategories: row.applicableCategories ?? [],
       applicableGrades: row.applicableGrades,
       sortOrder: row.sortOrder,
-    });
+    };
+    originalFormRef.current = editForm;
+    setForm(editForm);
     setFieldErrors({});
     setFormOpen(true);
   };
@@ -154,13 +183,20 @@ export default function LeaveTypeConfig() {
         render: (row) => (
           <div className="flex flex-wrap gap-1">
             {(row.applicableCategories ?? []).length > 0 ? (
-              row.applicableCategories?.map((category) => (
-                <Badge key={category} variant="outline" className="text-[10px]">
-                  {category.replace(/_/g, " ")}
-                </Badge>
+              row.applicableCategories?.map((cat) => (
+                <span
+                  key={cat}
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    CATEGORY_CHIP_COLORS[cat as StaffCategory] ?? "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {cat === "TEACHING" ? "Teaching" : cat === "NON_TEACHING_ADMIN" ? "Admin" : "Support"}
+                </span>
               ))
             ) : (
-              <span className="text-xs text-muted-foreground">All</span>
+              <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                All
+              </span>
             )}
           </div>
         ),
@@ -355,32 +391,40 @@ export default function LeaveTypeConfig() {
 
             <div className="grid gap-2">
               <Label>Applicable Categories</Label>
-              <div className="grid gap-2 rounded-md border p-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {STAFF_CATEGORY_OPTIONS.map((option) => {
                   const selected = (form.applicableCategories ?? []).includes(option.value);
+                  const colors = CATEGORY_TOGGLE_COLORS[option.value];
                   return (
-                    <label key={option.value} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setForm((prev) => {
-                            const current = prev.applicableCategories ?? [];
-                            return {
-                              ...prev,
-                              applicableCategories: checked
-                                ? [...current, option.value]
-                                : current.filter((item) => item !== option.value),
-                            };
-                          });
-                        }}
-                      />
-                      <span>{option.label}</span>
-                    </label>
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setForm((prev) => {
+                          const current = prev.applicableCategories ?? [];
+                          return {
+                            ...prev,
+                            applicableCategories: selected
+                              ? current.filter((item) => item !== option.value)
+                              : [...current, option.value],
+                          };
+                        });
+                      }}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                        selected ? colors.selected : colors.base
+                      }`}
+                    >
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                        selected ? "border-current bg-current" : "border-current"
+                      }`}>
+                        {selected && <Check className="h-2.5 w-2.5 text-white dark:text-gray-900" />}
+                      </span>
+                      {option.label}
+                    </button>
                   );
                 })}
               </div>
+              <p className="text-xs text-muted-foreground">Leave empty to apply to all categories.</p>
             </div>
 
             {/* Sort order */}
@@ -400,7 +444,7 @@ export default function LeaveTypeConfig() {
             <Button variant="outline" onClick={closeForm}>Cancel</Button>
             <Button
               onClick={() => setSaveReviewOpen(true)}
-              disabled={saveMutation.isPending || !form.leaveCode || !form.displayName}
+              disabled={saveMutation.isPending || !form.leaveCode || !form.displayName || !isDirty}
             >
               {editing ? "Save Changes" : "Create"}
             </Button>

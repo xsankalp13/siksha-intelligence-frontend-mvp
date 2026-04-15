@@ -73,7 +73,6 @@ export default function LeaveCalendarDesigner() {
   const queryClient = useQueryClient();
   const { formatDate } = useHrmsFormatters();
   const [academicYear, setAcademicYear] = useState(`${currentYear}-${currentYear + 1}`);
-  const [calendarYear, setCalendarYear] = useState(currentYear);
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [formOpen, setFormOpen] = useState(false);
   const [saveReviewOpen, setSaveReviewOpen] = useState(false);
@@ -135,9 +134,9 @@ export default function LeaveCalendarDesigner() {
     setFieldErrors({});
   };
 
-  const openCreate = () => {
+  const openCreate = (dateStr?: string) => {
     setEditing(null);
-    setForm({ ...initialForm, academicYear });
+    setForm({ ...initialForm, academicYear, date: dateStr || todayIso });
     setFieldErrors({});
     setFormOpen(true);
   };
@@ -224,11 +223,17 @@ export default function LeaveCalendarDesigner() {
             <CardTitle className="text-sm text-muted-foreground">Academic Year</CardTitle>
           </CardHeader>
           <CardContent>
-            <Input
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              placeholder="e.g. 2025-2026"
-            />
+            <Select value={academicYear} onValueChange={setAcademicYear}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Year" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={`${currentYear - 2}-${currentYear - 1}`}>{currentYear - 2}-{currentYear - 1}</SelectItem>
+                <SelectItem value={`${currentYear - 1}-${currentYear}`}>{currentYear - 1}-{currentYear}</SelectItem>
+                <SelectItem value={`${currentYear}-${currentYear + 1}`}>{currentYear}-{currentYear + 1}</SelectItem>
+                <SelectItem value={`${currentYear + 1}-${currentYear + 2}`}>{currentYear + 1}-{currentYear + 2}</SelectItem>
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
       </div>
@@ -281,12 +286,14 @@ export default function LeaveCalendarDesigner() {
         </div>
       )}
 
-      {/* Calendar View */}
       {viewMode === "calendar" && (
         <CalendarYearView
-          year={calendarYear}
-          onYearChange={setCalendarYear}
+          startYear={parseInt(academicYear.split("-")[0])}
+          endYear={parseInt(academicYear.split("-")[1])}
           events={rows}
+          onAddEvent={openCreate}
+          onEditEvent={openEdit}
+          onDeleteEvent={(row) => setDeleteTarget(row)}
         />
       )}
 
