@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from '@/components/ui/sonner'
 import AdminLayout from '@/components/layout/AdminLayout'
 
+import HrmsLayout from '@/components/layout/HrmsLayout'
 import TeacherDashboard from '@/pages/dashboard/teacher/page'
 import StudentLayout from '@/components/layout/StudentLayout'
 import { GuestOnly } from '@/routes/GuestOnly'
@@ -35,25 +36,50 @@ const ExaminationsPage = lazy(() => import('@/pages/dashboard/admin/examinations
 const AdminRoomsPage = lazy(() => import('@/pages/dashboard/admin/rooms/page'))
 const AdminFinancePage = lazy(() => import('@/pages/dashboard/admin/finance/page'))
 const IdCardsPage = lazy(() => import('@/pages/dashboard/admin/id-cards/page'))
-const AdminHrmsPage = lazy(() => import('@/pages/dashboard/admin/hrms/page'))
+
+// HRMS sub-modules (lazy-loaded per route)
+const HrmsDashboard = lazy(() => import('@/features/hrms/HrmsDashboard'))
+const DesignationManagement = lazy(() => import('@/features/hrms/DesignationManagement'))
+const StaffGradingTab = lazy(() => import('@/features/hrms/StaffGradingTab'))
+const StaffAttendanceTab = lazy(() => import('@/features/hrms/StaffAttendanceTab'))
+const AttendanceTrendDashboard = lazy(() => import('@/features/hrms/AttendanceTrendDashboard'))
+const ShiftManagement = lazy(() => import('@/features/hrms/ShiftManagement'))
+const LeaveCalendarDesigner = lazy(() => import('@/features/hrms/LeaveCalendarDesigner'))
+const LeaveTypeConfig = lazy(() => import('@/features/hrms/LeaveTypeConfig'))
+const LeaveTemplateManager = lazy(() => import('@/features/hrms/LeaveTemplateManager'))
+const LeaveManagement = lazy(() => import('@/features/hrms/LeaveManagement'))
+const LeaveBalanceCards = lazy(() => import('@/features/hrms/LeaveBalanceCards'))
+const SalaryComponents = lazy(() => import('@/features/hrms/SalaryComponents'))
+const SalaryTemplateBuilder = lazy(() => import('@/features/hrms/SalaryTemplateBuilder'))
+const SalaryStaffMapping = lazy(() => import('@/features/hrms/SalaryStaffMapping'))
+const HrmsPayrollPage = lazy(() => import('@/pages/dashboard/admin/hrms/payroll/page'))
+const PromotionManagement = lazy(() => import('@/features/hrms/PromotionManagement'))
+const ApprovalCenter = lazy(() => import('@/features/hrms/ApprovalCenter'))
+const ApprovalChainConfig = lazy(() => import('@/features/hrms/ApprovalChainConfig'))
+const DocumentVault = lazy(() => import('@/features/hrms/DocumentVault'))
+const OnboardingManagement = lazy(() => import('@/features/hrms/OnboardingManagement'))
+const ExitManagement = lazy(() => import('@/features/hrms/ExitManagement'))
+const PerformanceAppraisals = lazy(() => import('@/features/hrms/PerformanceAppraisals'))
+const TrainingCatalog = lazy(() => import('@/features/hrms/TrainingCatalog'))
+const LoanManagement = lazy(() => import('@/features/hrms/LoanManagement'))
+const ExpenseClaims = lazy(() => import('@/features/hrms/ExpenseClaims'))
+const OvertimeTracker = lazy(() => import('@/features/hrms/OvertimeTracker'))
+const BankDetailsManager = lazy(() => import('@/features/hrms/BankDetailsManager'))
+const StatutoryReports = lazy(() => import('@/features/hrms/StatutoryReports'))
+const StatutorySettings = lazy(() => import('@/features/hrms/StatutorySettings'))
+const Staff360ProfilePage = lazy(() => import('@/features/hrms/Staff360Profile'))
 
 const TeacherDashboardPage = lazy(() => import('@/pages/dashboard/teacher/page'))
 const TeacherProfilePage = lazy(() => import('@/pages/dashboard/teacher/profile/page'))
 
-const TeacherSelfAttendancePage = lazy(() => import('@/pages/dashboard/teacher/self-attendance/page'))
 const TeacherAttendancePage = lazy(() => import('@/pages/dashboard/teacher/attendance/page'))
 const TeacherClassesPage = lazy(() => import('@/pages/dashboard/teacher/classes/page'))
 const TeacherMyHrPage = lazy(() => import('@/pages/dashboard/teacher/my-hr/page'))
-const TeacherEvaluationPage = lazy(() => import('@/pages/dashboard/teacher/evaluation/page'))
 const TeacherMyClassPage = lazy(() => import('@/pages/dashboard/teacher/my-class/page'))
-const TeacherLectureLogsPage = lazy(() => import('@/pages/dashboard/teacher/lecture-logs/page'))
+const TeacherSelfAttendancePage = lazy(() => import('@/pages/dashboard/teacher/self-attendance/page'))
 
 const StudentDashboard = lazy(() => import('@/pages/dashboard/student/page'))
 const StudentProfilePage = lazy(() => import('@/pages/dashboard/student/profile/page'))
-const StudentTimetablePage = lazy(() => import('@/pages/dashboard/student/timetable/page'))
-const StudentResultsPage = lazy(() => import('@/pages/dashboard/student/results/page'))
-const StudentPastPapersPage = lazy(() => import('@/pages/dashboard/student/past-papers/page'))
-const StudentAdmitCardsPage = lazy(() => import('@/pages/dashboard/student/admit-cards/page'))
 
 const SecurityGuardDashboard = lazy(() => import('@/pages/dashboard/security-guard/page'))
 const SecurityGuardVisitorManagement = lazy(() => import('@/pages/dashboard/security-guard/visitor-management/page'))
@@ -169,6 +195,40 @@ export default function App() {
           <Route path="hrms" element={withRouteSuspense(<AdminHrmsPage />)} />
           <Route path="transport" element={<AdminTransportPage />} />
 
+          <Route path="hrms" element={<HrmsLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={withRouteSuspense(<HrmsDashboard />)} />
+            <Route path="people/designations" element={withRouteSuspense(<DesignationManagement />)} />
+            <Route path="people/grades" element={withRouteSuspense(<StaffGradingTab />)} />
+            <Route path="attendance" element={withRouteSuspense(<StaffAttendanceTab />)} />
+            <Route path="attendance/trends" element={withRouteSuspense(<AttendanceTrendDashboard />)} />
+            <Route path="attendance/shifts" element={withRouteSuspense(<ShiftManagement />)} />
+            <Route path="leaves/calendar" element={withRouteSuspense(<LeaveCalendarDesigner />)} />
+            <Route path="leaves/types" element={withRouteSuspense(<LeaveTypeConfig />)} />
+            <Route path="leaves/templates" element={withRouteSuspense(<LeaveTemplateManager />)} />
+            <Route path="leaves/applications" element={withRouteSuspense(<LeaveManagement />)} />
+            <Route path="leaves/balances" element={withRouteSuspense(<LeaveBalanceCards />)} />
+            <Route path="compensation/components" element={withRouteSuspense(<SalaryComponents />)} />
+            <Route path="compensation/templates" element={withRouteSuspense(<SalaryTemplateBuilder />)} />
+            <Route path="compensation/mappings" element={withRouteSuspense(<SalaryStaffMapping />)} />
+            <Route path="bank-details" element={withRouteSuspense(<BankDetailsManager />)} />
+            <Route path="payroll" element={withRouteSuspense(<HrmsPayrollPage />)} />
+            <Route path="promotions" element={withRouteSuspense(<PromotionManagement />)} />
+            <Route path="approvals" element={withRouteSuspense(<ApprovalCenter />)} />
+            <Route path="approvals/config" element={withRouteSuspense(<ApprovalChainConfig />)} />
+            <Route path="documents" element={withRouteSuspense(<DocumentVault />)} />
+            <Route path="onboarding" element={withRouteSuspense(<OnboardingManagement />)} />
+            <Route path="exit" element={withRouteSuspense(<ExitManagement />)} />
+            <Route path="performance" element={withRouteSuspense(<PerformanceAppraisals />)} />
+            <Route path="training" element={withRouteSuspense(<TrainingCatalog />)} />
+            <Route path="loans" element={withRouteSuspense(<LoanManagement />)} />
+            <Route path="expenses" element={withRouteSuspense(<ExpenseClaims />)} />
+            <Route path="overtime" element={withRouteSuspense(<OvertimeTracker />)} />
+            <Route path="reports" element={withRouteSuspense(<StatutoryReports />)} />
+            <Route path="settings" element={withRouteSuspense(<StatutorySettings />)} />
+            <Route path="staff/:staffRef" element={withRouteSuspense(<Staff360ProfilePage />)} />
+            <Route path="*" element={<Navigate to="dashboard" replace />} />
+          </Route>
           <Route path="id-cards" element={withRouteSuspense(<IdCardsPage />)} />
           <Route path="users/:type/:id" element={withRouteSuspense(<UserDetailsPage />)} />
           <Route path="visitor-logs" element={withRouteSuspense(<AdminVisitorLogsPage />)} />
@@ -209,14 +269,12 @@ export default function App() {
         >
           <Route index element={withRouteSuspense(<TeacherDashboardPage />)} />
           <Route path="my-class" element={withRouteSuspense(<TeacherMyClassPage />)} />
-          <Route path="self-attendance" element={withRouteSuspense(<TeacherSelfAttendancePage />)} />
           <Route path="attendance" element={withRouteSuspense(<TeacherAttendancePage />)} />
+          <Route path="self-attendance" element={withRouteSuspense(<TeacherSelfAttendancePage />)} />
           <Route path="classes" element={withRouteSuspense(<TeacherClassesPage />)} />
           <Route path="profile" element={withRouteSuspense(<TeacherProfilePage />)} />
 
           <Route path="my-hr" element={withRouteSuspense(<TeacherMyHrPage />)} />
-          <Route path="lecture-logs" element={withRouteSuspense(<TeacherLectureLogsPage />)} />
-          <Route path="evaluation" element={withRouteSuspense(<TeacherEvaluationPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/teacher" replace />} />
         </Route>
 
