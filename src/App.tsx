@@ -5,7 +5,6 @@ import { Toaster } from '@/components/ui/sonner'
 import AdminLayout from '@/components/layout/AdminLayout'
 
 import HrmsLayout from '@/components/layout/HrmsLayout'
-import TeacherDashboard from '@/pages/dashboard/teacher/page'
 import StudentLayout from '@/components/layout/StudentLayout'
 import ParentLayout from '@/components/layout/ParentLayout'
 import { GuestOnly } from '@/routes/GuestOnly'
@@ -18,6 +17,11 @@ import SecurityGuardLayout from '@/components/layout/SecurityGuardLayout';
 import TeacherLayout from './components/layout/TeacherLayout'
 import AdminTransportPage from './pages/dashboard/admin/transport/page'
 import ApplicantLayout from './components/layout/ApplicantLayout'
+import AdminHrmsPage from './pages/dashboard/admin/hrms/page'
+import StudentTimetablePage from './pages/dashboard/student/timetable/page'
+import StudentResultsPage from './pages/dashboard/student/results/page'
+import StudentPastPapersPage from './pages/dashboard/student/past-papers/page'
+import StudentAdmitCardsPage from './pages/dashboard/student/admit-cards/page'
 
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const ApplicantSignupPage = lazy(() => import('@/features/auth/ApplicantSignupPage'))
@@ -79,6 +83,7 @@ const TeacherMyHrPage = lazy(() => import('@/pages/dashboard/teacher/my-hr/page'
 const TeacherMyClassPage = lazy(() => import('@/pages/dashboard/teacher/my-class/page'))
 const TeacherLectureLogsPage = lazy(() => import('@/pages/dashboard/teacher/lecture-logs/page'))
 const TeacherDisciplinePage = lazy(() => import('@/pages/dashboard/teacher/discipline/page'))
+const TeacherEvaluationPage = lazy(() => import('@/pages/dashboard/teacher/evaluation/page'))
 const TeacherSelfAttendancePage = lazy(() => import('@/pages/dashboard/teacher/self-attendance/page'))
 
 const StudentDashboard = lazy(() => import('@/pages/dashboard/student/page'))
@@ -89,6 +94,7 @@ const SecurityGuardVisitorManagement = lazy(() => import('@/pages/dashboard/secu
 const SecurityGuardPickupScannerPage = lazy(() => import('@/pages/dashboard/security-guard/pickup-scanner/page'))
 const AdminVisitorLogsPage = lazy(() => import('@/pages/dashboard/admin/visitor-logs/page'))
 const AdminPickupLogsPage = lazy(() => import('@/pages/dashboard/admin/pickup-logs/page'))
+const AdminProxyDashboardPage = lazy(() => import('@/pages/dashboard/admin/proxy/page'))
 const StudentPickupPage = lazy(() => import('@/pages/dashboard/student/pickup/page'))
 const StudentDisciplinePage = lazy(() => import('@/pages/dashboard/student/discipline/page'))
 
@@ -250,6 +256,7 @@ export default function App() {
           <Route path="users/:type/:id" element={withRouteSuspense(<UserDetailsPage />)} />
           <Route path="visitor-logs" element={withRouteSuspense(<AdminVisitorLogsPage />)} />
           <Route path="pickup-logs" element={withRouteSuspense(<AdminPickupLogsPage />)} />
+          <Route path="proxy" element={withRouteSuspense(<AdminProxyDashboardPage />)} />
           <Route path="admission" element={withRouteSuspense(<AdminAdmissionDashboard />)} />
           <Route path="discipline" element={withRouteSuspense(<AdminDisciplinePage />)} />
           {/* Catch-all for unknown admin sub-routes */}

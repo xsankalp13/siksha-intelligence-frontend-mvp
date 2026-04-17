@@ -110,28 +110,17 @@ export default function StaffPage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedStaffType, setSelectedStaffType] = useState<StaffType>("TEACHER");
   const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
-  const [designations, setDesignations] = useState<Designation[]>([]);
   
   const form = useForm<StaffFormData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(staffSchema) as any,
     defaultValues: {
       username: "", email: "", firstName: "", middleName: "", lastName: "",
-<<<<<<< HEAD
       jobTitle: "", hireDate: "", staffType: "TEACHER", gender: "", designationId: "",
-=======
-      jobTitle: "", hireDate: "", staffType: "TEACHER", gender: "",
       category: "TEACHING", department: "", designationCode: "",
->>>>>>> 17f5d3a (feat(pages): update admin staff and student dashboard pages)
       dateOfBirth: "", officeLocation: "", initialPassword: "",
     },
   });
-
-  useEffect(() => {
-    adminService.listDesignations()
-      .then(res => setDesignations(res.data))
-      .catch(console.error);
-  }, []);
 
   // ── Fetch staff (server-side) ─────────────────────────────────────
   const fetchStaff = useCallback(
@@ -810,7 +799,6 @@ export default function StaffPage() {
               </div>
             </div>
 
-<<<<<<< HEAD
             {/* Designation */}
             <div className="space-y-2">
               <Label>Designation *</Label>
@@ -828,9 +816,6 @@ export default function StaffPage() {
             </div>
 
             {/* Job Title + Hire Date */}
-=======
-            {/* Hire Date */}
->>>>>>> 17f5d3a (feat(pages): update admin staff and student dashboard pages)
             <div className="grid grid-cols-2 gap-4">
               {editingStaff && (
                  <div className="space-y-2">

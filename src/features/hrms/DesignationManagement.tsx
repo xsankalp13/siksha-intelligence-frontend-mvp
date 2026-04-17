@@ -31,7 +31,16 @@ import type {
   StaffCategory,
   StaffDesignationCreateUpdateDTO,
   StaffDesignationResponseDTO,
+  TeachingLevel,
 } from "@/services/types/hrms";
+
+const TEACHING_LEVEL_OPTIONS: Array<{ value: TeachingLevel; label: string }> = [
+  { value: "PRIMARY", label: "Primary" },
+  { value: "SECONDARY", label: "Secondary" },
+  { value: "HIGHER_SECONDARY", label: "Higher Secondary" },
+  { value: "PRIMARY_SECONDARY", label: "Primary & Secondary" },
+  { value: "ALL", label: "All Levels" },
+];
 
 const CATEGORY_OPTIONS: Array<{ value: StaffCategory; label: string }> = [
   { value: "TEACHING", label: "Teaching" },
@@ -47,6 +56,7 @@ const initialForm: StaffDesignationCreateUpdateDTO = {
   sortOrder: 0,
   defaultSalaryTemplateRef: undefined,
   defaultGradeRef: undefined,
+  teachingLevel: undefined,
 };
 
 const categoryBadgeVariant: Record<StaffCategory, "default" | "secondary" | "outline"> = {
@@ -142,6 +152,7 @@ export default function DesignationManagement() {
       sortOrder: row.sortOrder,
       defaultSalaryTemplateRef: salaryTemplates?.find(t => t.templateId === row.defaultSalaryTemplateId)?.uuid,
       defaultGradeRef: staffGrades?.find(g => g.gradeId === row.defaultGradeId)?.uuid,
+      teachingLevel: row.teachingLevel,
     });
     setFieldErrors({});
     setFormOpen(true);
@@ -170,6 +181,18 @@ export default function DesignationManagement() {
         key: "defaultGradeCode",
         header: "Grade",
         render: (row) => row.defaultGradeCode || <span className="text-muted-foreground">-</span>,
+      },
+      {
+        key: "teachingLevel",
+        header: "Teaching Level",
+        render: (row) =>
+          row.teachingLevel ? (
+            <Badge variant="outline" className="text-xs">
+              {TEACHING_LEVEL_OPTIONS.find((o) => o.value === row.teachingLevel)?.label ?? row.teachingLevel}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          ),
       },
       {
         key: "active",
@@ -302,6 +325,33 @@ export default function DesignationManagement() {
                 placeholder="Optional description"
               />
             </div>
+
+            {form.category === "TEACHING" && (
+              <div className="grid gap-2">
+                <Label>
+                  Teaching Level{" "}
+                  <span className="text-xs font-normal text-muted-foreground">(backend field pending)</span>
+                </Label>
+                <Select
+                  value={form.teachingLevel ?? "none"}
+                  onValueChange={(value) =>
+                    setForm((p) => ({ ...p, teachingLevel: value === "none" ? undefined : (value as TeachingLevel) }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Not specified" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not specified</SelectItem>
+                    {TEACHING_LEVEL_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

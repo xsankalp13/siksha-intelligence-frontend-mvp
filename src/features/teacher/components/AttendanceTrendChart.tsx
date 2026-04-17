@@ -49,6 +49,17 @@ export default function AttendanceTrendChart() {
     };
   }, []);
 
+  // Resolve current school's present short code from types config
+  const { data: attendanceTypes } = useQuery({
+    queryKey: ["ams", "types"],
+    queryFn: async () => (await attendanceService.getAllTypes()).data,
+    staleTime: 5 * 60 * 1000,
+  });
+  const presentCode = useMemo(
+    () => attendanceTypes?.find((t) => t.presentMark)?.shortCode ?? "P",
+    [attendanceTypes]
+  );
+
   const { data } = useQuery({
     queryKey: ["teacher", "attendance-trend", fromDate, toDate],
     queryFn: async () =>
@@ -56,7 +67,7 @@ export default function AttendanceTrendChart() {
         fromDate,
         toDate,
         page: 0,
-        size: 5000,
+        size: 9999,
       })).data,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -69,7 +80,7 @@ export default function AttendanceTrendChart() {
       const key = String(record.attendanceDate).slice(0, 10);
       const prev = byDate.get(key) ?? { present: 0, total: 0 };
       prev.total += 1;
-      if (record.attendanceTypeShortCode === "P") prev.present += 1;
+      if (record.attendanceTypeShortCode === presentCode) prev.present += 1;
       byDate.set(key, prev);
     });
 

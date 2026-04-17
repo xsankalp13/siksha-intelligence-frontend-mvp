@@ -64,6 +64,9 @@ export interface CalendarMonthSummary {
 }
 
 // ── Staff Designations ───────────────────────────────────────────────
+/** Teaching level this designation targets. Backend field is pending — stored for future use. */
+export type TeachingLevel = "PRIMARY" | "SECONDARY" | "HIGHER_SECONDARY" | "PRIMARY_SECONDARY" | "ALL";
+
 export interface StaffDesignationCreateUpdateDTO {
   designationCode: string;
   designationName: string;
@@ -72,6 +75,8 @@ export interface StaffDesignationCreateUpdateDTO {
   sortOrder?: number;
   defaultSalaryTemplateRef?: string;
   defaultGradeRef?: string;
+  /** Teaching level (backend field pending) */
+  teachingLevel?: TeachingLevel;
 }
 
 export interface StaffDesignationResponseDTO {
@@ -87,6 +92,8 @@ export interface StaffDesignationResponseDTO {
   defaultSalaryTemplateName?: string;
   defaultGradeId?: number;
   defaultGradeCode?: string;
+  /** Teaching level (backend field pending) */
+  teachingLevel?: TeachingLevel;
   createdAt: string;
   updatedAt: string;
 }
@@ -603,7 +610,8 @@ export interface AttendanceHeatmapDTO {
   data: Record<string, number>;
 }
 
-export type LoanStatus = "PENDING" | "APPROVED" | "ACTIVE" | "CLOSED" | "REJECTED" | "CANCELLED";
+/** Unified loan lifecycle states */
+export type LoanStatus = "PENDING" | "APPROVED" | "DISBURSED" | "ACTIVE" | "CLOSED" | "REJECTED" | "CANCELLED";
 
 export interface LoanResponseDTO {
   uuid: string;
@@ -622,7 +630,8 @@ export interface LoanResponseDTO {
   createdAt: string;
 }
 
-export type OvertimeStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
+/** Unified overtime approval states */
+export type OvertimeStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID" | "INCLUDED_IN_PAYROLL";
 
 export interface OvertimeResponseDTO {
   uuid: string;
@@ -1009,7 +1018,7 @@ export interface CourseCertificateDTO {
 }
 
 // ── Phase 3 — Loans ───────────────────────────────────────────────────
-export type LoanStatus = "PENDING" | "APPROVED" | "DISBURSED" | "ACTIVE" | "CLOSED" | "REJECTED";
+// LoanStatus is defined above (unified)
 export type RepaymentStatus = "SCHEDULED" | "DEDUCTED" | "OVERDUE";
 
 export interface StaffLoanDTO {
@@ -1107,7 +1116,7 @@ export interface ExpenseClaimItemCreateDTO {
 }
 
 // ── Phase 3 — Overtime & Comp-Off ─────────────────────────────────────
-export type OvertimeStatus = "PENDING" | "APPROVED" | "REJECTED" | "INCLUDED_IN_PAYROLL";
+// OvertimeStatus is defined above (unified)
 
 export interface OvertimeRecordDTO {
   uuid: string;

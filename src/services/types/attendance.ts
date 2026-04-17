@@ -147,8 +147,15 @@ export interface StaffDailyStatsResponseDTO {
   present: number;
   absent: number;
   late: number;
+  halfDay: number;
   onLeave: number;
   unmarkedCount: number;
+}
+
+export interface MarkAllResponseDTO {
+  marked: number;
+  type: string;
+  date: string;
 }
 
 // ── Staff Attendance Completion ───────────────────────────────────────

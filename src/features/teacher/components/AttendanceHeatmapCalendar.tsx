@@ -43,6 +43,16 @@ function weekdayMonZero(date: Date) {
 export default function AttendanceHeatmapCalendar() {
   const { fromDate, toDate } = useMemo(() => monthRange(), []);
 
+  const { data: attendanceTypes } = useQuery({
+    queryKey: ["ams", "types"],
+    queryFn: async () => (await attendanceService.getAllTypes()).data,
+    staleTime: 5 * 60 * 1000,
+  });
+  const presentCode = useMemo(
+    () => attendanceTypes?.find((t) => t.presentMark)?.shortCode ?? "P",
+    [attendanceTypes]
+  );
+
   const { data } = useQuery({
     queryKey: ["teacher", "attendance-heatmap", fromDate, toDate],
     queryFn: async () =>
@@ -50,7 +60,7 @@ export default function AttendanceHeatmapCalendar() {
         fromDate,
         toDate,
         page: 0,
-        size: 1000,
+        size: 9999,
       })).data,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -62,11 +72,11 @@ export default function AttendanceHeatmapCalendar() {
       const key = String(record.attendanceDate).slice(0, 10);
       const prev = map.get(key) ?? { present: 0, total: 0 };
       prev.total += 1;
-      if (record.attendanceTypeShortCode === "P") prev.present += 1;
+      if (record.attendanceTypeShortCode === presentCode) prev.present += 1;
       map.set(key, prev);
     });
     return map;
-  }, [data?.content]);
+  }, [data?.content, presentCode]);
 
   const days = useMemo(() => {
     const start = new Date(fromDate);
