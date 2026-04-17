@@ -66,6 +66,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 
   { label: "Transport", path: "/dashboard/admin/transport", icon: Bus },
   { label: "Admission", path: "/dashboard/admin/admission", icon: ClipboardSignature },
+  { label: "Discipline", path: "/dashboard/admin/discipline", icon: MessageSquare },
   { label: "Settings", path: "/dashboard/admin/settings", icon: Settings },
   { label: "ID Cards", path: "/dashboard/admin/id-cards", icon: CreditCard },
   { label: "Visitor Logs", path: "/dashboard/admin/visitor-logs", icon: ClipboardList },
@@ -144,6 +145,11 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
     icon: Bell,
   },
   {
+    label: "Discipline",
+    path: "/dashboard/student/discipline",
+    icon: MessageSquare,
+  },
+  {
     label: "Past Papers",
     path: "/dashboard/student/past-papers",
     icon: Archive,
@@ -217,6 +223,11 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
     label: "Evaluation",
     path: "/dashboard/teacher/evaluation",
     icon: FileCheck,
+  },
+  {
+    label: "Discipline",
+    path: "/dashboard/teacher/discipline",
+    icon: MessageSquare,
   },
 ];
 
