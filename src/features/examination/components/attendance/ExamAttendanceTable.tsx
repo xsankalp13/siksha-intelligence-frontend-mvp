@@ -3,7 +3,7 @@ import { useMarkAttendanceMutation } from '@/features/examination/hooks/useExamA
 import type { ExamRoomStudentResponseDTO, ExamAttendanceStatus, ExamAttendanceMarkEntryDTO } from '@/services/types/examAttendance';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ExamAttendanceTableProps {
@@ -152,6 +152,42 @@ export function ExamAttendanceTable({
         });
     };
 
+    const renderActionButtons = (studentId: number, status: ExamAttendanceStatus | null, malpractice: boolean, isRowDisabled: boolean) => (
+        <>
+            <button
+                onClick={() => handleMark(studentId, status === 'PRESENT' ? 'ABSENT' : 'PRESENT', malpractice && status === 'PRESENT' ? false : malpractice)}
+                disabled={isRowDisabled}
+                className={cn(
+                    "flex-1 md:flex-none flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold transition-colors text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50",
+                    status === 'PRESENT' ? "bg-emerald-500 hover:bg-emerald-600 text-white ring-emerald-300" : 
+                    status === 'ABSENT' ? "bg-red-500 hover:bg-red-600 text-white ring-red-300" : 
+                    "bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-200"
+                )}
+            >
+                {status === 'PRESENT' ? <CheckCircle2 className="w-3.5 h-3.5" /> : 
+                 status === 'ABSENT' ? <XCircle className="w-3.5 h-3.5" /> : 
+                 <CheckCircle2 className="w-3.5 h-3.5 opacity-40" />}
+                {status === 'PRESENT' ? 'Present' : 
+                 status === 'ABSENT' ? 'Absent' : 
+                 'Not Marked'}
+            </button>
+
+            <button
+                onClick={() => handleMark(studentId, status !== 'ABSENT' ? (status || 'PRESENT') : 'PRESENT', !malpractice)}
+                disabled={isRowDisabled}
+                className={cn(
+                    "flex-1 md:flex-none flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold transition-colors text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50",
+                    malpractice ? "bg-amber-500 hover:bg-amber-600 text-white ring-amber-300" : 
+                    "bg-transparent hover:bg-slate-100 text-slate-400 border border-transparent hover:border-slate-200"
+                )}
+                title="Report Malpractice"
+            >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Malpractice
+            </button>
+        </>
+    );
+
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center bg-card p-4 rounded-lg shadow-sm border">
@@ -164,7 +200,36 @@ export function ExamAttendanceTable({
                 </div>
             </div>
 
-            <div className="border rounded-lg overflow-x-auto">
+            {/* Mobile View */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
+                {students.map((student) => {
+                    const state = localState[student.studentId] || { status: student.attendanceStatus, malpractice: student.malpractice || false, dirty: false, isSaving: false };
+                    const status = state.status;
+                    const malpractice = state.malpractice;
+                    const isRowSaving = state.isSaving;
+                    const isRowDisabled = isFinalized;
+
+                    return (
+                        <div key={student.studentId} className={cn("p-4 bg-card border rounded-xl shadow-sm relative overflow-hidden transition-opacity flex flex-col gap-3", isRowSaving && "opacity-60")}>
+                            <div className="flex justify-between items-start gap-2">
+                                <div className="space-y-0.5">
+                                    <p className="font-semibold text-sm leading-tight text-foreground">{student.studentName}</p>
+                                    <p className="text-xs text-muted-foreground">{student.className} • Roll {student.rollNo || '-'}</p>
+                                </div>
+                                <div className="px-2.5 py-1 bg-muted/70 text-muted-foreground rounded text-[10px] font-bold tracking-wider uppercase shrink-0">
+                                    Seat {student.seatNumber || '-'}
+                                </div>
+                            </div>
+                            <div className="flex justify-center gap-2 pt-3 border-t border-border/40 mt-auto">
+                                {renderActionButtons(student.studentId, status, malpractice, isRowDisabled)}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Desktop View */}
+            <div className="hidden md:block border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs uppercase bg-muted/50 sticky top-0">
                         <tr>
@@ -190,34 +255,8 @@ export function ExamAttendanceTable({
                                     <td className="px-6 py-4">{student.studentName}</td>
                                     <td className="px-6 py-4">{student.className}</td>
                                     <td className="px-6 py-4">
-                                        <div className="flex justify-center space-x-2">
-                                            <Button
-                                                size="sm"
-                                                variant={status === 'PRESENT' ? 'default' : 'outline'}
-                                                className={cn("w-12", status === 'PRESENT' && "bg-green-600 hover:bg-green-700")}
-                                                disabled={isRowDisabled}
-                                                onClick={() => handleMark(student.studentId, 'PRESENT', malpractice)}
-                                            >
-                                                P
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant={status === 'ABSENT' ? 'default' : 'outline'}
-                                                className={cn("w-12", status === 'ABSENT' && "bg-red-600 hover:bg-red-700")}
-                                                disabled={isRowDisabled}
-                                                onClick={() => handleMark(student.studentId, 'ABSENT', false)}
-                                            >
-                                                A
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant={malpractice ? 'default' : 'outline'}
-                                                className={cn("w-12", malpractice && "bg-yellow-600 hover:bg-yellow-700 text-white")}
-                                                disabled={isRowDisabled}
-                                                onClick={() => handleMark(student.studentId, status !== 'ABSENT' ? (status || 'PRESENT') : 'PRESENT', !malpractice)}
-                                            >
-                                                M
-                                            </Button>
+                                        <div className="flex justify-center flex-wrap gap-2">
+                                            {renderActionButtons(student.studentId, status, malpractice, isRowDisabled)}
                                         </div>
                                     </td>
                                 </tr>
