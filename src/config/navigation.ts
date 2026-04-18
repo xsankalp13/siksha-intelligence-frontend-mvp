@@ -191,4 +191,9 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
     path: "/dashboard/teacher/evaluation",
     icon: FileCheck,
   },
+  {
+    label: "Exam Attendance",
+    path: "/dashboard/invigilator/attendance",
+    icon: DoorOpen,
+  },
 ];

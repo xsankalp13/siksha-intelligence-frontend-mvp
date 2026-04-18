@@ -42,6 +42,9 @@ const TeacherEvaluationPage = lazy(() => import('@/pages/dashboard/teacher/evalu
 const TeacherMyClassPage = lazy(() => import('@/pages/dashboard/teacher/my-class/page'))
 const TeacherLectureLogsPage = lazy(() => import('@/pages/dashboard/teacher/lecture-logs/page'))
 
+const InvigilatorRoomsPage = lazy(() => import('@/pages/dashboard/invigilator/attendance/page'))
+const RoomAttendancePage = lazy(() => import('@/pages/dashboard/invigilator/attendance/[roomId]/page'))
+
 const StudentDashboard = lazy(() => import('@/pages/dashboard/student/page'))
 const StudentProfilePage = lazy(() => import('@/pages/dashboard/student/profile/page'))
 const StudentTimetablePage = lazy(() => import('@/pages/dashboard/student/timetable/page'))
@@ -166,6 +169,22 @@ export default function App() {
           <Route path="lecture-logs" element={withRouteSuspense(<TeacherLectureLogsPage />)} />
           <Route path="evaluation" element={withRouteSuspense(<TeacherEvaluationPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/teacher" replace />} />
+        </Route>
+
+        {/* Invigilator Routes */}
+        <Route
+          path="/dashboard/invigilator"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']}>
+                <TeacherLayout />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        >
+          <Route path="attendance" element={withRouteSuspense(<InvigilatorRoomsPage />)} />
+          <Route path="attendance/:examScheduleId/:roomId" element={withRouteSuspense(<RoomAttendancePage />)} />
+          <Route path="*" element={<Navigate to="/dashboard/invigilator/attendance" replace />} />
         </Route>
 
         {/* Student Dashboard - All roles (students and above) */}
