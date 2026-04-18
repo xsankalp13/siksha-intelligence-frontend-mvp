@@ -6,6 +6,7 @@ import AdminLayout from '@/components/layout/AdminLayout'
 
 import HrmsLayout from '@/components/layout/HrmsLayout'
 import StudentLayout from '@/components/layout/StudentLayout'
+import ParentLayout from '@/components/layout/ParentLayout'
 import { GuestOnly } from '@/routes/GuestOnly'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { RoleBasedRoute } from '@/routes/RoleBasedRoute'
@@ -97,6 +98,20 @@ const AdminProxyDashboardPage = lazy(() => import('@/pages/dashboard/admin/proxy
 const StudentPickupPage = lazy(() => import('@/pages/dashboard/student/pickup/page'))
 const StudentDisciplinePage = lazy(() => import('@/pages/dashboard/student/discipline/page'))
 
+
+const ParentDashboardPage = lazy(() => import('@/pages/dashboard/parent/page'))
+const ParentAcademicsPage = lazy(() => import('@/pages/dashboard/parent/academics/page'))
+const ParentAttendancePage = lazy(() => import('@/pages/dashboard/parent/attendance/page'))
+const ParentHomeworkPage = lazy(() => import('@/pages/dashboard/parent/homework/page'))
+const ParentFeesPage = lazy(() => import('@/pages/dashboard/parent/fees/page'))
+const ParentCommunicationPage = lazy(() => import('@/pages/dashboard/parent/communication/page'))
+const ParentCalendarPage = lazy(() => import('@/pages/dashboard/parent/calendar/page'))
+const ParentTransportPage = lazy(() => import('@/pages/dashboard/parent/transport/page'))
+const ParentHealthPage = lazy(() => import('@/pages/dashboard/parent/health/page'))
+const ParentDocumentsPage = lazy(() => import('@/pages/dashboard/parent/documents/page'))
+const ParentNotificationsPage = lazy(() => import('@/pages/dashboard/parent/notifications/page'))
+const ParentProfilePage = lazy(() => import('@/pages/dashboard/parent/profile/page'))
+const ParentStudentProfilePage = lazy(() => import('@/pages/dashboard/parent/student-profile/page'))
 
 const SuperAdminOverviewPage = lazy(() => import('@/pages/dashboard/super-admin/overview/page'))
 const SuperAdminUsersPage = lazy(() => import('@/pages/dashboard/super-admin/users/page'))
@@ -328,6 +343,33 @@ export default function App() {
           <Route path="results" element={withRouteSuspense(<StudentResultsPage />)} />
           <Route path="past-papers" element={withRouteSuspense(<StudentPastPapersPage />)} />
           <Route path="admit-cards" element={withRouteSuspense(<StudentAdmitCardsPage />)} />
+        </Route>
+
+        {/* Parent Dashboard */}
+        <Route
+          path="/dashboard/parent"
+          element={
+            <ProtectedRoute>
+              <RoleBasedRoute allowedRoles={['SUPER_ADMIN', 'ADMIN', 'PARENT', 'GUARDIAN']}>
+                <ParentLayout />
+              </RoleBasedRoute>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={withRouteSuspense(<ParentDashboardPage />)} />
+          <Route path="academics" element={withRouteSuspense(<ParentAcademicsPage />)} />
+          <Route path="attendance" element={withRouteSuspense(<ParentAttendancePage />)} />
+          <Route path="homework" element={withRouteSuspense(<ParentHomeworkPage />)} />
+          <Route path="fees" element={withRouteSuspense(<ParentFeesPage />)} />
+          <Route path="communication" element={withRouteSuspense(<ParentCommunicationPage />)} />
+          <Route path="calendar" element={withRouteSuspense(<ParentCalendarPage />)} />
+          <Route path="transport" element={withRouteSuspense(<ParentTransportPage />)} />
+          <Route path="health" element={withRouteSuspense(<ParentHealthPage />)} />
+          <Route path="documents" element={withRouteSuspense(<ParentDocumentsPage />)} />
+          <Route path="notifications" element={withRouteSuspense(<ParentNotificationsPage />)} />
+          <Route path="profile" element={withRouteSuspense(<ParentProfilePage />)} />
+          <Route path="student-profile" element={withRouteSuspense(<ParentStudentProfilePage />)} />
+          <Route path="*" element={<Navigate to="/dashboard/parent" replace />} />
         </Route>
 
         {/* Redirect all unknown routes to home (which will redirect to login if not authenticated) */}

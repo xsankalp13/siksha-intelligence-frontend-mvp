@@ -141,6 +141,22 @@ export const login = createAsyncThunk<LoginResponse, LoginRequest, { rejectValue
         rememberMe: credentials.rememberMe,
       }
 
+      // Bypass for mock parent user
+      if (credentials.username.toLowerCase() === 'parent') {
+        const mockResponse = {
+          accessToken: "mock-token-parent-1234",
+          requiresPasswordChange: false,
+          user: {
+            userId: "parent-1",
+            username: "parentUser",
+            email: "parent@edusync.com",
+            roles: ["PARENT"],
+            profileUrl: undefined
+          }
+        };
+        return mockResponse;
+      }
+
       const res = await api.post('/auth/login', payload, { withCredentials: true })
       return normalizeLoginResponse(res.data)
     } catch (err) {

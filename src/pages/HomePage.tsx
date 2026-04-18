@@ -15,7 +15,9 @@ export default function HomePage() {
       TEACHER: '/dashboard/teacher',
       STUDENT: '/dashboard/student',
       APPLICANT: '/dashboard/applicant',
+      PARENT: '/dashboard/parent',
     }
+
 
     // Helper to normalize role (strip ROLE_ prefix if present)
     const normalizeRole = (role: string): string => {
