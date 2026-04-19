@@ -63,6 +63,7 @@ export interface CreateTeacherRequestDTO extends CreateUserRequestDTO {
   certifications?: string[];
   classesToTeach?: string[];
   staffType?: StaffType;
+  designationCode: string;
 }
 
 // Principal
@@ -75,6 +76,7 @@ export interface CreatePrincipalRequestDTO extends CreateUserRequestDTO {
   administrativeCertifications?: string[];
   schoolLevelManaged?: SchoolLevel;
   staffType?: StaffType;
+  designationCode: string;
 }
 
 // Librarian
@@ -86,6 +88,17 @@ export interface CreateLibrarianRequestDTO extends CreateUserRequestDTO {
   officeLocation?: string;
   librarySystemPermissions?: string[];
   hasMlisDegree?: boolean;
+  staffType?: StaffType;
+  designationCode: string;
+}
+
+// Security Guard
+export interface CreateSecurityGuardRequestDTO extends CreateUserRequestDTO {
+  jobTitle: string;
+  hireDate: string;
+  officeLocation?: string;
+  designationId?: number;
+  category?: string;
   staffType?: StaffType;
 }
 
@@ -133,6 +146,8 @@ export interface UpdateStaffRequestDTO {
   officeLocation?: string;
   department?: Department;
   staffType?: StaffType;
+  designationId?: number;
+  category?: string;
   teachableSubjectIds?: string[];
 }
 

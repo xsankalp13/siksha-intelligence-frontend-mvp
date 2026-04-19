@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   CheckCircle2, Clock3, UserX, Users, Search, CalendarDays,
-  Filter, UserCheck, ChevronDown, ChevronUp, MapPin, Clock, ChevronLeft, ChevronRight, AlertTriangle
+  Filter, UserCheck, ChevronDown, ChevronUp, MapPin, Clock, ChevronLeft, ChevronRight, AlertTriangle,
+  UserMinus, Timer
 } from "lucide-react";
 import AttendanceStatusBadge from "@/components/shared/AttendanceStatusBadge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { attendanceService } from "@/services/attendance";
 import { hrmsService } from "@/services/hrms";
 import { getLocalDateString } from "@/lib/dateUtils";
@@ -71,7 +73,7 @@ export default function StaffAttendanceManager() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [isMarkingAbsent, setIsMarkingAbsent] = useState(false);
+  const [testMode, setTestMode] = useState(false);
   const [page, setPage] = useState(0);
   const pageSize = 15;
 
@@ -140,33 +142,40 @@ export default function StaffAttendanceManager() {
         present: statsData.present,
         absent: statsData.absent,
         late: statsData.late,
+        halfDay: statsData.halfDay ?? 0,
         leave: statsData.onLeave,
         unmarked: statsData.unmarkedCount,
       };
     }
-    return { total: 0, present: 0, absent: 0, late: 0, leave: 0, unmarked: unmarked?.length ?? 0 };
+    return { total: 0, present: 0, absent: 0, late: 0, halfDay: 0, leave: 0, unmarked: unmarked?.length ?? 0 };
   }, [statsData, unmarked]);
 
-  const handleMarkRemainingAbsent = async () => {
-    if (!unmarked || unmarked.length === 0) return;
-    try {
-      setIsMarkingAbsent(true);
-      const payload = unmarked.map((staff) => ({
-        staffUuid: staff.uuid,
-        staffId: staff.staffId,
-        attendanceDate: selectedDate,
-        attendanceShortCode: "A",
-        source: "SYSTEM" as const,
-      }));
-      await attendanceService.createStaffAttendanceBulk(payload);
-      toast.success(`Successfully marked ${payload.length} staff as absent.`);
+  const isFutureDate = selectedDate > getLocalDateString();
+
+  const markAllPresentMut = useMutation({
+    mutationFn: () => attendanceService.markAllPresent(selectedDate, testMode).then(r => r.data),
+    onSuccess: (data) => {
+      toast.success(`Marked ${data.marked} staff as Present (leave-holders skipped).`);
       queryClient.invalidateQueries({ queryKey: ["ams", "staff"] });
-    } catch (err) {
-      toast.error("Failed to mark remaining staff as absent");
-    } finally {
-      setIsMarkingAbsent(false);
-    }
-  };
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || "Failed to mark all as present");
+    },
+  });
+
+  const markAllAbsentMut = useMutation({
+    mutationFn: () => attendanceService.markAllAbsent(selectedDate, testMode).then(r => r.data),
+    onSuccess: (data) => {
+      toast.success(`Marked ${data.marked} staff as Absent (leave-holders skipped).`);
+      queryClient.invalidateQueries({ queryKey: ["ams", "staff"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || "Failed to mark all as absent");
+    },
+  });
+
+  const isBulkBusy = markAllPresentMut.isPending || markAllAbsentMut.isPending;
+  const canBulkMark = !isBulkBusy && (unmarked?.length ?? 0) > 0 && !isHoliday && (!isFutureDate || testMode);
 
   const attendanceRate = stats.total > 0
     ? Math.round(((stats.present + stats.late) / stats.total) * 100)
@@ -226,6 +235,9 @@ export default function StaffAttendanceManager() {
             <SelectItem value="LATE">
               <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500" /> Late</span>
             </SelectItem>
+            <SelectItem value="HALF_DAY">
+              <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-orange-500" /> Half Day</span>
+            </SelectItem>
             <SelectItem value="ON_LEAVE">
               <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500" /> On Leave</span>
             </SelectItem>
@@ -241,20 +253,56 @@ export default function StaffAttendanceManager() {
             className="pl-9 h-9"
           />
         </div>
+      </div>
+
+      {/* Bulk actions bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button 
+          variant="default"
+          size="sm" 
+          className="h-9 bg-emerald-600 hover:bg-emerald-700" 
+          disabled={!canBulkMark}
+          onClick={() => markAllPresentMut.mutate()}
+        >
+          <UserCheck className="mr-1.5 h-3.5 w-3.5" />
+          {markAllPresentMut.isPending ? "Marking..." : "Mark All Present"}
+        </Button>
 
         <Button 
-          variant="outline" 
+          variant="destructive"
           size="sm" 
           className="h-9" 
-          disabled={isMarkingAbsent || (unmarked?.length ?? 0) === 0 || selectedDate >= getLocalDateString() || isHoliday}
-          onClick={handleMarkRemainingAbsent}
+          disabled={!canBulkMark}
+          onClick={() => markAllAbsentMut.mutate()}
         >
-          {isMarkingAbsent ? "Marking..." : "Mark Remaining as Absent"}
+          <UserMinus className="mr-1.5 h-3.5 w-3.5" />
+          {markAllAbsentMut.isPending ? "Marking..." : "Mark All Absent"}
         </Button>
+
+        {(unmarked?.length ?? 0) > 0 && (
+          <span className="text-xs text-muted-foreground">
+            {unmarked?.length} unmarked staff • leave-holders auto-skipped
+          </span>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          <label htmlFor="test-mode-toggle" className="text-xs text-muted-foreground cursor-pointer">Test Mode</label>
+          <Switch
+            id="test-mode-toggle"
+            checked={testMode}
+            onCheckedChange={setTestMode}
+            className="data-[state=checked]:bg-amber-500"
+          />
+          {testMode && (
+            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 bg-amber-50">
+              Future dates allowed
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
         <Card className="border-l-4 border-l-slate-400">
           <CardContent className="p-3 flex items-center gap-3">
             <Users className="h-5 w-5 text-slate-500" />
@@ -288,6 +336,15 @@ export default function StaffAttendanceManager() {
             <div>
               <p className="text-xl font-bold text-amber-600">{stats.late}</p>
               <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">Late</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-orange-500">
+          <CardContent className="p-3 flex items-center gap-3">
+            <Timer className="h-5 w-5 text-orange-500" />
+            <div>
+              <p className="text-xl font-bold text-orange-600">{stats.halfDay}</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">Half Day</p>
             </div>
           </CardContent>
         </Card>

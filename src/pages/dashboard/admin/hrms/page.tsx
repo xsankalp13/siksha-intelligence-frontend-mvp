@@ -8,11 +8,10 @@ import StaffGradingTab from "@/features/hrms/StaffGradingTab";
 import StaffAttendanceTab from "@/features/hrms/StaffAttendanceTab";
 import DesignationManagement from "@/features/hrms/DesignationManagement";
 import ShiftManagement from "@/features/hrms/ShiftManagement";
-import StudentAttendanceReview from "@/features/hrms/StudentAttendanceReview";
 import AttendanceTrendDashboard from "@/features/hrms/AttendanceTrendDashboard";
 import {
   LayoutDashboard, CalendarDays, CheckSquare, Building2, Award,
-  ClipboardCheck, GraduationCap, TrendingUp, Clock, Wallet, CreditCard,
+  ClipboardCheck, TrendingUp, Clock, Wallet, CreditCard,
 } from "lucide-react";
 
 const LeaveManagement = lazy(() => import("@/features/hrms/LeaveManagement"));
@@ -46,7 +45,6 @@ export default function AdminHrmsPage() {
           <TabsTrigger value="designations" className="gap-1.5 text-xs"><Building2 className="h-3.5 w-3.5" />Designations</TabsTrigger>
           <TabsTrigger value="grades" className="gap-1.5 text-xs"><Award className="h-3.5 w-3.5" />Grades</TabsTrigger>
           <TabsTrigger value="attendance" className="gap-1.5 text-xs"><ClipboardCheck className="h-3.5 w-3.5" />Attendance</TabsTrigger>
-          <TabsTrigger value="student-attendance" className="gap-1.5 text-xs"><GraduationCap className="h-3.5 w-3.5" />Students</TabsTrigger>
           <TabsTrigger value="trends" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" />Trends</TabsTrigger>
           <TabsTrigger value="shifts" className="gap-1.5 text-xs"><Clock className="h-3.5 w-3.5" />Shifts</TabsTrigger>
           <TabsTrigger value="salary-setup" className="gap-1.5 text-xs"><Wallet className="h-3.5 w-3.5" />Salary</TabsTrigger>
@@ -80,10 +78,6 @@ export default function AdminHrmsPage() {
 
         <TabsContent value="attendance" className="mt-4">
           <StaffAttendanceTab />
-        </TabsContent>
-
-        <TabsContent value="student-attendance" className="mt-4">
-          <StudentAttendanceReview />
         </TabsContent>
 
         <TabsContent value="trends" className="mt-4">

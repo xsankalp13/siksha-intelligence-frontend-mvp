@@ -82,6 +82,18 @@ export default function TeacherMyLeaves() {
     },
   });
 
+  const leaveBalancesQuery = useQuery({
+    queryKey: ["hrms", "leave-balances", "me"],
+    queryFn: () => hrmsService.getMyLeaveBalance().then((res) => res.data),
+  });
+
+  const getBalanceText = (leaveTypeCode: string) => {
+    if (!leaveBalancesQuery.data) return "";
+    const balance = leaveBalancesQuery.data.find(b => b.leaveTypeCode === leaveTypeCode);
+    if (!balance) return " - Balance: 0";
+    return ` - Balance: ${balance.remaining}`;
+  };
+
   const leavesQuery = useQuery({
     queryKey: ["hrms", "self", "leaves", status],
     queryFn: async () => {
@@ -243,6 +255,18 @@ export default function TeacherMyLeaves() {
             <DialogDescription>Submit leave request from self-service portal.</DialogDescription>
           </DialogHeader>
 
+          {/* Quick Balance Overview */}
+          {!leaveBalancesQuery.isLoading && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              <span className="text-xs font-semibold text-muted-foreground w-full">Available Balances:</span>
+              {(leaveBalancesQuery.data ?? []).map((b) => (
+                <Badge key={b.balanceId} variant={b.remaining > 0 ? "secondary" : "outline"} className="text-xs">
+                  {b.leaveTypeCode}: {b.remaining} left
+                </Badge>
+              ))}
+            </div>
+          )}
+
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
               <Label>Leave Type</Label>
@@ -256,7 +280,7 @@ export default function TeacherMyLeaves() {
                 <SelectContent>
                   {(leaveTypesQuery.data ?? []).map((type) => (
                     <SelectItem key={type.leaveTypeId} value={type.uuid}>
-                      {type.displayName} ({type.leaveCode})
+                      {type.displayName} ({type.leaveCode}){getBalanceText(type.leaveCode)}
                     </SelectItem>
                   ))}
                 </SelectContent>

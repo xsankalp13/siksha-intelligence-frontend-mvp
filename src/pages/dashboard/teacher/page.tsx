@@ -27,6 +27,7 @@ import WeeklyTeachingChart from "@/features/teacher/components/WeeklyTeachingCha
 import AttendanceTrendChart from "@/features/teacher/components/AttendanceTrendChart";
 import ClassDistributionChart from "@/features/teacher/components/ClassDistributionChart";
 import DashboardSkeleton from "@/features/teacher/skeletons/DashboardSkeleton";
+import ProxyScheduleBanner from "@/features/teacher/components/ProxyScheduleBanner";
 import { attendanceService } from "@/services/attendance";
 import type { TeacherScheduleEntry } from "@/services/types/teacher";
 
@@ -169,6 +170,12 @@ export default function TeacherDashboardPage() {
         className="space-y-6"
       >
         <KpiRibbon summary={summary} />
+
+        {schedule?.staffUuid && (
+          <ErrorBoundary fallback={null}>
+            <ProxyScheduleBanner staffUuid={schedule.staffUuid} />
+          </ErrorBoundary>
+        )}
 
         {!alertsDismissed && alerts.length > 0 ? (
           <div className="rounded-2xl border bg-card p-4 shadow-sm">

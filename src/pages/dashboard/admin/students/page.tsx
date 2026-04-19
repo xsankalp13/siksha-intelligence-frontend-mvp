@@ -16,8 +16,13 @@ import {
   Printer,
   CreditCard,
   Camera,
+  Users,
+  ClipboardCheck
 } from "lucide-react";
 import { toast } from "sonner";
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import StudentAttendanceReview from "@/features/hrms/StudentAttendanceReview";
 
 import StatusBadge from "@/components/common/StatusBadge";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -435,236 +440,249 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      {/* Search + Refresh bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Search by name, email, roll no…"
-            value={searchInput}
-            onChange={(e) => handleSearchChange(e.target.value)}
-          />
-        </div>
-        
-        {/* Class Filter */}
-        <Select value={classFilter || "ALL"} onValueChange={handleClassFilterChange}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="All Classes" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All Classes</SelectItem>
-            {classes.map((c) => (
-              <SelectItem key={c.classId} value={c.name}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <Tabs defaultValue="directory" className="w-full">
+        <TabsList className="h-auto flex flex-wrap justify-start gap-1 bg-muted/60 p-1.5 rounded-xl mb-6">
+          <TabsTrigger value="directory" className="gap-1.5 text-xs"><Users className="h-3.5 w-3.5" /> Directory</TabsTrigger>
+          <TabsTrigger value="attendance" className="gap-1.5 text-xs"><ClipboardCheck className="h-3.5 w-3.5" /> Attendance</TabsTrigger>
+        </TabsList>
 
-        {/* Section Filter (Only visible if a class is selected & has sections) */}
-        {(() => {
-          const filterClassObj = classes.find((c) => c.name === classFilter);
-          if (!filterClassObj || filterClassObj.sections.length === 0) return null;
-          
-          return (
-            <Select 
-              value={sectionFilter || "ALL"} 
-              onValueChange={(v) => { setSectionFilter(v === "ALL" ? "" : v); setPage(0); }}
-            >
+        <TabsContent value="directory" className="space-y-6 mt-0">
+          {/* Search + Refresh bar */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Search by name, email, roll no…"
+                value={searchInput}
+                onChange={(e) => handleSearchChange(e.target.value)}
+              />
+            </div>
+            
+            {/* Class Filter */}
+            <Select value={classFilter || "ALL"} onValueChange={handleClassFilterChange}>
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="All Sections" />
+                <SelectValue placeholder="All Classes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All Sections</SelectItem>
-                {[...filterClassObj.sections]
-                  .sort((a, b) => a.sectionName.localeCompare(b.sectionName, undefined, { numeric: true }))
-                  .map((sec) => (
-                    <SelectItem key={sec.uuid} value={sec.sectionName}>
-                      {sec.sectionName}
-                    </SelectItem>
+                <SelectItem value="ALL">All Classes</SelectItem>
+                {classes.map((c) => (
+                  <SelectItem key={c.classId} value={c.name}>
+                    {c.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          );
-        })()}
 
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => fetchStudents(page, search, classFilter, sectionFilter)}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
-
-      {/* Table */}
-      {loading ? (
-        <TableSkeleton rows={8} columns={6} />
-      ) : students.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 py-16 text-center">
-          <GraduationCap className="h-10 w-10 text-muted-foreground/40" />
-          <p className="font-medium text-foreground">
-            {search ? `No students matching "${search}"` : "No students enrolled yet"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {search ? "Try a different search term" : "Add students individually or upload a CSV file"}
-          </p>
-          {!search && (
-            <div className="flex gap-2 mt-2">
-              <Button variant="outline" onClick={() => setBulkOpen(true)} className="gap-2">
-                <Upload className="h-4 w-4" />Bulk Upload
-              </Button>
-              <Button onClick={openCreate} className="gap-2">
-                <Plus className="h-4 w-4" />Add Student
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border bg-muted/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">#</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Username</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Class</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Roll #</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s, idx) => (
-                <tr
-                  key={s.studentId}
-                  className="border-b border-border/50 transition-colors hover:bg-accent/40"
+            {/* Section Filter (Only visible if a class is selected & has sections) */}
+            {(() => {
+              const filterClassObj = classes.find((c) => c.name === classFilter);
+              if (!filterClassObj || filterClassObj.sections.length === 0) return null;
+              
+              return (
+                <Select 
+                  value={sectionFilter || "ALL"} 
+                  onValueChange={(v) => { setSectionFilter(v === "ALL" ? "" : v); setPage(0); }}
                 >
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {page * PAGE_SIZE + idx + 1}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-foreground">
-                    <Link to={`/dashboard/admin/users/student/${s.uuid}`} className="hover:underline text-primary transition-colors">
-                      {s.firstName} {s.lastName}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                    {s.username}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">
-                    {s.email}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {s.className && s.sectionName
-                      ? `${s.className} – ${s.sectionName}`
-                      : s.className || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                    {s.rollNo ?? "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge variant={s.enrollmentStatus === "ACTIVE" ? "active" : "inactive"}>
-                      {s.enrollmentStatus === "INACTIVE" ? "BLOCKED" : (s.enrollmentStatus ?? "ACTIVE")}
-                    </StatusBadge>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
-                          title="Download ID Card"
-                          onClick={async () => {
-                            try {
-                              const res = await idCardService.downloadStudentIdCard(s.studentId);
-                              triggerBlobDownload(res.data, `student-id-${s.studentId}.pdf`);
-                              toast.success("ID Card downloaded");
-                            } catch (e) {
-                              toast.error("Failed to download ID Card");
-                            }
-                          }}
-                        >
-                          <CreditCard className="h-3.5 w-3.5" />
-                        </Button>
-                      </motion.div>
-                      <Link to={`/dashboard/admin/users/student/${s.uuid}`}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
-                        >
-                          View
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEdit(s)}
-                        className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
-                      >
-                        Edit
-                      </Button>
-                      {s.enrollmentStatus === "INACTIVE" ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setActionTarget({ student: s, action: 'activate' })}
-                          className="h-7 w-[72px] px-2 text-xs text-green-600 hover:text-green-700"
-                        >
-                          Activate
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setActionTarget({ student: s, action: 'block' })}
-                          className="h-7 w-[72px] px-2 text-xs text-destructive hover:text-destructive"
-                        >
-                          Block
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="All Sections" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Sections</SelectItem>
+                    {[...filterClassObj.sections]
+                      .sort((a, b) => a.sectionName.localeCompare(b.sectionName, undefined, { numeric: true }))
+                      .map((sec) => (
+                        <SelectItem key={sec.uuid} value={sec.sectionName}>
+                          {sec.sectionName}
+                        </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              );
+            })()}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-border px-4 py-3">
-              <p className="text-sm text-muted-foreground">
-                Page {page + 1} of {totalPages} · {totalElements} total
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => fetchStudents(page, search, classFilter, sectionFilter)}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+
+          {/* Table */}
+          {loading ? (
+            <TableSkeleton rows={8} columns={6} />
+          ) : students.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 py-16 text-center">
+              <GraduationCap className="h-10 w-10 text-muted-foreground/40" />
+              <p className="font-medium text-foreground">
+                {search ? `No students matching "${search}"` : "No students enrolled yet"}
               </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="gap-1"
-                >
-                  <ChevronLeft className="h-4 w-4" /> Prev
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="gap-1"
-                >
-                  Next <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                {search ? "Try a different search term" : "Add students individually or upload a CSV file"}
+              </p>
+              {!search && (
+                <div className="flex gap-2 mt-2">
+                  <Button variant="outline" onClick={() => setBulkOpen(true)} className="gap-2">
+                    <Upload className="h-4 w-4" />Bulk Upload
+                  </Button>
+                  <Button onClick={openCreate} className="gap-2">
+                    <Plus className="h-4 w-4" />Add Student
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">#</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Username</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Class</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Roll #</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s, idx) => (
+                    <tr
+                      key={s.studentId}
+                      className="border-b border-border/50 transition-colors hover:bg-accent/40"
+                    >
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {page * PAGE_SIZE + idx + 1}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        <Link to={`/dashboard/admin/users/student/${s.uuid}`} className="hover:underline text-primary transition-colors">
+                          {s.firstName} {s.lastName}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                        {s.username}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell truncate max-w-[200px]">
+                        {s.email}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {s.className && s.sectionName
+                          ? `${s.className} – ${s.sectionName}`
+                          : s.className || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                        {s.rollNo ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge variant={s.enrollmentStatus === "ACTIVE" ? "active" : "inactive"}>
+                          {s.enrollmentStatus === "INACTIVE" ? "BLOCKED" : (s.enrollmentStatus ?? "ACTIVE")}
+                        </StatusBadge>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
+                              title="Download ID Card"
+                              onClick={async () => {
+                                try {
+                                  const res = await idCardService.downloadStudentIdCard(s.studentId);
+                                  triggerBlobDownload(res.data, `student-id-${s.studentId}.pdf`);
+                                  toast.success("ID Card downloaded");
+                                } catch (e) {
+                                  toast.error("Failed to download ID Card");
+                                }
+                              }}
+                            >
+                              <CreditCard className="h-3.5 w-3.5" />
+                            </Button>
+                          </motion.div>
+                          <Link to={`/dashboard/admin/users/student/${s.uuid}`}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
+                            >
+                              View
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEdit(s)}
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-primary"
+                          >
+                            Edit
+                          </Button>
+                          {s.enrollmentStatus === "INACTIVE" ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setActionTarget({ student: s, action: 'activate' })}
+                              className="h-7 w-[72px] px-2 text-xs text-green-600 hover:text-green-700"
+                            >
+                              Activate
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setActionTarget({ student: s, action: 'block' })}
+                              className="h-7 w-[72px] px-2 text-xs text-destructive hover:text-destructive"
+                            >
+                              Block
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                  <p className="text-sm text-muted-foreground">
+                    Page {page + 1} of {totalPages} · {totalElements} total
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      className="gap-1"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                      className="gap-1"
+                    >
+                      Next <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
+        </TabsContent>
 
+        <TabsContent value="attendance" className="mt-0">
+          <StudentAttendanceReview />
+        </TabsContent>
+      </Tabs>
+      
       {/* Bulk Upload Dialog */}
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

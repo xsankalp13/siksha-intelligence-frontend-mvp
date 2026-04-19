@@ -53,6 +53,7 @@ export interface StaffSummaryDTO {
   jobTitle: string;
   department?: string;
   staffType: string;
+  designationId?: number;
   hireDate?: string;
   officeLocation?: string;
   active: boolean;
@@ -125,6 +126,16 @@ export const adminService = {
   /** POST /auth/admin/users/staff/librarian */
   createLibrarian(data: CreateLibrarianRequestDTO) {
     return api.post<string>("/auth/admin/users/staff/librarian", data);
+  },
+
+  /** POST /auth/admin/users/staff/security-guard */
+  createSecurityGuard(data: any) {
+    return api.post<string>("/auth/admin/users/staff/security-guard", data);
+  },
+
+  /** GET /auth/hrms/designations */
+  listDesignations() {
+    return api.get<any[]>("/auth/hrms/designations");
   },
 
   /** PUT /auth/admin/users/student/{studentId} — studentId is the UUID field */

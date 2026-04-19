@@ -120,6 +120,7 @@ export type StaffType =
   | "PRINCIPAL"
   | "SECURITY_GUARD"
   | "ADMINISTRATIVE_STAFF"
+  | "SUPPORT_STAFF"
   | "SCHOOL_ADMIN"
   | "SUPER_ADMIN"
   | "OTHER";

@@ -26,6 +26,15 @@ export const seatAllocationService = {
     );
   },
 
+  /** POST /auth/examination/seat-allocation/rooms/seats/bulk — Get multiple seat grids */
+  getBulkSeatGrids(roomUuids: string[], examScheduleId: number) {
+    return api.post<Record<string, SeatAvailabilityDTO[]>>(
+      `/auth/examination/seat-allocation/rooms/seats/bulk`,
+      roomUuids,
+      { params: { examScheduleId } }
+    );
+  },
+
   /** POST /auth/examination/seat-allocation/allocate — Manual assign */
   allocateSingleSeat(data: SingleSeatAllocationRequestDTO) {
     return api.post<SeatAllocationResponseDTO>(

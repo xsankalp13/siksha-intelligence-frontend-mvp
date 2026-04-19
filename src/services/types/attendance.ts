@@ -68,6 +68,9 @@ export interface StudentAttendanceQueryParams {
   sort?: string;
   studentUuid?: string;
   takenByStaffUuid?: string;
+  classUuid?: string;
+  sectionUuid?: string;
+  search?: string;
 
   // Deprecated fallback query fields.
   studentId?: number;
@@ -144,8 +147,15 @@ export interface StaffDailyStatsResponseDTO {
   present: number;
   absent: number;
   late: number;
+  halfDay: number;
   onLeave: number;
   unmarkedCount: number;
+}
+
+export interface MarkAllResponseDTO {
+  marked: number;
+  type: string;
+  date: string;
 }
 
 // ── Staff Attendance Completion ───────────────────────────────────────

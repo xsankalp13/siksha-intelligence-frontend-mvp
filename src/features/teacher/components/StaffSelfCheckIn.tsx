@@ -94,19 +94,24 @@ export default function StaffSelfCheckIn() {
   });
 
   const geo = useMemo(() => {
-    if (settingsError) return { enabled: false, latitude: 0, longitude: 0, radiusMeters: 200 };
+    // If settings fetch errored (e.g. 403 for teacher), fail open — don't enforce geofence
+    if (settingsError) return { enabled: false, latitude: null as number | null, longitude: null as number | null, radiusMeters: 200, configured: false };
     const settings = (attendanceSettings as Record<string, { key: string; value: string }[]> | undefined)?.ATTENDANCE ?? [];
-    const getNum = (key: string, fallback: number) => {
+    const getNum = (key: string): number | null => {
       const value = settings.find((s) => s.key === key)?.value;
+      if (value === undefined || value === null || value.trim() === "") return null;
       const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : fallback;
+      return Number.isFinite(parsed) ? parsed : null;
     };
-    return {
-      enabled: settings.find((s) => s.key === "attendance.geofence.enabled")?.value !== "false",
-      latitude: getNum("attendance.geofence.latitude", 0),
-      longitude: getNum("attendance.geofence.longitude", 0),
-      radiusMeters: getNum("attendance.geofence.radius.meters", 200),
-    };
+    // Geofence is only enabled when the setting is explicitly "true"
+    const enabledRaw = settings.find((s) => s.key === "attendance.geofence.enabled")?.value;
+    const enabled = enabledRaw === "true";
+    const latitude = getNum("attendance.geofence.latitude");
+    const longitude = getNum("attendance.geofence.longitude");
+    const radiusMeters = getNum("attendance.geofence.radius.meters") ?? 200;
+    // configured = all three values are present and non-zero
+    const configured = latitude !== null && longitude !== null && latitude !== 0 && longitude !== 0;
+    return { enabled, latitude, longitude, radiusMeters, configured };
   }, [attendanceSettings, settingsError]);
 
   const initiateAction = async (type: "IN" | "OUT") => {
@@ -117,18 +122,34 @@ export default function StaffSelfCheckIn() {
       const { latitude, longitude } = pos.coords;
       setUserPos({ lat: latitude, lng: longitude });
 
-      if (geo.enabled && geo.latitude && geo.longitude) {
+      if (geo.enabled) {
+        if (!geo.configured || geo.latitude === null || geo.longitude === null) {
+          // Geofence is turned ON by admin but school coordinates are not set yet.
+          // Fail closed — block clock-in until admin configures coordinates.
+          toast.error("Geofence is enabled but school location is not configured. Please contact your administrator.");
+          setStatus("Geofence not configured");
+          return;
+        }
+
         const dist = haversineMeters(latitude, longitude, geo.latitude, geo.longitude);
         setDistanceToSchool(dist);
+
         if (dist > geo.radiusMeters) {
-          toast.error(`You are ${Math.round(dist)}m away from school. Allowed radius is ${geo.radiusMeters}m.`);
-          setStatus("Out of bounds");
+          toast.error(
+            `You are ${Math.round(dist)}m away from school. Allowed radius is ${geo.radiusMeters}m. Move closer to the school premises to clock ${type === "IN" ? "in" : "out"}.`
+          );
+          setStatus("Out of geofence bounds");
           return;
         }
       } else {
-        setDistanceToSchool(null);
+        // Geofence disabled — still capture distance for display if possible
+        if (geo.configured && geo.latitude !== null && geo.longitude !== null) {
+          setDistanceToSchool(haversineMeters(latitude, longitude, geo.latitude, geo.longitude));
+        } else {
+          setDistanceToSchool(null);
+        }
       }
-      
+
       if (type === "OUT" && shiftMapping?.shiftEndTime) {
         const currentTime = new Date().toTimeString().slice(0, 8);
         if (currentTime < shiftMapping.shiftEndTime) {
@@ -143,12 +164,12 @@ export default function StaffSelfCheckIn() {
       } else {
         setEarlyMinutesEst(null);
       }
-      
+
       setConfirmOpen(true);
       setStatus("Ready to confirm");
     } catch (e: any) {
       setStatus("GPS failed");
-      toast.error(e.message || "Failed to get location");
+      toast.error(e.message || "Failed to get location. Please enable location services and try again.");
     }
   };
 
@@ -297,13 +318,13 @@ export default function StaffSelfCheckIn() {
             {userPos && (
               <MapContainer 
                 center={[userPos.lat, userPos.lng]} 
-                zoom={geo.enabled && geo.latitude ? 16 : 14} 
+                zoom={geo.enabled && geo.configured ? 16 : 14} 
                 zoomControl={false}
                 style={{ height: "100%", width: "100%", zIndex: 10 }}
               >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <Marker position={[userPos.lat, userPos.lng]} />
-                {geo.enabled && geo.latitude !== 0 && (
+                {geo.configured && geo.latitude !== null && geo.longitude !== null && (
                   <>
                     <Circle 
                       center={[geo.latitude, geo.longitude]} 

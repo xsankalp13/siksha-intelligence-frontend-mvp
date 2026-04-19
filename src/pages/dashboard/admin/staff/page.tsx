@@ -4,18 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import {
-  Plus,
-  Loader2,
-  Users,
-  Upload,
-  ChevronRight,
-  RefreshCw,
-  Search,
-  ChevronLeft,
-  CreditCard,
-  Camera,
-} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Users, Upload, ChevronRight, RefreshCw, Search, ChevronLeft, CreditCard, Camera, Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import StatusBadge from "@/components/common/StatusBadge";
@@ -44,19 +34,27 @@ import {
   adminService,
   type StaffSummaryDTO,
 } from "@/services/admin";
+import { hrmsService } from "@/services/hrms";
 
 import BulkDataUpload from "@/features/bulk-upload/BulkDataUpload";
 import { BulkPhotoUploadDialog } from "@/features/uis/id-card/BulkPhotoUploadDialog";
 import { idCardService, triggerBlobDownload } from "@/services/idCard";
 
 // ── Types ───────────────────────────────────────────────────────────
-type StaffType = "TEACHER" | "PRINCIPAL" | "LIBRARIAN";
+type StaffType = "TEACHER" | "PRINCIPAL" | "LIBRARIAN" | "SECURITY_GUARD";
 
 const STAFF_TYPE_OPTIONS: { value: StaffType; label: string }[] = [
   { value: "TEACHER", label: "Teacher" },
   { value: "PRINCIPAL", label: "Principal" },
   { value: "LIBRARIAN", label: "Librarian" },
+  { value: "SECURITY_GUARD", label: "Security Guard" },
 ];
+
+interface Designation {
+  designationId: number;
+  designationName: string;
+  category: string;
+}
 
 // ── Zod Schema ──────────────────────────────────────────────────────
 const staffSchema = z.object({
@@ -68,8 +66,10 @@ const staffSchema = z.object({
   jobTitle: z.string().min(1, "Required"),
   category: z.enum(["TEACHING", "NON_TEACHING_SUPPORT", "NON_TEACHING_ADMIN"]),
   department: z.string().min(1, "Required"),
+  designationCode: z.string().min(1, "Required"),
   hireDate: z.string().min(1, "Required"),
-  staffType: z.enum(["TEACHER", "PRINCIPAL", "LIBRARIAN"]),
+  designationId: z.string().min(1, "Required"),
+  staffType: z.enum(["TEACHER", "PRINCIPAL", "LIBRARIAN", "SECURITY_GUARD"]),
   gender: z.string().optional(),
   dateOfBirth: z.string().optional(),
   officeLocation: z.string().optional(),
@@ -116,8 +116,8 @@ export default function StaffPage() {
     resolver: zodResolver(staffSchema) as any,
     defaultValues: {
       username: "", email: "", firstName: "", middleName: "", lastName: "",
-      jobTitle: "", hireDate: "", staffType: "TEACHER", gender: "",
-      category: "TEACHING", department: "",
+      jobTitle: "", hireDate: "", staffType: "TEACHER", gender: "", designationId: "",
+      category: "TEACHING", department: "", designationCode: "",
       dateOfBirth: "", officeLocation: "", initialPassword: "",
     },
   });
@@ -150,6 +150,11 @@ export default function StaffPage() {
   useEffect(() => {
     fetchStaff(page, search, staffTypeFilter);
   }, [fetchStaff, page, search, staffTypeFilter]);
+
+  const { data: designations = [] } = useQuery({
+    queryKey: ["hrms", "designations"],
+    queryFn: () => hrmsService.listDesignations({ active: true }).then(res => res.data),
+  });
 
   // ── Debounced search ──────────────────────────────────────────────
   const handleSearchChange = (val: string) => {
@@ -185,10 +190,12 @@ export default function StaffPage() {
       lastName: s.lastName,
       jobTitle: s.jobTitle,
       hireDate: s.hireDate || "",
+      designationCode: "", // We don't edit designation here, that's done via promotion module
       staffType: s.staffType as StaffType,
       gender: s.gender || "",
       dateOfBirth: s.dateOfBirth || "",
       officeLocation: s.officeLocation || "",
+      designationId: s.designationId ? String(s.designationId) : "",
     });
     setFormOpen(true);
   };
@@ -205,6 +212,10 @@ export default function StaffPage() {
   const handleEdit = async (data: StaffFormData) => {
     if (!editingStaff) return;
     setSubmitting(true);
+    const selectedDesig = designations.find(d => String(d.designationId) === data.designationId);
+    const desigId = selectedDesig?.designationId;
+    const cat = selectedDesig?.category;
+
     try {
       await adminService.updateStaff(editingStaff.uuid, {
         email: data.email || undefined,
@@ -217,6 +228,8 @@ export default function StaffPage() {
         hireDate: data.hireDate || undefined,
         officeLocation: data.officeLocation || undefined,
         staffType: data.staffType || undefined,
+        designationId: desigId,
+        category: cat,
       });
       toast.success("Staff member updated successfully");
       await fetchStaff(page, search, staffTypeFilter);
@@ -233,6 +246,10 @@ export default function StaffPage() {
 
   const handleCreate = async (data: StaffFormData) => {
     setSubmitting(true);
+    const selectedDesig = designations.find(d => String(d.designationId) === data.designationId);
+    const desigId = selectedDesig?.designationId;
+    const cat = selectedDesig?.category;
+
     try {
       if (data.staffType === "TEACHER") {
         await adminService.createTeacher({
@@ -254,6 +271,7 @@ export default function StaffPage() {
           certifications: data.certifications ? [data.certifications] : [],
           yearsOfExperience: data.yearsOfExperience,
           educationLevel: data.educationLevel,
+          designationCode: data.designationCode,
         });
       } else if (data.staffType === "PRINCIPAL") {
         await adminService.createPrincipal({
@@ -273,6 +291,7 @@ export default function StaffPage() {
           department: data.department as any,
           schoolLevelManaged: data.schoolLevelManaged as never,
           administrativeCertifications: data.adminCertifications ? [data.adminCertifications] : [],
+          designationCode: data.designationCode,
         });
       } else if (data.staffType === "LIBRARIAN") {
         await adminService.createLibrarian({
@@ -291,6 +310,24 @@ export default function StaffPage() {
           category: data.category as any,
           department: data.department as any,
           hasMlisDegree: data.hasMlisDegree,
+          designationCode: data.designationCode,
+        });
+      } else if (data.staffType === "SECURITY_GUARD") {
+        await adminService.createSecurityGuard({
+          username: data.username,
+          email: data.email,
+          initialPassword: data.initialPassword || undefined,
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
+          jobTitle: data.jobTitle,
+          hireDate: data.hireDate,
+          officeLocation: data.officeLocation,
+          gender: data.gender as never,
+          dateOfBirth: data.dateOfBirth,
+          staffType: data.staffType,
+          designationId: desigId,
+          category: cat,
         });
       }
       toast.success("Staff member hired successfully");
@@ -457,7 +494,7 @@ export default function StaffPage() {
                     {page * PAGE_SIZE + idx + 1}
                   </td>
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <Link to={`/dashboard/admin/users/staff/${s.uuid}`} className="hover:underline text-primary transition-colors">
+                    <Link to={`/dashboard/admin/hrms/staff/${s.uuid}`} className="hover:underline text-primary transition-colors">
                       {s.firstName} {s.lastName}
                     </Link>
                   </td>
@@ -496,7 +533,7 @@ export default function StaffPage() {
                           <CreditCard className="h-3.5 w-3.5" />
                         </Button>
                       </motion.div>
-                      <Link to={`/dashboard/admin/users/staff/${s.uuid}`}>
+                      <Link to={`/dashboard/admin/hrms/staff/${s.uuid}`}>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -687,6 +724,41 @@ export default function StaffPage() {
               </div>
             )}
 
+            {!editingStaff && (
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <Label>Designation *</Label>
+                    <Select value={form.watch("designationCode")} onValueChange={(val) => form.setValue("designationCode", val)}>
+                       <SelectTrigger><SelectValue placeholder="Select Designation" /></SelectTrigger>
+                       <SelectContent>
+                          {designations.map(d => (
+                             <SelectItem key={d.uuid} value={d.designationCode}>
+                                <div className="flex flex-col">
+                                  <span>{d.designationName}</span>
+                                  {(d.defaultSalaryTemplateName || d.defaultGradeCode) && (
+                                     <span className="text-[10px] text-muted-foreground">
+                                        Defaults: {d.defaultSalaryTemplateName || "No Salary"} | {d.defaultGradeCode || "No Grade"}
+                                     </span>
+                                  )}
+                                </div>
+                             </SelectItem>
+                          ))}
+                       </SelectContent>
+                    </Select>
+                    {form.formState.errors.designationCode && (
+                       <p className="text-xs text-destructive">{form.formState.errors.designationCode.message}</p>
+                    )}
+                 </div>
+                 <div className="space-y-2">
+                    <Label>Job Title *</Label>
+                    <Input {...form.register("jobTitle")} placeholder="e.g. Senior Math Teacher" />
+                    {form.formState.errors.jobTitle && (
+                      <p className="text-xs text-destructive">{form.formState.errors.jobTitle.message}</p>
+                    )}
+                 </div>
+              </div>
+            )}
+
             {/* Username & Email */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -727,15 +799,33 @@ export default function StaffPage() {
               </div>
             </div>
 
+            {/* Designation */}
+            <div className="space-y-2">
+              <Label>Designation *</Label>
+              <Select value={form.watch("designationId") ?? ""} onValueChange={(val) => form.setValue("designationId", val)}>
+                <SelectTrigger><SelectValue placeholder="Select Designation" /></SelectTrigger>
+                <SelectContent>
+                  {designations.map(d => (
+                    <SelectItem key={d.designationId} value={String(d.designationId)}>{d.designationName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.designationId && (
+                <p className="text-xs text-destructive">{form.formState.errors.designationId.message}</p>
+              )}
+            </div>
+
             {/* Job Title + Hire Date */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Job Title *</Label>
-                <Input {...form.register("jobTitle")} />
-                {form.formState.errors.jobTitle && (
-                  <p className="text-xs text-destructive">{form.formState.errors.jobTitle.message}</p>
-                )}
-              </div>
+              {editingStaff && (
+                 <div className="space-y-2">
+                    <Label>Job Title *</Label>
+                    <Input {...form.register("jobTitle")} />
+                    {form.formState.errors.jobTitle && (
+                      <p className="text-xs text-destructive">{form.formState.errors.jobTitle.message}</p>
+                    )}
+                 </div>
+              )}
               <div className="space-y-2">
                 <Label>Hire Date *</Label>
                 <Input type="date" {...form.register("hireDate")} />

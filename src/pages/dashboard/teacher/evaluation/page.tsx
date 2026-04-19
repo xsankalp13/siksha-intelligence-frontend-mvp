@@ -20,7 +20,6 @@ import {
   XCircle,
   ImagePlus,
   Camera,
-  Trash2,
   Check,
   X,
   Eye,
@@ -30,7 +29,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +62,7 @@ import type {
   SaveQuestionMarkRequestDTO,
   AnnotationType,
   AnnotationResponseDTO,
+  EvaluationResultResponseDTO,
 } from "@/services/types/evaluation";
 
 // ── Status Configs ──────────────────────────────────────────────────
@@ -769,6 +769,7 @@ function EvaluationView({
   const { data: students = [] } = useEvaluationStudents(scheduleId);
 
   const [marks, setMarks] = useState<Record<string, string>>({});
+  const [lastSaveResult, setLastSaveResult] = useState<EvaluationResultResponseDTO | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -807,9 +808,18 @@ function EvaluationView({
     const initial: Record<string, string> = {};
     structure.sections.forEach((section) => {
       section.questions.forEach((q) => {
-        const key = `${section.sectionName}#${q.questionNumber}`;
-        if (q.marksObtained != null) {
-          initial[key] = String(q.marksObtained);
+        if (q.type === "INTERNAL_CHOICE" && q.options) {
+          q.options.forEach(opt => {
+            if (opt.marksObtained != null) {
+              const key = `${section.sectionName}#${q.questionNumber}#${opt.label}`;
+              initial[key] = String(opt.marksObtained);
+            }
+          });
+        } else {
+          const key = `${section.sectionName}#${q.questionNumber}`;
+          if (q.marksObtained != null) {
+            initial[key] = String(q.marksObtained);
+          }
         }
       });
     });
@@ -825,14 +835,29 @@ function EvaluationView({
     const items: SaveQuestionMarkRequestDTO[] = [];
     currentStructure.sections.forEach((section) => {
       section.questions.forEach((q) => {
-        const key = `${section.sectionName}#${q.questionNumber}`;
-        const val = currentMarks[key];
-        if (val !== undefined && val !== "") {
-          items.push({
-            sectionName: section.sectionName,
-            questionNumber: q.questionNumber,
-            marksObtained: parseFloat(val),
+        if (q.type === "INTERNAL_CHOICE" && q.options) {
+          q.options.forEach(opt => {
+            const key = `${section.sectionName}#${q.questionNumber}#${opt.label}`;
+            const val = currentMarks[key];
+            if (val !== undefined && val !== "") {
+              items.push({
+                sectionName: section.sectionName,
+                questionNumber: q.questionNumber,
+                optionLabel: opt.label,
+                marksObtained: parseFloat(val),
+              });
+            }
           });
+        } else {
+          const key = `${section.sectionName}#${q.questionNumber}`;
+          const val = currentMarks[key];
+          if (val !== undefined && val !== "") {
+            items.push({
+              sectionName: section.sectionName,
+              questionNumber: q.questionNumber,
+              marksObtained: parseFloat(val),
+            });
+          }
         }
       });
     });
@@ -844,14 +869,29 @@ function EvaluationView({
     const items: SaveQuestionMarkRequestDTO[] = [];
     structure.sections.forEach((section) => {
       section.questions.forEach((q) => {
-        const key = `${section.sectionName}#${q.questionNumber}`;
-        const val = marks[key];
-        if (val !== undefined && val !== "") {
-          items.push({
-            sectionName: section.sectionName,
-            questionNumber: q.questionNumber,
-            marksObtained: parseFloat(val),
+        if (q.type === "INTERNAL_CHOICE" && q.options) {
+          q.options.forEach(opt => {
+            const key = `${section.sectionName}#${q.questionNumber}#${opt.label}`;
+            const val = marks[key];
+            if (val !== undefined && val !== "") {
+              items.push({
+                sectionName: section.sectionName,
+                questionNumber: q.questionNumber,
+                optionLabel: opt.label,
+                marksObtained: parseFloat(val),
+              });
+            }
           });
+        } else {
+          const key = `${section.sectionName}#${q.questionNumber}`;
+          const val = marks[key];
+          if (val !== undefined && val !== "") {
+            items.push({
+              sectionName: section.sectionName,
+              questionNumber: q.questionNumber,
+              marksObtained: parseFloat(val),
+            });
+          }
         }
       });
     });
@@ -869,10 +909,11 @@ function EvaluationView({
       savingRef.current = true;
       setSaveStatus("saving");
       try {
-        await saveMutation.mutateAsync({
+        const result = await saveMutation.mutateAsync({
           answerSheetId,
           data: { questionMarks },
         });
+        setLastSaveResult(result);
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       } catch {
@@ -883,7 +924,7 @@ function EvaluationView({
     }, 1000);
   }, [answerSheetId, buildPayloadFromRefs, isFinal, saveMutation]);
 
-  const handleMarkChange = (sectionName: string, questionNumber: number, maxMarks: number, value: string) => {
+  const handleMarkChange = (key: string, maxMarks: number, value: string) => {
     if (isFinal) return;
     let val = value;
     if (val !== "") {
@@ -891,7 +932,6 @@ function EvaluationView({
       if (num < 0) val = "0";
       if (num > maxMarks) val = String(maxMarks);
     }
-    const key = `${sectionName}#${questionNumber}`;
     setMarks((prev) => ({ ...prev, [key]: val }));
     triggerAutoSave();
   };
@@ -928,7 +968,8 @@ function EvaluationView({
       return;
     }
     try {
-      await saveMutation.mutateAsync({ answerSheetId, data: { questionMarks } });
+      const result = await saveMutation.mutateAsync({ answerSheetId, data: { questionMarks } });
+      setLastSaveResult(result);
       await submitMutation.mutateAsync(answerSheetId);
       toast.success("Marks submitted for review successfully! Editing is now locked.");
       setPublishDialogOpen(false);
@@ -941,6 +982,16 @@ function EvaluationView({
   // Totals
   const totals = useMemo(() => {
     if (!structure) return { current: 0, max: 0, total: 0, filled: 0 };
+    if (lastSaveResult) {
+      // Use backend truth if available
+      return {
+        current: lastSaveResult.totalMarks,
+        max: structure.totalMaxMarks,
+        total: structure.totalQuestions,
+        filled: lastSaveResult.selectedQuestions ? Object.values(lastSaveResult.selectedQuestions).reduce((acc: number, arr: string[]) => acc + arr.length, 0) : 0,
+      };
+    }
+    // Fallback local calc
     let current = 0;
     let max = 0;
     let total = 0;
@@ -949,22 +1000,34 @@ function EvaluationView({
       section.questions.forEach((q) => {
         total++;
         max += q.maxMarks;
-        const key = `${section.sectionName}#${q.questionNumber}`;
-        const val = parseFloat(marks[key]);
-        if (!isNaN(val)) {
-          current += val;
-          filled++;
+        if (q.type === "INTERNAL_CHOICE" && q.options) {
+          let maxOptMark = 0;
+          let anyFilled = false;
+          q.options.forEach(opt => {
+            const key = `${section.sectionName}#${q.questionNumber}#${opt.label}`;
+            const val = parseFloat(marks[key]);
+            if (!isNaN(val)) {
+              if (val > maxOptMark) maxOptMark = val;
+              anyFilled = true;
+            }
+          });
+          current += maxOptMark;
+          if (anyFilled) filled++;
+        } else {
+          const key = `${section.sectionName}#${q.questionNumber}`;
+          const val = parseFloat(marks[key]);
+          if (!isNaN(val)) {
+            current += val;
+            filled++;
+          }
         }
       });
     });
     return { current, max, total, filled };
-  }, [structure, marks]);
+  }, [structure, marks, lastSaveResult]);
 
   // Student switcher
   const currentStudentIdx = students.findIndex((s) => s.studentId === studentId);
-  const evaluatableStudents = students.filter(
-    (s) => s.answerSheetId && s.answerSheetStatus && s.answerSheetStatus !== "UPLOADED"
-  );
 
   // Detect "uploads not completed" 403 vs other errors
   const isUploadsIncomplete = useMemo(() => {
@@ -1120,10 +1183,6 @@ function EvaluationView({
               className="h-7 w-7"
               disabled={currentStudentIdx <= 0}
               onClick={() => {
-                const prev = evaluatableStudents.find(
-                  (s, i) => evaluatableStudents.indexOf(students[currentStudentIdx - 1]) >= 0 ||
-                    i < evaluatableStudents.findIndex((es) => es.studentId === studentId)
-                );
                 // Simple prev logic
                 if (currentStudentIdx > 0) {
                   const prevStudent = students[currentStudentIdx - 1];
@@ -1169,7 +1228,8 @@ function EvaluationView({
                       setSaveStatus("saving");
                       saveMutation
                         .mutateAsync({ answerSheetId, data: { questionMarks } })
-                        .then(() => {
+                        .then((result) => {
+                          setLastSaveResult(result);
                           setSaveStatus("saved");
                           toast.success("Draft saved");
                           setTimeout(() => setSaveStatus("idle"), 2000);
@@ -1334,78 +1394,162 @@ function EvaluationView({
 
         {/* RIGHT: Marks Panel */}
         <div className="space-y-3 max-h-[85vh] overflow-y-auto pr-1 eval-marks-panel">
-          {structure.sections.map((section, sIdx) => (
-            <motion.div
-              key={section.sectionName}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: sIdx * 0.04 }}
-              className="rounded-xl border border-border/50 bg-card overflow-hidden"
-            >
-              {/* Section Header */}
-              <div className="bg-muted/40 p-2.5 px-3.5 border-b border-border/50 flex justify-between items-center">
-                <h4 className="font-semibold text-foreground flex items-center gap-2 text-sm">
-                  <span className="bg-primary/10 text-primary w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold">
-                    {String.fromCharCode(65 + sIdx)}
+          {structure.sections.map((section, sIdx) => {
+            const isOptional = section.sectionType === "OPTIONAL";
+            const selectedQIds = lastSaveResult?.selectedQuestions?.[section.sectionName] || [];
+            const isSectionEvaluated = selectedQIds.length > 0 || (lastSaveResult && !isOptional);
+            
+            // For UI summary of ignored questions
+            const allQIds = section.questions.map(q => `Q${q.questionNumber}`);
+            const ignoredQIds = isOptional ? allQIds.filter(id => !selectedQIds.includes(id)) : [];
+
+            return (
+              <motion.div
+                key={section.sectionName}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: sIdx * 0.04 }}
+                className="rounded-xl border border-border/50 bg-card overflow-hidden"
+              >
+                {/* Section Header */}
+                <div className="bg-muted/40 p-2.5 px-3.5 border-b border-border/50 flex justify-between items-start">
+                  <div>
+                    <h4 className="font-semibold text-foreground flex items-center gap-2 text-sm">
+                      <span className="bg-primary/10 text-primary w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold">
+                        {String.fromCharCode(65 + sIdx)}
+                      </span>
+                      {section.sectionName}
+                      {isOptional && section.attemptQuestions && (
+                        <span className="text-[10px] font-normal text-muted-foreground bg-background px-1.5 py-0.5 rounded border border-border/50 shadow-sm ml-1">
+                          Attempt any {section.attemptQuestions} out of {section.totalQuestions || section.questions.length}
+                        </span>
+                      )}
+                    </h4>
+                    {section.helperText && (
+                      <p className="text-[10px] text-muted-foreground mt-1 ml-7 italic">
+                        {section.helperText}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-medium bg-background px-1.5 py-0.5 rounded border border-border/50 tabular-nums shrink-0 mt-0.5">
+                    {section.questions.length}Q × {section.questions[0]?.maxMarks ?? 0}m
                   </span>
-                  {section.sectionName}
-                </h4>
-                <span className="text-[10px] font-medium bg-background px-1.5 py-0.5 rounded border border-border/50 tabular-nums">
-                  {section.questions.length}Q × {section.questions[0]?.maxMarks ?? 0}m
-                </span>
-              </div>
+                </div>
 
-              {/* Questions Grid */}
-              <div className="p-3 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-2.5">
-                {section.questions.map((q) => {
-                  const key = `${section.sectionName}#${q.questionNumber}`;
-                  const val = marks[key] ?? "";
-                  const num = parseFloat(val);
-                  const isValid = val === "" || (!isNaN(num) && num >= 0 && num <= q.maxMarks);
+                {/* Questions Grid */}
+                <div className="p-3 grid grid-cols-1 gap-y-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-2.5">
+                    {section.questions.map((q) => {
+                      if (q.type === "INTERNAL_CHOICE" && q.options) {
+                        return (
+                          <div key={q.questionNumber} className="col-span-full rounded-md border border-border/40 p-2 space-y-2 relative bg-muted/5">
+                            <label className="text-[11px] font-semibold text-foreground flex justify-between bg-muted/30 px-2 py-1 rounded">
+                              <span className="flex items-center gap-1.5">
+                                Q{q.questionNumber} 
+                                <span className="bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 rounded-[3px] text-[9px] uppercase tracking-wider">Attempt any ONE</span>
+                              </span>
+                              <span className="opacity-70">/{q.maxMarks}</span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-3 pl-1">
+                              {q.options.map((opt) => {
+                                const key = `${section.sectionName}#${q.questionNumber}#${opt.label}`;
+                                const val = marks[key] ?? "";
+                                const num = parseFloat(val);
+                                const isValid = val === "" || (!isNaN(num) && num >= 0 && num <= opt.maxMarks);
+                                const isSelected = selectedQIds.includes(`Q${q.questionNumber}(${opt.label})`);
 
-                  return (
-                    <div key={q.questionNumber} className="flex flex-col gap-0.5">
-                      <label className="text-[10px] font-medium text-muted-foreground flex justify-between">
-                        <span>Q{q.questionNumber}</span>
-                        <span className="opacity-50">/{q.maxMarks}</span>
-                      </label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={q.maxMarks}
-                        step={0.5}
-                        placeholder="–"
-                        disabled={isFinal}
-                        className={`h-8 text-center text-sm font-medium bg-muted/20 focus:bg-background transition-colors placeholder:text-muted-foreground/30 tabular-nums ${
-                          !isValid ? "border-destructive/60 bg-destructive/5" : ""
-                        }`}
-                        value={val}
-                        onChange={(e) =>
-                          handleMarkChange(section.sectionName, q.questionNumber, q.maxMarks, e.target.value)
-                        }
-                      />
+                                return (
+                                  <div key={opt.label} className="flex flex-col gap-0.5">
+                                    <label className="text-[10px] font-medium text-muted-foreground flex justify-between items-center bg-background px-1 rounded-sm">
+                                      <span className="flex items-center gap-1">
+                                        ({opt.label})
+                                        {isSelected && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
+                                      </span>
+                                      <span className="opacity-50">/{opt.maxMarks}</span>
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      max={opt.maxMarks}
+                                      step={0.5}
+                                      placeholder="–"
+                                      disabled={isFinal}
+                                      className={`h-8 text-center text-sm font-medium bg-muted/20 focus:bg-background transition-colors placeholder:text-muted-foreground/30 tabular-nums ${
+                                        !isValid ? "border-destructive/60 bg-destructive/5" : ""
+                                      } ${isSelected ? "border-emerald-500/50 bg-emerald-500/5" : ""}`}
+                                      value={val}
+                                      onChange={(e) => handleMarkChange(key, opt.maxMarks, e.target.value)}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // NORMAL TYPE
+                      const key = `${section.sectionName}#${q.questionNumber}`;
+                      const val = marks[key] ?? "";
+                      const num = parseFloat(val);
+                      const isValid = val === "" || (!isNaN(num) && num >= 0 && num <= q.maxMarks);
+                      const isSelected = selectedQIds.includes(`Q${q.questionNumber}`);
+
+                      return (
+                        <div key={q.questionNumber} className="flex flex-col gap-0.5">
+                          <label className="text-[10px] font-medium text-muted-foreground flex justify-between items-center">
+                            <span className="flex items-center gap-1">
+                              Q{q.questionNumber}
+                              {isSelected && isOptional && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
+                            </span>
+                            <span className="opacity-50">/{q.maxMarks}</span>
+                          </label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={q.maxMarks}
+                            step={0.5}
+                            placeholder="–"
+                            disabled={isFinal}
+                            className={`h-8 text-center text-sm font-medium bg-muted/20 focus:bg-background transition-colors placeholder:text-muted-foreground/30 tabular-nums ${
+                              !isValid ? "border-destructive/60 bg-destructive/5" : ""
+                            } ${isSelected && isOptional ? "border-emerald-500/50 bg-emerald-500/5 shadow-sm" : ""}`}
+                            value={val}
+                            onChange={(e) => handleMarkChange(key, q.maxMarks, e.target.value)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section Footer (Optional Feedback & Subtotal) */}
+                <div className="bg-muted/30 border-t border-border/40 px-3.5 py-3 flex flex-col gap-2.5 text-xs">
+                  {isOptional && isSectionEvaluated && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 bg-background px-3 py-2 rounded-md border border-border/60 shadow-sm">
+                      <span className="flex items-center gap-1.5 text-emerald-600 font-medium whitespace-nowrap">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Selected: <span className="text-foreground">{selectedQIds.join(", ") || "None"}</span>
+                      </span>
+                      {ignoredQIds.length > 0 && (
+                        <span className="flex items-center gap-1.5 text-muted-foreground font-medium whitespace-nowrap">
+                          <X className="w-3.5 h-3.5 text-destructive/60" /> Ignored: <span className="text-foreground/80">{ignoredQIds.join(", ")}</span>
+                        </span>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* Section Subtotal */}
-              <div className="bg-muted/20 border-t border-border/40 px-3.5 py-2 flex justify-between items-center text-xs">
-                <span className="text-muted-foreground">Section Total</span>
-                <span className="font-bold tabular-nums">
-                  {section.questions
-                    .reduce((sum, q) => {
-                      const v = parseFloat(marks[`${section.sectionName}#${q.questionNumber}`]);
-                      return sum + (isNaN(v) ? 0 : v);
-                    }, 0)
-                    .toFixed(1)}{" "}
-                  <span className="text-muted-foreground/60 font-normal">
-                    / {section.questions.reduce((sum, q) => sum + q.maxMarks, 0)}
-                  </span>
-                </span>
-              </div>
-            </motion.div>
-          ))}
+                  )}
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-muted-foreground font-medium uppercase tracking-wider text-[10px]">Section Total</span>
+                    <span className="font-bold tabular-nums text-sm">
+                      {lastSaveResult?.sectionTotals?.[section.sectionName]?.toFixed(1) ?? "0.0"}
+                      <span className="text-muted-foreground/60 font-normal ml-1">
+                        / {isOptional ? (section.attemptQuestions ?? 0) * (section.questions[0]?.maxMarks ?? 0) : section.questions.reduce((sum, q) => sum + q.maxMarks, 0)}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
 
           {/* Grand Total Card */}
           <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 text-center">

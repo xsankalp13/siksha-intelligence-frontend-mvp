@@ -119,9 +119,13 @@ const envBaseURL = import.meta.env.VITE_API_BASE_URL
 
 // Vite reads `.env` only on server start. If the dev server wasn't restarted after adding `.env`,
 // this falls back to Spring Boot's default local URL so API calls still work.
+const prefix = import.meta.env.VITE_API_PREFIX ?? '/api'
+const version = import.meta.env.VITE_API_VERSION ?? 'v1'
+const fallbackUrl = import.meta.env.DEV ? `${prefix}/${version}`.replace(/\/+/g, '/') : undefined
+
 const baseURL = envBaseURL && envBaseURL.trim().length > 0
   ? buildBaseURL(envBaseURL)
-  : (import.meta.env.DEV ? 'http://localhost:8080' : undefined)
+  : fallbackUrl
 
 if (import.meta.env.DEV && (!envBaseURL || envBaseURL.trim().length === 0)) {
   console.warn('VITE_API_BASE_URL is not set; falling back to http://localhost:8080. Restart `npm run dev` after creating/updating .env.')
