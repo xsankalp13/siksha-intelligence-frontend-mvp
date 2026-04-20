@@ -270,4 +270,9 @@ export const PARENT_NAV_ITEMS: NavItem[] = [
   { label: "Health", path: "/dashboard/parent/health", icon: HeartPulse },
   { label: "Notifications", path: "/dashboard/parent/notifications", icon: Bell },
   { label: "Profile", path: "/dashboard/parent/profile", icon: User },
+  {
+    label: "Exam Attendance",
+    path: "/dashboard/invigilator/attendance",
+    icon: DoorOpen,
+  },
 ];

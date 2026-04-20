@@ -144,7 +144,7 @@ export default function ExaminationsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-8">
+    <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-8 min-h-screen">
       {/* Page Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -166,185 +166,189 @@ export default function ExaminationsPage() {
         </div>
       </motion.div>
 
-      {/* Tabs */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="flex overflow-x-auto gap-1 p-1 bg-muted/60 rounded-xl border border-border/40 w-fit max-w-full print:hidden scroll-smooth [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-thumb]:rounded-full pb-1"
-      >
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0 ${
-                isActive
-                  ? "bg-background text-foreground shadow-sm border border-border/50"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-              }`}
+      <div className="flex flex-col md:flex-row gap-8 flex-1">
+        {/* Left Sidebar Menu */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.05 }}
+          className="flex flex-row md:flex-col gap-1 w-full md:w-64 shrink-0 overflow-x-auto md:overflow-y-auto border-b md:border-b-0 md:border-r border-border/40 pb-4 md:pb-0 md:pr-4 print:hidden scroll-smooth [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-thumb]:rounded-full"
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full shrink-0 text-left ${
+                  isActive
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Icon
+                  className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : ""}`}
+                />
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
+        </motion.div>
+
+        {/* Tab Content Area */}
+        <div className="flex-1 min-w-0 relative">
+          {activeTab === "dashboard" && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
             >
-              <Icon
-                className={`w-4 h-4 ${isActive ? "text-primary" : ""}`}
+              <ExamDashboardPanel
+                onNavigateToExams={() => handleTabChange("exams")}
+                onNavigateToSchedules={() => handleTabChange("exams")}
+                onNavigateToGrades={() => handleTabChange("grades")}
+                onNavigateToQuestions={() => handleTabChange("questions")}
+                onNavigateToPapers={() => handleTabChange("papers")}
+                onViewExamSchedules={handleViewSchedules}
+                questionCount={questions.length}
+                gradeSystemCount={gradeSystems.length}
+                pastPaperCount={pastPapers.length}
               />
-              {tab.label}
-            </button>
-          );
-        })}
-      </motion.div>
-
-      {/* Tab Content */}
-      {activeTab === "dashboard" && (
-        <motion.div
-          key="dashboard"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <ExamDashboardPanel
-            onNavigateToExams={() => handleTabChange("exams")}
-            onNavigateToSchedules={() => handleTabChange("exams")}
-            onNavigateToGrades={() => handleTabChange("grades")}
-            onNavigateToQuestions={() => handleTabChange("questions")}
-            onNavigateToPapers={() => handleTabChange("papers")}
-            onViewExamSchedules={handleViewSchedules}
-            questionCount={questions.length}
-            gradeSystemCount={gradeSystems.length}
-            pastPaperCount={pastPapers.length}
-          />
-        </motion.div>
-      )}
-
-      {activeTab === "exams" && (
-        <motion.div
-          key="exams"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {subView.kind === "list" && (
-            <ExamListPanel onViewSchedules={handleViewSchedules} />
+            </motion.div>
           )}
-          {subView.kind === "schedules" && (
-            <ExamSchedulePanel
-              exam={subView.exam}
-              onBack={handleBackToList}
-              onEnterMarks={(schedule) =>
-                handleEnterMarks(subView.exam, schedule)
-              }
-              onNavigateToTemplates={() => handleTabChange("templates")}
-            />
+
+          {activeTab === "exams" && (
+            <motion.div
+              key="exams"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {subView.kind === "list" && (
+                <ExamListPanel onViewSchedules={handleViewSchedules} />
+              )}
+              {subView.kind === "schedules" && (
+                <ExamSchedulePanel
+                  exam={subView.exam}
+                  onBack={handleBackToList}
+                  onEnterMarks={(schedule) =>
+                    handleEnterMarks(subView.exam, schedule)
+                  }
+                  onNavigateToTemplates={() => handleTabChange("templates")}
+                />
+              )}
+              {subView.kind === "marks" && (
+                <MarksEntryPanel
+                  exam={subView.exam}
+                  schedule={subView.schedule}
+                  onBack={() => handleBackToSchedules(subView.exam)}
+                />
+              )}
+            </motion.div>
           )}
-          {subView.kind === "marks" && (
-            <MarksEntryPanel
-              exam={subView.exam}
-              schedule={subView.schedule}
-              onBack={() => handleBackToSchedules(subView.exam)}
-            />
+
+          {activeTab === "templates" && (
+            <motion.div
+              key="templates"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ExamTemplatePanel />
+            </motion.div>
           )}
-        </motion.div>
-      )}
 
-      {activeTab === "templates" && (
-        <motion.div
-          key="templates"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <ExamTemplatePanel />
-        </motion.div>
-      )}
+          {activeTab === "grades" && (
+            <motion.div
+              key="grades"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <GradeSystemPanel />
+            </motion.div>
+          )}
 
-      {activeTab === "grades" && (
-        <motion.div
-          key="grades"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <GradeSystemPanel />
-        </motion.div>
-      )}
+          {activeTab === "questions" && (
+            <motion.div
+              key="questions"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <QuestionBankPanel />
+            </motion.div>
+          )}
 
-      {activeTab === "questions" && (
-        <motion.div
-          key="questions"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <QuestionBankPanel />
-        </motion.div>
-      )}
+          {activeTab === "papers" && (
+            <motion.div
+              key="papers"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <PastPapersPanel />
+            </motion.div>
+          )}
 
-      {activeTab === "papers" && (
-        <motion.div
-          key="papers"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <PastPapersPanel />
-        </motion.div>
-      )}
+          {activeTab === "invigilation" && (
+            <motion.div
+              key="invigilation"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <InvigilationPanel />
+            </motion.div>
+          )}
 
-      {activeTab === "invigilation" && (
-        <motion.div
-          key="invigilation"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <InvigilationPanel />
-        </motion.div>
-      )}
+          {activeTab === "seating" && (
+            <motion.div
+              key="seating"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <SeatingPlanPanel />
+            </motion.div>
+          )}
 
-      {activeTab === "seating" && (
-        <motion.div
-          key="seating"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <SeatingPlanPanel />
-        </motion.div>
-      )}
+          {activeTab === "admitCards" && (
+            <motion.div
+              key="admitCards"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <AdmitCardBatchPanel />
+            </motion.div>
+          )}
 
-      {activeTab === "admitCards" && (
-        <motion.div
-          key="admitCards"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <AdmitCardBatchPanel />
-        </motion.div>
-      )}
+          {activeTab === "evaluation" && (
+            <motion.div
+              key="evaluation"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <EvaluationAssignmentsPanel />
+            </motion.div>
+          )}
 
-      {activeTab === "evaluation" && (
-        <motion.div
-          key="evaluation"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <EvaluationAssignmentsPanel />
-        </motion.div>
-      )}
-
-      {activeTab === "results" && (
-        <motion.div
-          key="results"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <ResultsApprovalPanel />
-        </motion.div>
-      )}
+          {activeTab === "results" && (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ResultsApprovalPanel />
+            </motion.div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

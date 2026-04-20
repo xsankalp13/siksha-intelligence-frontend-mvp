@@ -66,6 +66,8 @@ function downloadAsXLSX(rows: ReturnType<typeof buildRows>, filename: string) {
   XLSX.utils.book_append_sheet(wb, ws, "Attendance");
   XLSX.writeFile(wb, filename);
 }
+import { useGetAllExams } from "@/features/examination/hooks/useExaminationQueries";
+import { Link } from "react-router-dom";
 
 export default function TeacherAttendancePage() {
   const { data: classes = [], isLoading } = useTeacherCtClasses();
@@ -182,6 +184,17 @@ export default function TeacherAttendancePage() {
     return map;
   }, [existingAttendancePage, students]);
 
+  // Check if there is an active exam on the selected date
+  const { data: allExams } = useGetAllExams();
+  const activeExam = useMemo(() => {
+    if (!allExams) return null;
+    return allExams.find(exam =>
+      exam.published &&
+      selectedDate >= exam.startDate &&
+      selectedDate <= exam.endDate
+    );
+  }, [allExams, selectedDate]);
+
   if (!isLoading && classes.length === 0) {
     return (
       <div className="mx-auto max-w-6xl">
@@ -271,7 +284,19 @@ export default function TeacherAttendancePage() {
         </div>
       </div>
 
-      <EditWindowGuard
+      {activeExam ? (
+        <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8 text-center">
+          <Shield className="mx-auto mb-3 h-10 w-10 text-blue-600" />
+          <h1 className="text-xl font-bold">Attendance is handled via Exam Attendance</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground mb-6">
+            There is an active examination ({activeExam.name}) scheduled for this date. Regular class attendance is disabled.
+          </p>
+          <Button asChild>
+            <Link to="/dashboard/invigilator/attendance">Go to Exam Attendance</Link>
+          </Button>
+        </div>
+      ) : (
+        <EditWindowGuard
         attendanceDate={selectedDate}
         attendanceType="student"
         fallback={
@@ -293,6 +318,7 @@ export default function TeacherAttendancePage() {
           onSubmitSuccess={() => refetchExisting()}
         />
       </EditWindowGuard>
+      )}
     </div>
   );
 }
