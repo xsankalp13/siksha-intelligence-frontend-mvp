@@ -303,6 +303,32 @@ export const hrmsService = {
     return api.delete<void>(`${HRMS}/designations/${identifier}`);
   },
 
+  /** POST /hrms/designations/{ref}/assign-staff — bulk-assign staff to a designation (auto-provisions salary) */
+  bulkAssignStaffToDesignation(designationRef: string, payload: { staffRefs: string[] }) {
+    return api.post<{
+      designationCode: string;
+      designationName: string;
+      totalRequested: number;
+      successCount: number;
+      failureCount: number;
+      successfulEmployeeIds: string[];
+      errors: string[];
+    }>(`${HRMS}/designations/${designationRef}/assign-staff`, payload);
+  },
+
+  /** POST /hrms/designations/unassign-staff — bulk-unassign staff from their designations */
+  bulkUnassignStaffFromDesignation(payload: { staffRefs: string[] }) {
+    return api.post<{
+      designationCode: string | null;
+      designationName: string;
+      totalRequested: number;
+      successCount: number;
+      failureCount: number;
+      successfulEmployeeIds: string[];
+      errors: string[];
+    }>(`${HRMS}/designations/unassign-staff`, payload);
+  },
+
   // ── Staff Grades ─────────────────────────────────────────────────
   listGrades() {
     return api.get<StaffGradeResponseDTO[]>(`${HRMS}/grades`);

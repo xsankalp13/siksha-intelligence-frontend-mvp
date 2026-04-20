@@ -1,13 +1,30 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Award, BarChart2, Building2, Calendar, CheckCircle2, Clock, FolderOpen, IndianRupee, Loader2, TrendingUp, Users } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Award, BarChart2, Building2, Calendar, CheckCircle2, Clock, FolderOpen, IndianRupee, Loader2, Pencil, TrendingUp, Users, X } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
-import { hrmsService } from "@/services/hrms";
+import { hrmsService, normalizeHrmsError } from "@/services/hrms";
 import { cn } from "@/lib/utils";
 import CategoryBadge from "./components/CategoryBadge";
 import StatusTimeline from "./components/StatusTimeline";
@@ -57,6 +74,45 @@ export default function Staff360ProfilePage() {
     queryKey: ["hrms", "bank-details", staffRef],
     queryFn: () => hrmsService.getStaffBankDetails(staffRef!).then((r) => r.data),
     enabled: !!staffRef,
+  });
+
+  // Designation management state
+  const queryClient = useQueryClient();
+  const [designationEditOpen, setDesignationEditOpen] = useState(false);
+  const [selectedDesignationRef, setSelectedDesignationRef] = useState<string>("");
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+
+  const { data: allDesignations } = useQuery({
+    queryKey: ["hrms", "designations", "active"],
+    queryFn: () => hrmsService.listDesignations({ active: true }).then((r) => r.data),
+    enabled: designationEditOpen,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: (desRef: string) =>
+      hrmsService.bulkAssignStaffToDesignation(desRef, { staffRefs: [staffRef!] }),
+    onSuccess: (res) => {
+      const d = res.data;
+      if (d.successCount > 0) {
+        toast.success(`Designation updated to ${d.designationName}`);
+      } else {
+        toast.error(d.errors?.[0] ?? "Failed to assign designation");
+      }
+      queryClient.invalidateQueries({ queryKey: ["hrms", "staff360", staffRef] });
+      setDesignationEditOpen(false);
+    },
+    onError: (err) => toast.error(normalizeHrmsError(err).message),
+  });
+
+  const unassignMutation = useMutation({
+    mutationFn: () =>
+      hrmsService.bulkUnassignStaffFromDesignation({ staffRefs: [staffRef!] }),
+    onSuccess: () => {
+      toast.success("Designation removed");
+      queryClient.invalidateQueries({ queryKey: ["hrms", "staff360", staffRef] });
+      setRemoveConfirmOpen(false);
+    },
+    onError: (err) => toast.error(normalizeHrmsError(err).message),
   });
 
   if (isLoading || !data || bankLoading) {
@@ -225,8 +281,40 @@ export default function Staff360ProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {/* Designation — special row with edit/remove */}
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="text-muted-foreground shrink-0">Designation</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium text-right">
+                      {currentDesignation?.designationName ?? "—"}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-primary hover:text-primary hover:bg-primary/10"
+                      title="Edit Designation"
+                      onClick={() => {
+                        setSelectedDesignationRef(currentDesignation?.uuid ?? "");
+                        setDesignationEditOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    {currentDesignation && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Remove Designation"
+                        onClick={() => setRemoveConfirmOpen(true)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {/* Remaining employment fields */}
                 {[
-                  { label: "Designation", value: currentDesignation?.designationName },
                   { label: "Grade", value: currentGrade?.gradeName },
                   { label: "Department", value: personal?.department },
                   { label: "Staff Type", value: personal?.staffType },
@@ -1040,6 +1128,102 @@ export default function Staff360ProfilePage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* ── Edit Designation Dialog ── */}
+      <Dialog open={designationEditOpen} onOpenChange={setDesignationEditOpen}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+          <div className="relative bg-gradient-to-r from-violet-500 to-purple-600 px-6 pt-6 pb-5 text-white">
+            <div className="pointer-events-none absolute -top-8 -right-4 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+            <DialogHeader className="relative z-10">
+              <DialogTitle className="text-white text-lg flex items-center gap-2">
+                <Pencil className="h-4 w-4" />
+                Change Designation
+              </DialogTitle>
+              <DialogDescription className="text-white/75 text-sm">
+                Select a new designation for <strong>{fullName}</strong>. If the designation has a default salary template and this staff has no existing salary, it will be auto-provisioned.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Designation</label>
+              <Select
+                value={selectedDesignationRef}
+                onValueChange={setSelectedDesignationRef}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a designation…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(allDesignations ?? []).map((d) => (
+                    <SelectItem key={d.uuid} value={d.uuid!}>
+                      <div className="flex items-center gap-2">
+                        <span>{d.designationName}</span>
+                        <span className="text-muted-foreground text-xs">({d.designationCode})</span>
+                        {d.defaultSalaryTemplateName && (
+                          <Badge variant="outline" className="text-[9px] h-[16px] ml-1 text-emerald-600 border-emerald-300">
+                            <IndianRupee className="h-2 w-2 mr-0.5" />
+                            {d.defaultSalaryTemplateName}
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 pb-5 pt-0">
+            <Button variant="outline" onClick={() => setDesignationEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!selectedDesignationRef || assignMutation.isPending}
+              onClick={() => assignMutation.mutate(selectedDesignationRef)}
+              className="gap-1.5 shadow-md"
+            >
+              {assignMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Update Designation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Remove Designation Confirmation ── */}
+      <Dialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
+        <DialogContent className="sm:max-w-sm p-0 overflow-hidden">
+          <div className="relative bg-gradient-to-r from-red-500 to-rose-600 px-6 pt-6 pb-5 text-white">
+            <div className="pointer-events-none absolute -top-8 -right-4 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+            <DialogHeader className="relative z-10">
+              <DialogTitle className="text-white text-lg">Remove Designation</DialogTitle>
+              <DialogDescription className="text-white/75 text-sm">
+                Are you sure you want to remove <strong>{currentDesignation?.designationName}</strong> from <strong>{fullName}</strong>?
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="px-6 py-4 text-sm text-muted-foreground">
+            <p>
+              The job title will revert to the staff type. <strong className="text-foreground">Existing salary mappings will be preserved.</strong>
+            </p>
+          </div>
+          <DialogFooter className="px-6 pb-5 pt-0">
+            <Button variant="outline" onClick={() => setRemoveConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={unassignMutation.isPending}
+              onClick={() => unassignMutation.mutate()}
+              className="gap-1.5"
+            >
+              {unassignMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

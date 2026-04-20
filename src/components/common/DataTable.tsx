@@ -24,6 +24,8 @@ interface DataTableProps<T> {
   pageSize?: number;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
+  /** Render additional action buttons per row */
+  customActions?: (row: T) => React.ReactNode;
   searchPlaceholder?: string;
   emptyMessage?: string;
 }
@@ -35,6 +37,7 @@ export default function DataTable<T extends object>({
   pageSize = 10,
   onEdit,
   onDelete,
+  customActions,
   searchPlaceholder = "Search…",
   emptyMessage = "No records found.",
 }: DataTableProps<T>) {
@@ -65,7 +68,7 @@ export default function DataTable<T extends object>({
   const safePage = Math.min(page, totalPages - 1);
   const slice = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
-  const hasActions = Boolean(onEdit || onDelete);
+  const hasActions = Boolean(onEdit || onDelete || customActions);
 
   return (
     <div className="space-y-4">
@@ -147,6 +150,7 @@ export default function DataTable<T extends object>({
                     {hasActions && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {customActions && customActions(row)}
                           {onEdit && (
                             <Button
                               variant="ghost"

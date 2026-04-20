@@ -32,6 +32,26 @@ import UploadingProgress, { type RowStatus } from "./components/UploadingProgres
 // ─── Upload phases ───────────────────────────────────────────────────────────
 type Phase = "idle" | "validating" | "ready" | "uploading" | "success" | "error";
 
+function ErrorCell({ message, maxLength = 120 }: { message: string; maxLength?: number }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!message) return null;
+  const needsTruncation = message.length > maxLength;
+  const displayMessage = expanded || !needsTruncation ? message : message.slice(0, maxLength) + "...";
+
+  return (
+    <div className="flex flex-col items-start gap-1 w-full max-w-[350px]">
+      <span className="whitespace-pre-wrap break-words">{displayMessage}</span>
+      {needsTruncation && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-[10px] uppercase tracking-wider font-semibold text-primary hover:underline focus:outline-none"
+        >
+          {expanded ? "Show Less" : "Show More"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface BulkDataUploadProps {
   defaultUserType?: BulkImportUserType;
@@ -654,8 +674,8 @@ export default function BulkDataUpload({
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">
-                            {errorText || "Imported successfully."}
+                          <td className="px-4 py-3 text-xs text-muted-foreground align-top">
+                            {errorText ? <ErrorCell message={errorText} /> : "Imported successfully."}
                           </td>
                         </tr>
                       );

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import DataTable, { type Column } from "@/components/common/DataTable";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import ReviewDialog from "@/features/hrms/components/ReviewDialog";
+import DesignationStaffDialog from "@/features/hrms/components/DesignationStaffDialog";
 import { hrmsService, normalizeHrmsError } from "@/services/hrms";
 import { useAppSelector } from "@/store/hooks";
 import type {
@@ -75,6 +76,7 @@ export default function DesignationManagement() {
   const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [form, setForm] = useState<StaffDesignationCreateUpdateDTO>(initialForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [assignDialogDesignation, setAssignDialogDesignation] = useState<StaffDesignationResponseDTO | null>(null);
 
   const canDelete = roles
     .map((role) => role.toUpperCase().replace(/^ROLE_/, ""))
@@ -233,6 +235,9 @@ export default function DesignationManagement() {
             </SelectContent>
           </Select>
 
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAssignDialogDesignation(null)}>
+            <UserPlus className="h-4 w-4" />
+          </Button>
           <Button size="sm" onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" /> Add Designation
           </Button>
@@ -246,6 +251,17 @@ export default function DesignationManagement() {
         onEdit={openEdit}
         onDelete={(row) => setDeleteTarget(row)}
         emptyMessage={isLoading ? "Loading designations..." : "No designations found."}
+        customActions={(row) => (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10"
+            title="Assign Staff"
+            onClick={() => setAssignDialogDesignation(row)}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+          </Button>
+        )}
       />
 
       <Dialog open={formOpen} onOpenChange={(open) => { if (!open) closeForm(); }}>
@@ -448,6 +464,12 @@ export default function DesignationManagement() {
           deleteMutation.mutate(deleteTarget.uuid);
         }}
         loading={deleteMutation.isPending}
+      />
+
+      <DesignationStaffDialog
+        open={Boolean(assignDialogDesignation)}
+        onOpenChange={(open) => { if (!open) setAssignDialogDesignation(null); }}
+        designation={assignDialogDesignation}
       />
     </div>
   );
