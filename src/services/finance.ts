@@ -285,4 +285,28 @@ export const financeService = {
   triggerBulkReminders() {
     return api.post("/auth/finance/reminders/trigger-bulk");
   },
+
+  // ── Financial Statements (Phase 5) ───────────────────────────────
+  getTrialBalance(asOfDate: string) {
+    return api.get("/auth/finance/statements/trial-balance", { params: { asOfDate } });
+  },
+  getProfitAndLoss(startDate: string, endDate: string) {
+    return api.get("/auth/finance/statements/profit-and-loss", { params: { startDate, endDate } });
+  },
+  getBalanceSheet(asOfDate: string) {
+    return api.get("/auth/finance/statements/balance-sheet", { params: { asOfDate } });
+  },
+
+  // ── Miscellaneous Receipts (Phase 5) ──────────────────────────────
+  getMiscReceipts() {
+    return api.get("/auth/finance/misc-receipts");
+  },
+  createMiscReceipt(data: any) {
+    return api.post("/auth/finance/misc-receipts", data);
+  },
+
+  // ── Finance Audit Logs (Phase 5) ──────────────────────────────────
+  getFinanceAuditLogs() {
+    return api.get("/auth/finance/audit-logs");
+  },
 };

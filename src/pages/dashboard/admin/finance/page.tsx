@@ -2,6 +2,8 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import {
   RefreshCw, LayoutDashboard, FileText, Blocks, Settings2, Link2,
   GraduationCap, CalendarRange, CreditCard, RotateCcw, Bell, Timer, BarChart3,
+  BookOpen, BookMarked, PiggyBank, Building2, ShoppingCart, Receipt,
+  Layers, Landmark, Award, FileSpreadsheet, ShieldAlert, BadgeIndianRupee,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,6 +31,18 @@ import { InstallmentPlans } from "@/features/finance/InstallmentPlans";
 import { RefundManager } from "@/features/finance/RefundManager";
 import { FeeReminderCenter } from "@/features/finance/FeeReminderCenter";
 import { ReportsCenter } from "@/features/finance/ReportsCenter";
+import { ChartOfAccounts } from "@/features/finance/ChartOfAccounts";
+import { GeneralLedger } from "@/features/finance/GeneralLedger";
+import { BudgetManager } from "@/features/finance/BudgetManager";
+import { VendorDirectory } from "@/features/finance/VendorDirectory";
+import { PurchaseOrders } from "@/features/finance/PurchaseOrders";
+import { VendorBills } from "@/features/finance/VendorBills";
+import { AssetRegister } from "@/features/finance/AssetRegister";
+import { BankReconciliation } from "@/features/finance/BankReconciliation";
+import { GrantManager } from "@/features/finance/GrantManager";
+import { MiscellaneousReceipts } from "@/features/finance/MiscellaneousReceipts";
+import { FinancialStatements } from "@/features/finance/FinancialStatements";
+import { AuditTrail } from "@/features/finance/AuditTrail";
 
 const InvoicesTab = lazy(() =>
   import("@/features/finance/InvoicesTab").then((m) => ({ default: m.InvoicesTab }))
@@ -125,6 +139,27 @@ export default function AdminFinancePage() {
             <NavItem value="dashboard" label="Dashboard" icon={LayoutDashboard} />
           </NavSection>
 
+          <NavSection title="Core Accounting">
+            <NavItem value="coa" label="Chart of Accounts" icon={BookOpen} />
+            <NavItem value="gl" label="General Ledger" icon={BookMarked} />
+          </NavSection>
+
+          <NavSection title="Planning">
+            <NavItem value="budgets" label="Budget Management" icon={PiggyBank} />
+          </NavSection>
+
+          <NavSection title="Procurement">
+            <NavItem value="vendors" label="Vendor Directory" icon={Building2} />
+            <NavItem value="purchase-orders" label="Purchase Orders" icon={ShoppingCart} />
+            <NavItem value="vendor-bills" label="Vendor Bills (AP)" icon={Receipt} />
+          </NavSection>
+
+          <NavSection title="Assets & Treasury">
+            <NavItem value="assets" label="Asset Register" icon={Layers} />
+            <NavItem value="bank-recon" label="Bank Reconciliation" icon={Landmark} />
+            <NavItem value="grants" label="Grant Management" icon={Award} />
+          </NavSection>
+
           <NavSection title="Fee Management">
             <NavItem value="structures" label="Fee Structures" icon={Blocks} />
             <NavItem value="types" label="Fee Types" icon={Settings2} />
@@ -138,14 +173,17 @@ export default function AdminFinancePage() {
           </NavSection>
 
           <NavSection title="Operations">
+            <NavItem value="misc-receipts" label="Misc Receipts" icon={BadgeIndianRupee} />
             <NavItem value="payments" label="Payments" icon={CreditCard} />
             <NavItem value="refunds" label="Refunds" icon={RotateCcw} />
             <NavItem value="reminders" label="Reminders" icon={Bell} />
             <NavItem value="late-fees" label="Late Fees" icon={Timer} />
           </NavSection>
 
-          <NavSection title="Analytics">
+          <NavSection title="Reports & Audit">
             <NavItem value="reports" label="Reports" icon={BarChart3} />
+            <NavItem value="statements" label="Financial Statements" icon={FileSpreadsheet} />
+            <NavItem value="audit-logs" label="Audit Trail" icon={ShieldAlert} />
           </NavSection>
         </nav>
       </aside>
@@ -160,6 +198,24 @@ export default function AdminFinancePage() {
         </div>
 
         <div>
+          {activeTab === "coa" && <ChartOfAccounts />}
+
+          {activeTab === "gl" && <GeneralLedger />}
+
+          {activeTab === "budgets" && <BudgetManager />}
+
+          {activeTab === "vendors" && <VendorDirectory />}
+          {activeTab === "purchase-orders" && <PurchaseOrders />}
+          {activeTab === "vendor-bills" && <VendorBills />}
+
+          {activeTab === "assets" && <AssetRegister />}
+          {activeTab === "bank-recon" && <BankReconciliation />}
+          {activeTab === "grants" && <GrantManager />}
+          {activeTab === "misc-receipts" && <MiscellaneousReceipts />}
+
+          {activeTab === "statements" && <FinancialStatements />}
+          {activeTab === "audit-logs" && <AuditTrail />}
+
           {activeTab === "dashboard" && (
             <FinanceDashboard summary={summary} invoices={invoices} payments={payments} loading={loading} />
           )}
