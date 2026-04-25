@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CalendarDays, Clock, Edit2, LayoutTemplate, Loader2, Plus, SlidersHorizontal, Tag, Trash2, UserCheck, Users } from "lucide-react";
+import { BookOpen, CalendarDays, Clock, Edit2, LayoutTemplate, Loader2, Plus, SlidersHorizontal, Tag, Trash2,  } from "lucide-react";
 import { toast } from "sonner";
 import {
   Card,

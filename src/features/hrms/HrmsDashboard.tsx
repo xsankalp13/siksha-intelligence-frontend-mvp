@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   AlertCircle, CheckCircle2, IndianRupee, Users2, UserX,
-  Calendar, ShieldAlert, ArrowRight, ClipboardCheck, CreditCard,
+  Calendar, ShieldAlert, ArrowRight, ClipboardCheck, 
   TrendingUp, TrendingDown, Zap, Award, BookOpen, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -227,7 +227,7 @@ export default function HrmsDashboard() {
         {[
           { label: "Payroll This Month", value: data?.totalPayrollThisMonth, icon: TrendingUp, palette: "cyan" as const, trend: "up" },
           { label: "Payroll Last Month", value: data?.totalPayrollLastMonth, icon: TrendingDown, palette: "blue" as const, trend: "down" },
-        ].map(({ label, value, icon: Icon, palette, trend }) => {
+        ].map(({ label, value, icon: Icon, palette, }) => {
           const p = PALETTE[palette];
           return (
             <div key={label} className={cn(

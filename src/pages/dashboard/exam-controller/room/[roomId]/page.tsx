@@ -31,7 +31,7 @@ export default function ExamControllerRoomPage() {
 
   // Queries
   const { data: dashboardData } = useControllerDashboardQuery(selectedExamId);
-  const { data: roomViewData, isLoading, refetch } = useControllerRoomViewQuery(selectedExamId);
+  const { data: roomViewData, isLoading, } = useControllerRoomViewQuery(selectedExamId);
   
   // Mutations
   const markMutation = useControllerMarkAttendanceMutation();
@@ -43,7 +43,7 @@ export default function ExamControllerRoomPage() {
   const dashboardRoom = dashboardData?.rooms.find(r => r.roomId === Number(roomId));
   
   // Timer setup
-  const { display: timerDisplay, status: timerStatus, isNotStarted, isEnded } = useExamTimer({
+  const { display: timerDisplay, status: timerStatus, isNotStarted, } = useExamTimer({
     startTime: dashboardData?.timer.startTime,
     endTime: dashboardData?.timer.endTime,
   });

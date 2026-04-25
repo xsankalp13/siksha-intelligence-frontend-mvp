@@ -229,6 +229,23 @@ export default function BulkDataUpload({
     setIsMinimized(false);
   }, []);
 
+  const showProgressToast = useCallback((
+    done: number,
+    total: number,
+    failures: number,
+    typeLabel: string,
+    onRestore: () => void
+  ) => {
+    toast(`Importing ${typeLabel} (${done}/${total})`, {
+      description: failures > 0 ? `${failures} failures` : 'In progress...',
+      action: {
+        label: 'View',
+        onClick: onRestore,
+      },
+      id: 'bulk-import-progress',
+    });
+  }, []);
+
   // ── File change ──────────────────────────────────────────────────────────
   const handleFileChange = useCallback((f: File | null) => {
     setFile(f);

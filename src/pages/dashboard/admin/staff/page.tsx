@@ -298,7 +298,7 @@ export default function StaffPage() {
           certifications: data.certifications ? [data.certifications] : [],
           yearsOfExperience: data.yearsOfExperience,
           educationLevel: data.educationLevel,
-          designationCode: data.designationCode,
+          designationCode: data.designationCode ?? "",
         });
       } else if (data.staffType === "PRINCIPAL") {
         await adminService.createPrincipal({
@@ -318,7 +318,7 @@ export default function StaffPage() {
           department: data.department as any,
           schoolLevelManaged: data.schoolLevelManaged as never,
           administrativeCertifications: data.adminCertifications ? [data.adminCertifications] : [],
-          designationCode: data.designationCode,
+          designationCode: data.designationCode ?? "",
         });
       } else if (data.staffType === "LIBRARIAN") {
         await adminService.createLibrarian({
@@ -337,7 +337,7 @@ export default function StaffPage() {
           category: data.category as any,
           department: data.department as any,
           hasMlisDegree: data.hasMlisDegree,
-          designationCode: data.designationCode,
+          designationCode: data.designationCode ?? "",
         });
       } else if (data.staffType === "SECURITY_GUARD") {
         const selectedDesig = designations.find(d => String(d.designationId) === data.designationId);

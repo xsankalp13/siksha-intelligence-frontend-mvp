@@ -7,7 +7,7 @@ import {
   CreditCard,
   FileText,
   Loader2,
-  Plus,
+  
   XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

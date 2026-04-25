@@ -5,7 +5,7 @@ import DataTable, { type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {} from "@/components/ui/label";
 import PayslipViewer from "@/features/hrms/PayslipViewer";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { triggerBlobDownload } from "@/services/idCard";

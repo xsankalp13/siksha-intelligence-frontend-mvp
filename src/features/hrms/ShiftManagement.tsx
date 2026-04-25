@@ -16,7 +16,7 @@ import { getLocalDateString } from "@/lib/dateUtils";
 import type { ShiftCreateDTO, ShiftResponseDTO } from "@/services/types/shift";
 import {
   Clock,
-  Plus,
+  
   Users,
   UserPlus,
   Search,

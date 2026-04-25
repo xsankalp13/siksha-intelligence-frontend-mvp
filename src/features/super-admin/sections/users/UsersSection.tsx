@@ -262,7 +262,7 @@ function StaffRow({ member, onHrAdminChanged }: { member: StaffSummaryDTO; onHrA
   const isHrAdmin = (member as any).hrAdmin === true || (member as any).roles?.includes('ROLE_HR_ADMIN')
 
   const { mutate: promoteHrAdmin, isPending: isPromoting } = useMutation({
-    mutationFn: () => adminService.promoteToHrAdmin(member.staffId),
+    mutationFn: () => adminService.promoteToHrAdmin(String(member.staffId)),
     onSuccess: () => {
       toast.success(`🎉 ${member.firstName} is now an HR Admin`)
       onHrAdminChanged?.()
@@ -271,7 +271,7 @@ function StaffRow({ member, onHrAdminChanged }: { member: StaffSummaryDTO; onHrA
   })
 
   const { mutate: demoteHrAdmin, isPending: isDemoting } = useMutation({
-    mutationFn: () => adminService.demoteFromHrAdmin(member.staffId),
+    mutationFn: () => adminService.demoteFromHrAdmin(String(member.staffId)),
     onSuccess: () => {
       toast.success(`HR Admin role removed from ${member.firstName}`)
       onHrAdminChanged?.()
@@ -354,6 +354,7 @@ function StaffRow({ member, onHrAdminChanged }: { member: StaffSummaryDTO; onHrA
       </Button>
     </div>
   )
+}
 
 // ── Guardian Row ──────────────────────────────────────────────────────
 

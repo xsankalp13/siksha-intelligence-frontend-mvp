@@ -1,4 +1,4 @@
-import { ExamAttendanceStatus } from "./examAttendance";
+import type { ExamAttendanceStatus } from "./examAttendance";
 
 export interface ControllerDashboardDTO {
   examId: number;

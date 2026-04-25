@@ -990,7 +990,7 @@ export const hrmsService = {
   // ── Late Clock-In Review (Phase 2.2) ───────────────────────────────
   /** GET /auth/ams/late-clockin — list with optional status filter */
   listLateClockInRequests(params?: { status?: string; page?: number; size?: number }) {
-    return api.get<import("./types/common").Page<import("./types/hrms").LateClockInRequestDTO>>(
+    return api.get<import("./types/common").PageResponse<import("./types/hrms").LateClockInRequestDTO>>(
       `/auth/ams/late-clockin`,
       { params }
     );

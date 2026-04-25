@@ -427,13 +427,3 @@ export default function TeacherMyAttendance({ staffUuid }: { staffUuid?: string 
   );
 }
 
-function StatMini({ label, value, loading, color }: { label: string; value: number | string; loading: boolean; color?: string; }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-3 shadow-sm flex flex-col items-center justify-center h-full">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-      <p className={cn("text-2xl font-bold tracking-tight", color ?? "text-foreground")}>
-        {loading ? <span className="animate-pulse">…</span> : value}
-      </p>
-    </div>
-  );
-}
