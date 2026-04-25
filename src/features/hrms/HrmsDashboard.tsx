@@ -133,12 +133,25 @@ export default function HrmsDashboard() {
     );
   }
 
-  // Heatmap calendar
+  // Heatmap calendar — lazy-loaded from dedicated endpoint (decoupled from summary for perf)
   const now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth();
+  const month = now.getMonth(); // 0-indexed
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const heatmapData = data?.currentMonthHeatmap ?? {};
+
+  const { data: heatmapResponse } = useQuery({
+    queryKey: ["hrms", "dashboard", "attendance-heatmap", year, month + 1],
+    queryFn: () => hrmsService.getAttendanceHeatmap(year, month + 1).then((res) => res.data),
+  });
+
+  // Convert backend AttendanceHeatmapDTO.days[] into the Record<string, number> format used by the widget
+  const heatmapData: Record<string, number> = {};
+  if (heatmapResponse?.days) {
+    for (const day of heatmapResponse.days) {
+      // day.date is ISO string "YYYY-MM-DD", use presentCount as the heatmap intensity value
+      heatmapData[day.date] = day.presentCount ?? 0;
+    }
+  }
   const maxCount = Math.max(1, ...Object.values(heatmapData));
   const monthDays = Array.from({ length: daysInMonth }, (_, i) => {
     const d = i + 1;
