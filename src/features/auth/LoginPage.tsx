@@ -3,17 +3,31 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, GraduationCap } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Eye,
+  EyeOff,
+  GraduationCap,
+  Lock,
+  Mail,
+  ArrowRight,
+  Users,
+  BarChart3,
+  ShieldCheck,
+  Headphones,
+  X,
+  KeyRound,
+  CheckCircle2,
+} from 'lucide-react'
+import { useState, useCallback } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { login } from '@/store/slices/authSlice'
+import { authService } from '@/services/auth'
 import './LoginPage.css'
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Email is required'),
+  username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
   rememberMe: z.boolean(),
 })
@@ -33,25 +47,47 @@ const roleToPathMap: Record<string, string> = {
 
 const getDashboardPath = (roles: string[] | null | undefined): string => {
   if (!Array.isArray(roles) || roles.length === 0) {
-    return '/dashboard/student' // Default fallback
+    return '/dashboard/student'
   }
-
-  // Helper to normalize role (strip ROLE_ prefix if present)
   const normalizeRole = (role: string): string => {
     const upper = role.toUpperCase().trim()
     return upper.startsWith('ROLE_') ? upper.substring(5) : upper
   }
-
-  // Check roles in priority order (highest privilege first)
   for (const role of roles) {
     const normalized = normalizeRole(role)
     const path = roleToPathMap[normalized]
     if (path) return path
   }
-
-  // Fallback to student dashboard
   return '/dashboard/student'
 }
+
+// Features list for the left panel
+const features = [
+  {
+    icon: Users,
+    color: 'blue' as const,
+    title: 'Unified Platform',
+    desc: 'All your academic tools in one place',
+  },
+  {
+    icon: BarChart3,
+    color: 'red' as const,
+    title: 'Real-time Insights',
+    desc: 'Get data-driven insights instantly',
+  },
+  {
+    icon: ShieldCheck,
+    color: 'purple' as const,
+    title: 'Secure & Reliable',
+    desc: 'Enterprise-grade security for your data',
+  },
+  {
+    icon: Headphones,
+    color: 'orange' as const,
+    title: '24/7 Support',
+    desc: 'We are here to help you anytime',
+  },
+]
 
 export default function LoginPage() {
   const dispatch = useAppDispatch()
@@ -60,20 +96,21 @@ export default function LoginPage() {
 
   const [showPassword, setShowPassword] = useState(false)
 
+  // Forgot password state
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotSent, setForgotSent] = useState(false)
+
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: '',
-      password: '',
-      rememberMe: true,
-    },
+    defaultValues: { username: '', password: '', rememberMe: true },
     mode: 'onSubmit',
   })
 
   const onSubmit = async (values: LoginFormValues) => {
     try {
       const result = await dispatch(login(values)).unwrap()
-      // Get dashboard path based on user roles
       const dashboardPath = getDashboardPath(result.user.roles)
       navigate(dashboardPath, { replace: true })
     } catch (err) {
@@ -81,190 +118,291 @@ export default function LoginPage() {
     }
   }
 
+  // Forgot password submit
+  const handleForgotSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      if (!forgotEmail.trim()) {
+        toast.error('Please enter your email address')
+        return
+      }
+      setForgotLoading(true)
+      try {
+        await authService.forgotPassword({ email: forgotEmail.trim() })
+        setForgotSent(true)
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error ? err.message : 'Failed to send reset link'
+        toast.error(msg)
+      } finally {
+        setForgotLoading(false)
+      }
+    },
+    [forgotEmail]
+  )
+
+  const closeForgot = () => {
+    setForgotOpen(false)
+    setForgotEmail('')
+    setForgotSent(false)
+  }
+
   return (
     <div className="login-page">
-      {/* Full-screen white-themed background with AI education illustration */}
-      <div className="login-background">
-        <div className="bg-pattern"></div>
-      </div>
-
-      {/* Centered glassmorphic container */}
-      <div className="login-container">
-        <div className="login-card">
-          {/* Left Section: Glassmorphic Illustration Panel */}
-          <div className="illustration-panel">
-            {/* Branding at top-left */}
-            <div className="branding">
-              <div className="logo-wrapper">
-                <GraduationCap className="logo-icon" />
-              </div>
-              <span className="brand-text">Shiksha Intelligence</span>
+      <div className="login-card">
+        {/* ───── LEFT PANEL ───── */}
+        <div className="left-panel">
+          {/* Brand */}
+          <div className="left-brand">
+            <div className="left-brand-icon-wrap">
+              <GraduationCap />
             </div>
-
-            {/* Illustration Area */}
-            <div className="illustration-area">
-              <div className="illustration-placeholder">
-                <img 
-                  src="/login-illustration.png" 
-                  alt="Students using AI and smart technology for education" 
-                  className="main-illustration"
-                />
-              </div>
-            </div>
-
-            {/* Caption at bottom */}
-            <div className="caption">
-              <p>Empowering education through intelligent technology</p>
-            </div>
+            <span className="left-brand-name">Shiksha Intelligence</span>
           </div>
 
-          {/* Right Section: Login Form */}
-          <div className="form-panel">
-            <div className="form-wrapper">
-              {/* Title - center-aligned */}
-              <div className="form-header">
-                <h1 className="form-title">Login</h1>
-                <div className="title-underline"></div>
-              </div>
+          {/* Headline */}
+          <div className="left-headline">
+            <h1>
+              Smart Education.
+              <br />
+              <span className="accent">Stronger Future.</span>
+            </h1>
+            <p className="left-subtitle">
+              Shiksha Intelligence is your all-in-one platform to manage
+              academics, students, staff and more efficiently.
+            </p>
+          </div>
 
-              {/* Login Form */}
-              <form onSubmit={form.handleSubmit(onSubmit)} className="login-form">
-                {/* Email Field */}
-                <div className="form-group">
-                  <label htmlFor="username" className="form-label">Username</label>
-                  <Input
+          {/* Features */}
+          <div className="left-features">
+            {features.map((f) => (
+              <div className="feature-item" key={f.title}>
+                <div className={`feature-icon-wrap ${f.color}`}>
+                  <f.icon />
+                </div>
+                <div className="feature-text">
+                  <h4>{f.title}</h4>
+                  <p>{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Quote */}
+          <div className="left-quote">
+            <div className="quote-mark">"</div>
+            <blockquote>
+              Education is the most powerful weapon which you can use to change
+              the world.
+            </blockquote>
+            <p className="quote-author">– Nelson Mandela</p>
+          </div>
+        </div>
+
+        {/* ───── RIGHT PANEL ───── */}
+        <div className="right-panel">
+          <div className="right-inner">
+            {/* Brand icon */}
+            <div className="form-brand-icon">
+              <GraduationCap />
+            </div>
+
+            {/* Header */}
+            <div className="form-header">
+              <h1 className="form-title">Welcome Back!</h1>
+              <p className="form-subtitle">
+                Sign in to continue to Shiksha Intelligence
+              </p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={form.handleSubmit(onSubmit)} className="login-form">
+              {/* Username */}
+              <div className="form-group">
+                <label htmlFor="username" className="form-label">
+                  Email or Username
+                </label>
+                <div className="input-wrap">
+                  <span className="input-icon">
+                    <Mail />
+                  </span>
+                  <input
                     id="username"
                     type="text"
                     autoComplete="username"
-                    placeholder="Enter your username"
+                    placeholder="Enter your email or username"
                     disabled={loading}
                     aria-invalid={Boolean(form.formState.errors.username)}
                     className="form-input"
                     {...form.register('username')}
                   />
-                  {form.formState.errors.username?.message && (
-                    <p className="error-message">{form.formState.errors.username.message}</p>
-                  )}
                 </div>
-
-                {/* Password Field */}
-                <div className="form-group">
-                  <label htmlFor="password" className="form-label">Password</label>
-                  <div className="password-wrapper">
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete="current-password"
-                      placeholder="Enter your password"
-                      disabled={loading}
-                      aria-invalid={Boolean(form.formState.errors.password)}
-                      className="form-input password-input"
-                      {...form.register('password')}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="password-toggle"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      disabled={loading}
-                    >
-                      {showPassword ? <EyeOff className="icon" /> : <Eye className="icon" />}
-                    </button>
-                  </div>
-                  {form.formState.errors.password?.message && (
-                    <p className="error-message">{form.formState.errors.password.message}</p>
-                  )}
-                </div>
-
-                {/* Remember Me & Forgot Password */}
-                <div className="form-options">
-                  <label className="remember-me" htmlFor="rememberMe">
-                    <input
-                      id="rememberMe"
-                      type="checkbox"
-                      disabled={loading}
-                      {...form.register('rememberMe')}
-                    />
-                    <span>Remember me</span>
-                  </label>
-                  <a href="#" className="forgot-password">Forgot password?</a>
-                </div>
-
-                {/* Sign In Button */}
-                <Button 
-                  type="submit" 
-                  disabled={loading}
-                  className="sign-in-button"
-                >
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </Button>
-
-                {/* Sign Up Link */}
-                <div className="sign-up-prompt">
-                  <span>Don't have an account? </span>
-                  <a href="#" className="sign-up-link">Sign up</a>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-                  <label className="remember-me" htmlFor="rememberMe">
-                    <input
-                      id="rememberMe"
-                      type="checkbox"
-                      disabled={loading}
-                      {...form.register('rememberMe')}
-                    />
-                    <span>Remember me</span>
-                  </label>
-                  <a href="#" className="forgot-password">Forgot password?</a>
-                </div>
-
-                {/* Sign In Button */}
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className={`sign-in-button${loading ? ' is-loading' : ''}`}
-                  onClick={handleRipple}
-                >
-                  {/* Ripple elements */}
-                  {ripples.map((r) => (
-                    <span
-                      key={r.id}
-                      className="ripple-span"
-                      style={{
-                        left: r.x,
-                        top: r.y,
-                        width: 20,
-                        height: 20,
-                        marginLeft: -10,
-                        marginTop: -10,
-                      }}
-                    />
-                  ))}
-
-                  {loading ? (
-                    <>
-                      Signing in…
-                      <span className="btn-progress" />
-                    </>
-                  ) : (
-                    'Sign In'
-                  )}
-                </Button>
-              </form>
-
-              <div className="login-footer">
-                <p className="login-footer-text">Secured by Shiksha Intelligence Platform</p>
+                {form.formState.errors.username?.message && (
+                  <p className="error-message">
+                    {form.formState.errors.username.message}
+                  </p>
+                )}
               </div>
+
+              {/* Password */}
+              <div className="form-group">
+                <label htmlFor="password" className="form-label">
+                  Password
+                </label>
+                <div className="input-wrap">
+                  <span className="input-icon">
+                    <Lock />
+                  </span>
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    disabled={loading}
+                    aria-invalid={Boolean(form.formState.errors.password)}
+                    className="form-input has-toggle"
+                    {...form.register('password')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="password-toggle"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    disabled={loading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="icon" />
+                    ) : (
+                      <Eye className="icon" />
+                    )}
+                  </button>
+                </div>
+                {form.formState.errors.password?.message && (
+                  <p className="error-message">
+                    {form.formState.errors.password.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Options */}
+              <div className="form-options">
+                <label className="remember-me" htmlFor="rememberMe">
+                  <input
+                    id="rememberMe"
+                    type="checkbox"
+                    disabled={loading}
+                    {...form.register('rememberMe')}
+                  />
+                  <span>Remember me</span>
+                </label>
+                <button
+                  type="button"
+                  className="forgot-link"
+                  onClick={() => setForgotOpen(true)}
+                >
+                  Forgot Password?
+                </button>
+              </div>
+
+              {/* Sign In */}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="sign-in-button"
+              >
+                {loading ? 'Signing in…' : 'Sign In'}
+                {!loading && <ArrowRight className="btn-arrow" size={18} />}
+              </Button>
+            </form>
+
+            {/* Divider */}
+            <div className="login-divider">
+              <span>or continue with</span>
             </div>
+
+            {/* Footer */}
+            <p className="login-footer-note">
+              Don't have an account?{' '}
+              <a href="mailto:admin@shikshaintelligence.com">
+                Contact Administrator
+              </a>
+            </p>
           </div>
         </div>
       </div>
+
+      {/* ═══════ FORGOT PASSWORD MODAL ═══════ */}
+      {forgotOpen && (
+        <div className="forgot-overlay" onClick={closeForgot}>
+          <div
+            className="forgot-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="forgot-modal-close"
+              onClick={closeForgot}
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+
+            {!forgotSent ? (
+              <>
+                <div className="forgot-modal-icon">
+                  <KeyRound />
+                </div>
+                <h2>Forgot Password?</h2>
+                <p className="forgot-desc">
+                  Enter your registered email address and we'll send you a link
+                  to reset your password.
+                </p>
+                <form onSubmit={handleForgotSubmit}>
+                  <div className="forgot-input-group">
+                    <label htmlFor="forgotEmail">Email Address</label>
+                    <div className="input-wrap">
+                      <span className="input-icon">
+                        <Mail />
+                      </span>
+                      <input
+                        id="forgotEmail"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        disabled={forgotLoading}
+                        className="forgot-input"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="forgot-submit"
+                  >
+                    {forgotLoading ? 'Sending…' : 'Send Reset Link'}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div className="forgot-success">
+                <div className="forgot-success-icon">
+                  <CheckCircle2 />
+                </div>
+                <h3>Check your email</h3>
+                <p>
+                  We've sent a password reset link to{' '}
+                  <strong>{forgotEmail}</strong>. Please check your inbox and
+                  follow the instructions.
+                </p>
+                <button className="forgot-back-btn" onClick={closeForgot}>
+                  Back to Sign In
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
