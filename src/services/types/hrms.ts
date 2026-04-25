@@ -488,7 +488,10 @@ export interface HrmsDashboardSummaryDTO {
   payrollTrend: { month: string; amount: number }[];
   categoryAttendance: CategoryAttendanceItem[];
   pendingApprovalRequests: number;
-  currentMonthHeatmap: Record<string, number>;
+  // Phase 5 — Dashboard Intelligence (heatmap now via dedicated endpoint)
+  pendingProxyCount: number;
+  pendingLateClockInCount: number;
+  staffPresentPercent: number;
 }
 
 export interface CategoryAttendanceItem {
@@ -602,13 +605,19 @@ export interface LeaveTemplateResponseDTO {
   updatedAt: string;
 }
 
-// ── Phase 1 — Dashboard additions ────────────────────────────────────
-// NOTE: pendingApprovalRequests + currentMonthHeatmap added to HrmsDashboardSummaryDTO below
+// ── Dashboard heatmap (dedicated lazy-loaded endpoint) ───────────────
+
+export interface AttendanceHeatmapDayEntry {
+  date: string;           // ISO "YYYY-MM-DD"
+  presentCount: number;
+  absentCount: number;
+  onLeaveCount: number;
+}
 
 export interface AttendanceHeatmapDTO {
   year: number;
-  month?: number;
-  data: Record<string, number>;
+  month: number;
+  days: AttendanceHeatmapDayEntry[];
 }
 
 /** Unified loan lifecycle states */
