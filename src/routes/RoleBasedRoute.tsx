@@ -50,6 +50,7 @@ export function RoleBasedRoute({ children, allowedRoles }: RoleBasedRouteProps) 
       SUPER_ADMIN: '/dashboard/super-admin',
       SCHOOL_ADMIN: '/dashboard/admin',
       ADMIN: '/dashboard/admin',
+      EXAM_CONTROLLER: '/dashboard/exam-controller',
       TEACHER: '/dashboard/teacher',
       SECURITY_GUARD: '/dashboard/security-guard',
       STUDENT: '/dashboard/student',

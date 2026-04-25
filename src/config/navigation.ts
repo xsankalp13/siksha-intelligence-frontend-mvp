@@ -33,6 +33,7 @@ import {
   MessageSquare,
   ClipboardSignature,
   HeartPulse,
+  Radio,
 } from "lucide-react";
 
 export type NavItem = {
@@ -274,5 +275,26 @@ export const PARENT_NAV_ITEMS: NavItem[] = [
     label: "Exam Attendance",
     path: "/dashboard/invigilator/attendance",
     icon: DoorOpen,
+  },
+];
+
+export const EXAM_CONTROLLER_NAV_ITEMS: NavItem[] = [
+  // ── Live Monitoring ──
+  {
+    label: "Control Tower",
+    path: "/dashboard/exam-controller",
+    icon: Radio,
+    end: true,
+  },
+  {
+    label: "Class View",
+    path: "/dashboard/exam-controller/class",
+    icon: Users,
+  },
+  // ── Exam Management ──
+  {
+    label: "Examinations",
+    path: "/dashboard/exam-controller/examinations",
+    icon: ClipboardCheck,
   },
 ];

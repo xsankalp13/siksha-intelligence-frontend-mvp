@@ -11,6 +11,7 @@ import {
   ChevronRight,
   FileText,
   Loader2,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { refreshSession } from "@/store/slices/authSlice";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +48,8 @@ import {
   useDeleteExam,
   usePublishExam,
 } from "../hooks/useExaminationQueries";
+import { useControllerAssignmentMutation } from "../hooks/useExamControllerQueries";
+import { useStaffList } from "@/features/hrms/hooks/useStaffList";
 import type {
   ExamRequestDTO,
   ExamResponseDTO,
@@ -85,7 +90,9 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
   const updateExam = useUpdateExam();
   const deleteExam = useDeleteExam();
   const publishExam = usePublishExam();
-
+  const assignController = useControllerAssignmentMutation();
+  const { data: staffList = [], isLoading: staffLoading } = useStaffList();
+  const dispatch = useAppDispatch();
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
@@ -94,6 +101,11 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<ExamResponseDTO | null>(
     null
   );
+  const [assignTarget, setAssignTarget] = useState<ExamResponseDTO | null>(null);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>("");
+  const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
+  const userRoles = useAppSelector((s) => s.auth.user?.roles || []);
+  const isAdmin = userRoles.some(r => ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_SCHOOL_ADMIN'].includes(r));
 
   // Form state
   const [form, setForm] = useState<ExamRequestDTO>({
@@ -290,6 +302,13 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
                           {exam.templateName}
                         </span>
                       )}
+                      {exam.assignedControllerName && (
+                        <span className="flex items-center gap-1 text-indigo-600/80 font-medium" title={`Remaining assignment changes: ${exam.remainingAttempts ?? 3}`}>
+                          <Shield className="w-3.5 h-3.5" />
+                          {exam.assignedControllerName} 
+                          <span className="text-xs text-muted-foreground ml-1">({exam.remainingAttempts ?? 3} left)</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -303,6 +322,20 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
                         title="Publish"
                       >
                         <Send className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-500/10"
+                        onClick={() => {
+                          setAssignTarget(exam);
+                          setSelectedStaffId("");
+                        }}
+                        title="Assign Controller"
+                      >
+                        <Shield className="w-4 h-4" />
                       </Button>
                     )}
                     <Button
@@ -466,6 +499,115 @@ export default function ExamListPanel({ onViewSchedules }: Props) {
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Assign Controller Dialog */}
+      <Dialog open={!!assignTarget} onOpenChange={(o) => !o && setAssignTarget(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-indigo-600" />
+              Assign Exam Controller
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Assign a staff member as the Examination Controller for{" "}
+              <span className="font-semibold text-foreground">{assignTarget?.name}</span>.
+            </p>
+            
+            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 p-3 rounded-lg text-sm">
+              <p className="font-semibold mb-1">Assignment Limits</p>
+              <p>You have <strong>{assignTarget?.remainingAttempts ?? 3}</strong> assignment changes remaining for this exam. Once zero, no further changes can be made.</p>
+            </div>
+
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium">
+                Staff Member <span className="text-destructive">*</span>
+              </label>
+              <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={staffLoading ? "Loading staff..." : "Select a staff member"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {staffList.map((staff) => (
+                    <SelectItem key={staff.staffId} value={staff.staffId.toString()}>
+                      {staff.firstName} {staff.lastName} — {staff.employeeId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setAssignTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!assignTarget?.id) {
+                    toast.error("Exam ID is missing from the exam data. Backend must return the numeric 'id'.");
+                    return;
+                  }
+                  if (!selectedStaffId) {
+                    toast.error("Please select a staff member");
+                    return;
+                  }
+                  setAssignConfirmOpen(true);
+                }}
+                disabled={!selectedStaffId || assignController.isPending || (assignTarget?.remainingAttempts ?? 3) <= 0}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                Proceed
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={assignConfirmOpen} onOpenChange={setAssignConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Controller Assignment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to assign this staff member as the Examination Controller?
+              <br/><br/>
+              <strong>Note:</strong> You only have {(assignTarget?.remainingAttempts ?? 3)} attempts left. If this user is replacing another controller, the previous controller will lose dashboard access if they have no other active exams.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!assignTarget?.id || !selectedStaffId) return;
+                const payload = {
+                  examId: Number(assignTarget.id),
+                  staffId: Number(selectedStaffId),
+                };
+
+                assignController.mutate(payload, { 
+                  onSuccess: () => {
+                    setAssignConfirmOpen(false);
+                    setAssignTarget(null);
+                    dispatch(refreshSession());
+                    toast.success("Controller assigned successfully");
+                  },
+                  onError: (err: any) => {
+                    setAssignConfirmOpen(false);
+                    toast.error(err?.response?.data?.message || "Failed to assign controller");
+                  }
+                });
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {assignController.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Yes, Assign Controller"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

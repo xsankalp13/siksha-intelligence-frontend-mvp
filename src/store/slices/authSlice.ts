@@ -186,6 +186,25 @@ export const logoutUser = createAsyncThunk<void, void, { state: { auth: AuthStat
   }
 )
 
+export const refreshSession = createAsyncThunk<LoginResponse, void, { state: { auth: AuthState }, rejectValue: string }>(
+  'auth/refreshSession',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const { auth } = getState();
+      const refreshToken = auth.refreshToken || getStoredRefreshToken();
+
+      if (!refreshToken) {
+        return rejectWithValue('No refresh token available');
+      }
+
+      const res = await api.post('/auth/refresh-token', { refreshToken });
+      return normalizeLoginResponse(res.data);
+    } catch (err) {
+      return rejectWithValue(extractMessage(err));
+    }
+  }
+)
+
 export const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -266,6 +285,15 @@ export const authSlice = createSlice({
       .addCase(login.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload ?? 'Login failed'
+      })
+      .addCase(refreshSession.fulfilled, (state, action) => {
+        state.user = action.payload.user
+        state.accessToken = action.payload.accessToken
+        if (action.payload.refreshToken) {
+          state.refreshToken = action.payload.refreshToken
+          setStoredRefreshToken(action.payload.refreshToken)
+        }
+        state.isAuthenticated = true
       })
   },
 })

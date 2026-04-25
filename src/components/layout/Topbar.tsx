@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import RoleSwitcher from "./RoleSwitcher";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,6 +82,8 @@ export default function Topbar() {
             {user?.roles?.[0]?.replace("ROLE_", "") ?? "ADMIN"}
           </p>
         </div>
+
+        <RoleSwitcher />
 
         {/* Avatar */}
         <UserAvatar 
