@@ -147,7 +147,46 @@ export const parentService = {
 
   /** GET /parent/fees?childId= */
   async getFees(childId: string) {
-    const res = await this.getDashboardSummary(childId);
-    return { data: res.data.feesDue };
+    const studentId = Number(childId);
+    
+    const [invoicesRes, paymentsRes] = await Promise.all([
+      api.get(`/auth/finance/parent/invoices/for-student/${studentId}`),
+      api.get(`/auth/finance/parent/payments/for-student/${studentId}`)
+    ]);
+
+    const invoices = invoicesRes.data;
+    const payments = paymentsRes.data;
+
+    // Filter for pending/overdue invoices to calculate total due
+    const pendingInvoices = invoices.filter((inv: any) => inv.status !== 'PAID' && inv.status !== 'CANCELLED');
+    const totalDue = pendingInvoices.reduce((sum: number, inv: any) => sum + (inv.totalAmount - (inv.paidAmount || 0)), 0);
+    
+    // Find the earliest due date
+    const nextDueDate = pendingInvoices.length > 0 
+      ? pendingInvoices.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0].dueDate
+      : new Date().toISOString();
+
+    return {
+      data: {
+        totalDue,
+        currency: "INR",
+        nextDueDate,
+        feeBreakdown: invoices.map((inv: any) => ({
+          invoiceId: inv.invoiceId,
+          feeType: inv.invoiceNumber, // Or map to a friendlier name if available
+          amount: inv.totalAmount - (inv.paidAmount || 0),
+          dueDate: inv.dueDate,
+          status: inv.status,
+          fullInvoice: inv
+        })),
+        recentPayments: payments.map((p: any) => ({
+          paymentId: p.paymentId,
+          amount: p.amountPaid,
+          date: p.paymentDate,
+          method: p.paymentMethod
+        }))
+      }
+    };
   }
 };
+
