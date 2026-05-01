@@ -385,6 +385,11 @@ export default function App() {
           <Route path="timetable" element={withRouteSuspense(<StudentTimetablePage />)} />
           <Route path="pickup" element={withRouteSuspense(<StudentPickupPage />)} />
           <Route path="discipline" element={withRouteSuspense(<StudentDisciplinePage />)} />
+          <Route path="results" element={withRouteSuspense(<StudentResultsPage />)} />
+          <Route path="past-papers" element={withRouteSuspense(<StudentPastPapersPage />)} />
+          <Route path="admit-cards" element={withRouteSuspense(<StudentAdmitCardsPage />)} />
+          {/* Catch-all: unknown student sub-routes fall back to student dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard/student" replace />} />
         </Route>
 
         {/* Security Guard Dashboard */}
@@ -402,9 +407,6 @@ export default function App() {
           <Route path="visitor-management" element={withRouteSuspense(<SecurityGuardVisitorManagement />)} />
           <Route path="pickup-scanner" element={withRouteSuspense(<SecurityGuardPickupScannerPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/security-guard" replace />} />
-          <Route path="results" element={withRouteSuspense(<StudentResultsPage />)} />
-          <Route path="past-papers" element={withRouteSuspense(<StudentPastPapersPage />)} />
-          <Route path="admit-cards" element={withRouteSuspense(<StudentAdmitCardsPage />)} />
         </Route>
 
         {/* Parent Dashboard */}
