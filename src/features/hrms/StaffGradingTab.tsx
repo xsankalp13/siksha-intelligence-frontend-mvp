@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import {} from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import DataTable, { type Column } from "@/components/common/DataTable";
@@ -314,19 +314,41 @@ export default function StaffGradingTab() {
 
   return (
     <div className="space-y-6">
-      {/* Grade Master CRUD */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Staff Grades</h3>
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner">
+              🏆
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Staff Grades</h2>
+              <p className="text-sm text-white/70">Seniority tiers, teaching wings, pay bands & promotions</p>
+            </div>
+          </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setAssignOpen(true)}>
-              Assign Grade
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm gap-1.5"
+              onClick={() => setAssignOpen(true)}
+            >
+              🏅 Assign Grade
             </Button>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" /> Add Grade
+            <Button
+              size="sm"
+              className="bg-white text-amber-700 hover:bg-white/90 font-semibold gap-1.5"
+              onClick={openCreate}
+            >
+              ➕ Add Grade
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Grade History section + table */}
+      <div className="space-y-4">
 
         <DataTable
           columns={columns}

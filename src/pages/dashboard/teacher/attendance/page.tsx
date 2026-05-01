@@ -1,14 +1,73 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, LayoutGrid, Hand, Shield } from "lucide-react";
+import * as XLSX from "xlsx";
+import { Download, FileSpreadsheet, FileText, Lock, Shield, Table2 } from "lucide-react";
 import { toast } from "sonner";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import EditWindowGuard from "@/components/shared/EditWindowGuard";
 import { useTeacherCtClasses, useTeacherCtStudents, useTeacherSchedule } from "@/features/teacher/queries/useTeacherQueries";
+import { useSectionAttendance } from "@/features/teacher/queries/useAttendanceQueries";
 import ClassSelector from "@/features/teacher/components/ClassSelector";
 import QuickAttendanceGrid from "@/features/teacher/components/QuickAttendanceGrid";
 import { attendanceService } from "@/services/attendance";
 import { teacherService } from "@/services/teacherService";
-import { useQuery } from "@tanstack/react-query";
+
+// ── Export helpers ────────────────────────────────────────────────────
+
+function getDateRange(option: "day" | "week" | "month", base: string) {
+  const d = new Date(`${base}T12:00:00`);
+  if (option === "day") return { from: base, to: base };
+  if (option === "week") {
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) };
+  }
+  // month
+  const start = new Date(d.getFullYear(), d.getMonth(), 1);
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+}
+
+function buildRows(records: { studentUuid?: string; studentFullName?: string; attendanceDate?: string; attendanceTypeShortCode?: string }[]) {
+  return records.map((r) => ({
+    Date: r.attendanceDate ?? "",
+    Student: r.studentFullName ?? "",
+    Status: r.attendanceTypeShortCode ?? "",
+  }));
+}
+
+function downloadAsCSV(rows: ReturnType<typeof buildRows>, filename: string) {
+  if (rows.length === 0) { toast.warning("No records to export"); return; }
+  const header = Object.keys(rows[0]).join(",");
+  const lines = rows.map((r) => Object.values(r).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
+  const blob = new Blob([header + "\n" + lines.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadAsXLSX(rows: ReturnType<typeof buildRows>, filename: string) {
+  if (rows.length === 0) { toast.warning("No records to export"); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // Auto-width columns
+  const colWidths = Object.keys(rows[0]).map((k) => ({ wch: Math.max(k.length, ...rows.map((r) => String(r[k as keyof typeof r]).length)) + 2 }));
+  ws["!cols"] = colWidths;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+  XLSX.writeFile(wb, filename);
+}
+import { useGetAllExams } from "@/features/examination/hooks/useExaminationQueries";
+import { Link } from "react-router-dom";
 
 export default function TeacherAttendancePage() {
   const { data: classes = [], isLoading } = useTeacherCtClasses();
@@ -16,7 +75,6 @@ export default function TeacherAttendancePage() {
   const staffUuid = schedule?.staffUuid ?? "";
   const defaultSelection = classes[0] ? `${classes[0].classUuid}:${classes[0].sectionUuid}` : "";
   const [selectedClass, setSelectedClass] = useState(defaultSelection);
-  const [mode, setMode] = useState("grid");
   const [downloading, setDownloading] = useState(false);
 
   const today = new Date();
@@ -38,47 +96,71 @@ export default function TeacherAttendancePage() {
 
   const { data: students } = useTeacherCtStudents(
     selectedSectionUuid
-      ? { sectionUuid: selectedSectionUuid, page: 0, size: 120 }
+      ? { sectionUuid: selectedSectionUuid, page: 0, size: 500 }
       : undefined,
     Boolean(selectedSectionUuid)
   );
 
-  const handleDownload = async () => {
+  const sectionLabel = selectedClassObj
+    ? `${selectedClassObj.className}-${selectedClassObj.sectionName}`
+    : "attendance";
+
+  const handleExportPDF = async (range: "day" | "week" | "month") => {
     if (!selectedSectionUuid) return;
+    const { from } = getDateRange(range, selectedDate);
     setDownloading(true);
     try {
-      const res = await teacherService.exportAttendanceSheet(selectedSectionUuid, selectedDate);
+      const res = await teacherService.exportAttendanceSheet(selectedSectionUuid, from);
       const blob = new Blob([res.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `attendance-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.download = `attendance-${sectionLabel}-${from}.pdf`;
       a.click();
       window.URL.revokeObjectURL(url);
-      toast.success("Attendance sheet downloaded");
+      toast.success("PDF downloaded");
     } catch {
-      toast.error("Failed to download attendance sheet");
+      toast.error("Failed to download PDF");
     } finally {
       setDownloading(false);
     }
   };
 
-  // Fetch existing attendance records for this teacher on the selected date
-  const { data: existingAttendancePage } = useQuery({
-    queryKey: ["teacher-attendance", staffUuid, selectedDate],
-    queryFn: async () => {
-      if (!staffUuid) return null;
-      return (
-        await attendanceService.listStudentAttendance({
-          takenByStaffUuid: staffUuid,
-          fromDate: selectedDate,
-          toDate: selectedDate,
-          size: 200,
-        })
-      ).data;
-    },
-    enabled: Boolean(staffUuid && selectedDate),
-  });
+  const handleExportData = async (format: "xlsx" | "csv", range: "day" | "week" | "month") => {
+    if (!selectedSectionUuid) return;
+    setDownloading(true);
+    try {
+      const { from, to } = getDateRange(range, selectedDate);
+      const res = await attendanceService.listStudentAttendance({
+        sectionUuid: selectedSectionUuid,
+        fromDate: from,
+        toDate: to,
+        size: 9999,
+      });
+      const rows = buildRows(res.data.content ?? []);
+      const base = `attendance-${sectionLabel}-${from}${from !== to ? `_to_${to}` : ""}`;
+      if (format === "csv") {
+        downloadAsCSV(rows, `${base}.csv`);
+        toast.success("CSV downloaded");
+      } else {
+        downloadAsXLSX(rows, `${base}.xlsx`);
+        toast.success("Excel downloaded");
+      }
+    } catch {
+      toast.error("Failed to export data");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // Fetch existing attendance records for the section+date — use sectionUuid (not staffUuid)
+  // so records marked by any substitute/proxy teacher are also loaded
+  const { data: existingAttendancePage, refetch: refetchExisting } = useSectionAttendance(
+    selectedSectionUuid && selectedDate
+      ? { sectionUuid: selectedSectionUuid, fromDate: selectedDate, toDate: selectedDate, size: 500 }
+      : undefined,
+    Boolean(selectedSectionUuid && selectedDate)
+  );
 
   // Map existing records to student Uuids for QuickAttendanceGrid
   const initialRecords = useMemo(() => {
@@ -102,6 +184,17 @@ export default function TeacherAttendancePage() {
     return map;
   }, [existingAttendancePage, students]);
 
+  // Check if there is an active exam on the selected date
+  const { data: allExams } = useGetAllExams();
+  const activeExam = useMemo(() => {
+    if (!allExams) return null;
+    return allExams.find(exam =>
+      exam.published &&
+      selectedDate >= exam.startDate &&
+      selectedDate <= exam.endDate
+    );
+  }, [allExams, selectedDate]);
+
   if (!isLoading && classes.length === 0) {
     return (
       <div className="mx-auto max-w-6xl">
@@ -121,10 +214,10 @@ export default function TeacherAttendancePage() {
     <div className="mx-auto max-w-6xl space-y-5 pb-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Mark Attendance</h1>
+          <h1 className="text-2xl font-bold">Take Attendance</h1>
           <p className="text-sm text-muted-foreground">
             {selectedClassObj
-              ? `Class teacher attendance for ${selectedClassObj.className}-${selectedClassObj.sectionName}`
+              ? `Mark attendance for ${selectedClassObj.className}-${selectedClassObj.sectionName}`
               : "Select a class to mark attendance."}
           </p>
         </div>
@@ -138,35 +231,93 @@ export default function TeacherAttendancePage() {
             onChange={(e) => setSelectedDate(e.target.value)}
           />
           <ClassSelector value={selectedClass} onChange={setSelectedClass} classes={classes} />
-          <Tabs value={mode} onValueChange={setMode}>
-            <TabsList>
-              <TabsTrigger value="grid"><LayoutGrid className="mr-1 h-4 w-4" />Grid</TabsTrigger>
-              <TabsTrigger value="swipe"><Hand className="mr-1 h-4 w-4" />Swipe</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button variant="outline" size="sm" onClick={handleDownload} disabled={downloading || !selectedSectionUuid}>
-            <Download className="mr-1 h-4 w-4" />
-            {downloading ? "Downloading..." : "Export PDF"}
-          </Button>
+
+          {/* Export dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={downloading || !selectedSectionUuid}>
+                <Download className="mr-1 h-4 w-4" />
+                {downloading ? "Exporting…" : "Export"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel className="flex items-center gap-1.5 text-xs">
+                <FileText className="h-3.5 w-3.5" /> PDF (from backend)
+              </DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => handleExportPDF("day")}>
+                  Today
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="flex items-center gap-1.5 text-xs">
+                <FileSpreadsheet className="h-3.5 w-3.5" /> Excel (XLSX)
+              </DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => handleExportData("xlsx", "day")}>
+                  Today
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleExportData("xlsx", "week")}>
+                  This week
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleExportData("xlsx", "month")}>
+                  This month
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="flex items-center gap-1.5 text-xs">
+                <Table2 className="h-3.5 w-3.5" /> CSV
+              </DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => handleExportData("csv", "day")}>
+                  Today
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleExportData("csv", "week")}>
+                  This week
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleExportData("csv", "month")}>
+                  This month
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {mode === "grid" ? (
-        <div className="space-y-4">
-          <QuickAttendanceGrid
-            students={students?.content ?? []}
-            sectionUuid={selectedSectionUuid ?? ""}
-            staffUuid={staffUuid}
-            selectedDate={selectedDate}
-            initialRecords={initialRecords}
-          />
+      {activeExam ? (
+        <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8 text-center">
+          <Shield className="mx-auto mb-3 h-10 w-10 text-blue-600" />
+          <h1 className="text-xl font-bold">Attendance is handled via Exam Attendance</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground mb-6">
+            There is an active examination ({activeExam.name}) scheduled for this date. Regular class attendance is disabled.
+          </p>
+          <Button asChild>
+            <Link to="/dashboard/invigilator/attendance">Go to Exam Attendance</Link>
+          </Button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
-          Swipe mode is kept as a fallback UX; grid mode is the default and primary flow now.
-          <br />
-          Selected class: {selectedClassObj ? `${selectedClassObj.className}-${selectedClassObj.sectionName}` : "N/A"}
-        </div>
+        <EditWindowGuard
+        attendanceDate={selectedDate}
+        attendanceType="student"
+        fallback={
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-6 py-10 text-center">
+            <Lock className="h-8 w-8 text-amber-500" />
+            <p className="font-semibold text-amber-700 dark:text-amber-400">Edit window closed</p>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              The attendance edit window for this date has expired. Contact your administrator if you need to make changes.
+            </p>
+          </div>
+        }
+      >
+        <QuickAttendanceGrid
+          students={students?.content ?? []}
+          sectionUuid={selectedSectionUuid ?? ""}
+          staffUuid={staffUuid}
+          selectedDate={selectedDate}
+          initialRecords={initialRecords}
+          onSubmitSuccess={() => refetchExisting()}
+        />
+      </EditWindowGuard>
       )}
     </div>
   );

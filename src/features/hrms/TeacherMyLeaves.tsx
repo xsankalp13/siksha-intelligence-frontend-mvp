@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { Plus } from "lucide-react";
+import {} from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import DataTable, { type Column } from "@/components/common/DataTable";
@@ -81,6 +81,18 @@ export default function TeacherMyLeaves() {
       }
     },
   });
+
+  const leaveBalancesQuery = useQuery({
+    queryKey: ["hrms", "leave-balances", "me"],
+    queryFn: () => hrmsService.getMyLeaveBalance().then((res) => res.data),
+  });
+
+  const getBalanceText = (leaveTypeCode: string) => {
+    if (!leaveBalancesQuery.data) return "";
+    const balance = leaveBalancesQuery.data.find(b => b.leaveTypeCode === leaveTypeCode);
+    if (!balance) return " - Balance: 0";
+    return ` - Balance: ${balance.remaining}`;
+  };
 
   const leavesQuery = useQuery({
     queryKey: ["hrms", "self", "leaves", status],
@@ -201,30 +213,39 @@ export default function TeacherMyLeaves() {
           </p>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-base font-semibold">My Leave Requests</h3>
-        <div className="flex items-center gap-2">
-          <Select value={status} onValueChange={(v) => setStatus(v as "ALL" | LeaveStatus)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter status" />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((opt) => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
-          <Button
-            size="sm"
-            onClick={() => {
-              setApplyForm(initialApplyForm);
-              setFieldErrors({});
-              setApplyOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Apply Leave
-          </Button>
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner">
+              🏖️
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">My Leave Requests</h2>
+              <p className="text-sm text-white/70">Apply, track and manage your leave applications</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={status} onValueChange={(v) => setStatus(v as "ALL" | LeaveStatus)}>
+              <SelectTrigger className="w-[130px] bg-white/20 border-white/30 text-white">
+                <SelectValue placeholder="Filter status" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((opt) => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={() => { setApplyForm(initialApplyForm); setFieldErrors({}); setApplyOpen(true); }}
+              className="bg-white text-violet-700 hover:bg-white/90 font-semibold gap-1 shadow-sm"
+            >
+              ➕ Apply Leave
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -243,6 +264,18 @@ export default function TeacherMyLeaves() {
             <DialogDescription>Submit leave request from self-service portal.</DialogDescription>
           </DialogHeader>
 
+          {/* Quick Balance Overview */}
+          {!leaveBalancesQuery.isLoading && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              <span className="text-xs font-semibold text-muted-foreground w-full">Available Balances:</span>
+              {(leaveBalancesQuery.data ?? []).map((b) => (
+                <Badge key={b.balanceId} variant={b.remaining > 0 ? "secondary" : "outline"} className="text-xs">
+                  {b.leaveTypeCode}: {b.remaining} left
+                </Badge>
+              ))}
+            </div>
+          )}
+
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
               <Label>Leave Type</Label>
@@ -256,7 +289,7 @@ export default function TeacherMyLeaves() {
                 <SelectContent>
                   {(leaveTypesQuery.data ?? []).map((type) => (
                     <SelectItem key={type.leaveTypeId} value={type.uuid}>
-                      {type.displayName} ({type.leaveCode})
+                      {type.displayName} ({type.leaveCode}){getBalanceText(type.leaveCode)}
                     </SelectItem>
                   ))}
                 </SelectContent>

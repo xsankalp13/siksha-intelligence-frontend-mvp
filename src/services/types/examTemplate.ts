@@ -12,6 +12,21 @@ export interface TemplateSectionDTO {
   // Future flags (matches backend entity columns)
   isObjective?: boolean;
   isSubjective?: boolean;
+
+  // New fields for Optional & Internal Choice support
+  sectionType?: "NORMAL" | "OPTIONAL";
+  totalQuestions?: number;
+  attemptQuestions?: number;
+  internalChoiceEnabled?: boolean;
+  optionsPerQuestion?: number;
+  questions?: TemplateQuestionRequestDTO[];
+}
+
+export interface TemplateQuestionRequestDTO {
+  questionNo: number;
+  marks: number;
+  type: "NORMAL" | "INTERNAL_CHOICE";
+  options: string[];
 }
 
 // ExamTemplate — request payload for create/update
@@ -55,10 +70,16 @@ export interface TemplateSnapshotDTO {
 export interface EvaluationQuestion {
   qNo: number;
   maxMarks: number;
+  type?: "NORMAL" | "INTERNAL_CHOICE";
+  options?: string[];
 }
 
 export interface EvaluationSection {
   name: string;
+  sectionType?: "FIXED" | "OPTIONAL";
+  totalQuestions?: number;
+  attemptQuestions?: number;
+  helperText?: string;
   questions: EvaluationQuestion[];
 }
 

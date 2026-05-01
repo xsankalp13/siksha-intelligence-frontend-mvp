@@ -64,6 +64,7 @@ import {
   useAutoAllocateSeatsBulk,
   useRemoveAllocation,
   useBulkRemoveAllocations,
+  useGetBulkSeatGrids,
 } from "../hooks/useSeatAllocationQueries";
 import { useGetAllExams, useGetSchedulesByExam } from "../hooks/useExaminationQueries";
 import { useQuery } from "@tanstack/react-query";
@@ -95,6 +96,7 @@ export default function SeatingPlanPanel() {
   const [selectedScheduleId, setSelectedScheduleId] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [isPrintingPdf, setIsPrintingPdf] = useState(false);
+  const [viewMode, setViewMode] = useState<"admin" | "seatcheck">("seatcheck");
 
   // ── Bulk selection state ────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -114,7 +116,7 @@ export default function SeatingPlanPanel() {
   // ── Queries ─────────────────────────────────────────────────────
   const { data: exams = [] } = useGetAllExams();
   const { data: schedules = [] } = useGetSchedulesByExam(selectedExamUuid);
-  
+
   const { data: allocations = [], isLoading } = useGetAllocationsForSchedule(selectedScheduleId);
   const { data: availableRooms = [], isLoading: isLoadingRooms } = useGetAvailableRooms(selectedScheduleId);
   const { data: seatGrid = [], isLoading: isLoadingGrid } = useGetSeatGrid(formRoomUuid, selectedScheduleId);
@@ -126,6 +128,20 @@ export default function SeatingPlanPanel() {
     staleTime: 10 * 60 * 1000,
   });
   const studentList = studentPage?.content ?? [];
+
+  // ── Room Seat Grid Queries (for Seat Check with cross-exam info) ─
+  const roomUuidsForGrid = useMemo(() => {
+    if (!selectedScheduleId || allocations.length === 0) return [];
+    const roomNames = new Set(allocations.map((a) => a.roomName));
+    return availableRooms
+      .filter((r) => roomNames.has(r.roomName))
+      .map((r) => ({ uuid: r.roomUuid, name: r.roomName }));
+  }, [allocations, availableRooms, selectedScheduleId]);
+
+  const { data: bulkGridData, isLoading: isBulkLoading } = useGetBulkSeatGrids(
+    viewMode === "seatcheck" ? roomUuidsForGrid.map(r => r.uuid) : [],
+    selectedScheduleId
+  );
 
   // ── Mutations ───────────────────────────────────────────────────
   const assignSeatMutation = useAllocateSingleSeat();
@@ -186,19 +202,19 @@ export default function SeatingPlanPanel() {
       const rollNos = allocs.map(a => a.rollNo).filter(r => r != null).sort((a, b) => a - b);
       let rollRange = "ALL";
       let minRollNo = Infinity;
-      
+
       if (rollNos.length > 0) {
         minRollNo = rollNos[0];
-        
+
         if (rollNos.length === 1) {
-             rollRange = String(rollNos[0]).padStart(2, '0');
+          rollRange = String(rollNos[0]).padStart(2, '0');
         } else {
-             rollRange = `${String(rollNos[0]).padStart(2, '0')} -\n${String(rollNos[rollNos.length - 1]).padStart(2, '0')}`;
+          rollRange = `${String(rollNos[0]).padStart(2, '0')} -\n${String(rollNos[rollNos.length - 1]).padStart(2, '0')}`;
         }
       }
 
       const roomInfo = availableRooms.find(r => r.roomName === roomName);
-      
+
       return {
         batch: selectedExam?.academicYear || "-",
         programme: `${selectedSchedule?.className || ""} ${selectedSchedule?.sectionName ? `(${selectedSchedule.sectionName})` : ""}`.trim(),
@@ -212,10 +228,10 @@ export default function SeatingPlanPanel() {
     });
 
     rows.sort((a, b) => {
-       if (a.minRollNo !== Infinity && b.minRollNo !== Infinity) {
-           return a.minRollNo - b.minRollNo;
-       }
-       return a.room.localeCompare(b.room);
+      if (a.minRollNo !== Infinity && b.minRollNo !== Infinity) {
+        return a.minRollNo - b.minRollNo;
+      }
+      return a.room.localeCompare(b.room);
     });
 
     return rows.map((r, index) => ({
@@ -224,50 +240,62 @@ export default function SeatingPlanPanel() {
     }));
   }, [allocations, selectedSchedule, selectedExam, availableRooms]);
 
-  // ── Print Room Grids (Dynamic Multi-Slot) ───────────────────────
+  // ── Seating Layout Engine ───────────────────────────────────────
   const currentMaxPerSeat = selectedSchedule?.maxStudentsPerSeat || 1;
 
-  const printRoomGrids = useMemo(() => {
-    const roomGroups: Record<string, SeatAllocationResponseDTO[]> = {};
-    allocations.forEach((a) => {
-      if (!roomGroups[a.roomName]) roomGroups[a.roomName] = [];
-      roomGroups[a.roomName].push(a);
-    });
+  // ── Seat Check Table Grid Data ──────────────────────────────────
+  const tableRoomGrids = useMemo(() => {
+    if (roomUuidsForGrid.length === 0) return [];
 
-    return Object.entries(roomGroups).map(([roomName, allocs]) => {
-      const roomInfo = availableRooms.find(r => r.roomName === roomName);
-      const floorNumber = roomInfo?.floorNumber ?? null;
+    return roomUuidsForGrid.map((room) => {
+      const seats = bulkGridData?.[room.uuid] ?? [];
+      const roomInfo = availableRooms.find((r) => r.roomUuid === room.uuid);
+      const isGridLoading = isBulkLoading;
 
-      const maxRow = Math.max(...allocs.map(a => a.rowNumber));
-      const maxCol = Math.max(...allocs.map(a => a.columnNumber));
+      const mxRow = seats.length > 0 ? Math.max(...seats.map((s) => s.rowNumber)) : 0;
+      const mxCol = seats.length > 0 ? Math.max(...seats.map((s) => s.columnNumber)) : 0;
 
-      // Grid: row → col → positionIndex → rollNo
-      const grid: Record<number, Record<number, Record<number, number | null>>> = {};
-      
-      for (let r = 1; r <= maxRow; r++) {
-        grid[r] = {};
-        for (let c = 1; c <= maxCol; c++) {
-          grid[r][c] = {};
-        }
-      }
-
-      allocs.forEach(a => {
-        if (!grid[a.rowNumber]) grid[a.rowNumber] = {};
-        if (!grid[a.rowNumber][a.columnNumber]) grid[a.rowNumber][a.columnNumber] = {};
-        grid[a.rowNumber][a.columnNumber][a.positionIndex] = a.rollNo;
+      const seatMap: Record<string, (typeof seats)[0]> = {};
+      seats.forEach((s) => {
+        seatMap[`${s.rowNumber}-${s.columnNumber}`] = s;
       });
 
-      return { roomName, floorNumber, maxRow, maxCol, grid, studentCount: allocs.length };
-    }).sort((a, b) => a.roomName.localeCompare(b.roomName));
-  }, [allocations, availableRooms]);
+      const allocLookup: Record<string, SeatAllocationResponseDTO> = {};
+      allocations
+        .filter((a) => a.roomName === room.name)
+        .forEach((a) => {
+          allocLookup[`${a.rowNumber}-${a.columnNumber}-${a.positionIndex}`] = a;
+        });
+
+      const currentRoomAllocCount = allocations.filter(
+        (a) => a.roomName === room.name
+      ).length;
+
+      return {
+        roomName: room.name,
+        roomUuid: room.uuid,
+        floorNumber: roomInfo?.floorNumber ?? null,
+        capacity: roomInfo?.totalSeats ?? 0,
+        totalCapacity: roomInfo?.totalCapacity ?? 0,
+        occupiedTotal: roomInfo?.occupiedCapacity ?? 0,
+        seated: currentRoomAllocCount,
+        maxPerSeat: roomInfo?.maxStudentsPerSeat ?? currentMaxPerSeat,
+        mxRow,
+        mxCol,
+        seatMap,
+        allocLookup,
+        isGridLoading,
+      };
+    });
+  }, [roomUuidsForGrid, bulkGridData, isBulkLoading, availableRooms, allocations, currentMaxPerSeat]);
 
   const totalStudents = availableRooms.length > 0 ? availableRooms[0].totalStudentsToSeat : (selectedSchedule?.totalStudents ?? 0);
   const seatedCount = allocations.length;
   const remainingToSeat = Math.max(0, totalStudents - seatedCount);
 
   const targetAutoFillRoom = availableRooms.find(r => r.roomUuid === autoFillRoomUuid);
-  const willSeatCount = targetAutoFillRoom 
-    ? Math.min(remainingToSeat, targetAutoFillRoom.availableCapacity ?? (targetAutoFillRoom.availableSeats * currentMaxPerSeat)) 
+  const willSeatCount = targetAutoFillRoom
+    ? Math.min(remainingToSeat, targetAutoFillRoom.availableCapacity ?? (targetAutoFillRoom.availableSeats * currentMaxPerSeat))
     : 0;
 
   const maxRow = seatGrid.length > 0 ? Math.max(...seatGrid.map(s => s.rowNumber)) : 0;
@@ -361,7 +389,8 @@ export default function SeatingPlanPanel() {
           setAssignOpen(false);
         },
         onError: (err: any) => {
-          toast.error(err.response?.data?.message || "Failed to assign seat. Time conflict detected.");
+          const msg = err?.response?.data?.message || err?.response?.data?.error || "Seat assignment failed";
+          toast.error(msg);
         },
       }
     );
@@ -383,7 +412,8 @@ export default function SeatingPlanPanel() {
           setAutoFillOpen(false);
         },
         onError: (err: any) => {
-          toast.error(err.response?.data?.message || "Failed to auto-allocate students.");
+          const msg = err?.response?.data?.message || err?.response?.data?.error || "Auto-fill failed";
+          toast.error(msg);
         },
       }
     );
@@ -429,10 +459,12 @@ export default function SeatingPlanPanel() {
 
   const handlePrintPdf = useCallback(async () => {
     if (!selectedScheduleId) return;
+
     try {
       setIsPrintingPdf(true);
       const response = await examinationService.downloadSeatingPlanPdf(
-        selectedScheduleId
+        selectedScheduleId,
+        "ROOM_WISE"
       );
       const url = window.URL.createObjectURL(new Blob([response.data as any]));
       const link = document.createElement("a");
@@ -454,37 +486,43 @@ export default function SeatingPlanPanel() {
   }, [selectedScheduleId]);
 
   // ── Format label for print grid ─────────────────────────────────
-  const formatLabel = () => {
-    if (currentMaxPerSeat === 1) return "Single seating per bench";
-    const labels = Array.from({ length: currentMaxPerSeat }, (_, i) => POSITION_FULL_LABELS[i] || `POS_${i}`);
-    return `Format: [ ${labels.join(" | ")} ] sharing per bench`;
-  };
+
 
   return (
-    <div className="space-y-5 relative" id="printable-seating-plan">
-      {/* ── Print Header (Only visible during print) ───────────────── */}
-      <div className="hidden print:block w-full text-black font-serif bg-white" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
+    <div className="space-y-5 relative overflow-hidden" id="printable-seating-plan">
+      <style>{`
+        @media print {
+          @page { size: landscape; margin: 12mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .print\\:break-after-always { page-break-after: always; }
+          .print\\:break-before-page { page-break-before: always; }
+          table { border-collapse: collapse !important; }
+          th, td { border: 1px solid black !important; padding: 4px 6px !important; }
+        }
+      `}</style>
+      {/* ── Print Header (Only visible during print, hidden in seatcheck mode) ── */}
+      <div className={`hidden ${viewMode !== "seatcheck" ? "print:block" : ""} w-full text-black font-serif bg-white`} style={{ fontFamily: '"Times New Roman", Times, serif' }}>
         <div className="flex items-center justify-center gap-4 mb-2">
-            <div className="w-16 h-16 flex items-center justify-center text-red-600 border border-red-600/30 rounded-full bg-red-50">
-               <GraduationCap className="w-10 h-10" />
-            </div>
-            <div className="text-center">
-                <h1 className="text-2xl font-bold text-blue-900 leading-tight uppercase">Siksha Intelligence</h1>
-                <h2 className="text-xl font-bold tracking-wider uppercase">Examination Department</h2>
-                <h3 className="text-base font-semibold uppercase mt-1">
-                   End Term Examination {selectedExam?.academicYear ? `, ${selectedExam.academicYear}` : ""}
-                </h3>
-            </div>
+          <div className="w-16 h-16 flex items-center justify-center text-red-600 border border-red-600/30 rounded-full bg-red-50">
+            <GraduationCap className="w-10 h-10" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-blue-900 leading-tight uppercase">Siksha Intelligence</h1>
+            <h2 className="text-xl font-bold tracking-wider uppercase">Examination Department</h2>
+            <h3 className="text-base font-semibold uppercase mt-1">
+              End Term Examination {selectedExam?.academicYear ? `, ${selectedExam.academicYear}` : ""}
+            </h3>
+          </div>
         </div>
-        
+
         <div className="bg-amber-400 py-1 border-y-2 border-black w-full text-center mt-2">
-           <h2 className="text-lg font-bold uppercase tracking-widest text-black">Seating Plan</h2>
+          <h2 className="text-lg font-bold uppercase tracking-widest text-black">Seating Plan</h2>
         </div>
-        
+
         {selectedSchedule && (
-           <div className="text-center py-2 text-md font-bold uppercase tracking-wider text-black">
-              {selectedSchedule.subjectName} ( {selectedSchedule.startTime?.substring(0, 5)} - {selectedSchedule.endTime?.substring(0, 5)} )
-           </div>
+          <div className="text-center py-2 text-md font-bold uppercase tracking-wider text-black">
+            {selectedSchedule.subjectName} ( {selectedSchedule.startTime?.substring(0, 5)} - {selectedSchedule.endTime?.substring(0, 5)} )
+          </div>
         )}
 
         <table className="w-full mt-4 text-sm border-collapse border border-black printable-table text-black">
@@ -492,9 +530,9 @@ export default function SeatingPlanPanel() {
             <tr className="bg-gray-100 border-b border-black">
               <th className="border border-black p-2 w-12 text-center text-black">S.No</th>
               <th className="border border-black p-2 w-20 text-center text-black">Batch</th>
-              <th className="border border-black p-2 w-32 text-center text-black">Programme/<br/>Branch</th>
+              <th className="border border-black p-2 w-32 text-center text-black">Programme/<br />Branch</th>
               <th className="border border-black p-2 text-center text-black">Roll No Range</th>
-              <th className="border border-black p-2 w-24 text-center text-black">No of<br/>Students</th>
+              <th className="border border-black p-2 w-24 text-center text-black">No of<br />Students</th>
               <th className="border border-black p-2 w-28 text-center text-black">Room No.</th>
               <th className="border border-black p-2 w-24 text-center text-black">Floor</th>
               <th className="border border-black p-2 w-32 text-center text-black">Area</th>
@@ -514,95 +552,20 @@ export default function SeatingPlanPanel() {
               </tr>
             ))}
             {printSummaryRows.length === 0 && (
-                <tr>
-                    <td colSpan={8} className="border border-black p-4 text-center text-black italic">No allocations available for this schedule.</td>
-                </tr>
+              <tr>
+                <td colSpan={8} className="border border-black p-4 text-center text-black italic">No allocations available for this schedule.</td>
+              </tr>
             )}
           </tbody>
         </table>
-        
+
         <div className="mt-8 pt-4 w-full flex justify-between text-xs font-bold border-t border-black px-4">
-           <span>* Auto-generated by Siksha Intelligence Seating Engine</span>
-           <span>Date Printed: {new Date().toLocaleDateString("en-IN")}</span>
+          <span>* Auto-generated by Siksha Intelligence Seating Engine</span>
+          <span>Date Printed: {new Date().toLocaleDateString("en-IN")}</span>
         </div>
       </div>
-      
-      {/* ── Print Room Grids (Dynamic Multi-Slot) ─────────────────── */}
-      <div className="hidden print:block font-serif text-black printable-grids" style={{ fontFamily: '"Times New Roman", Times, serif' }}>
-        {printRoomGrids.map((room) => (
-          <div key={room.roomName} style={{ pageBreakBefore: 'always', paddingTop: '20px' }}>
-            {/* Room Header */}
-            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>
-                Room: {room.roomName}
-                {room.floorNumber != null && ` — Floor : ${room.floorNumber}`}
-              </h2>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                {selectedSchedule?.subjectName} | {room.studentCount} Students | {currentMaxPerSeat === 1 ? "Single" : currentMaxPerSeat === 2 ? "Double" : "Triple"} Seating
-              </div>
-            </div>
 
-            {/* Grid Engine */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f1f5f9' }}>
-                  <th style={{ border: '1px solid black', padding: '6px', width: '50px' }}>Row</th>
-                  {Array.from({ length: room.maxCol }, (_, i) => (
-                    <th key={i} style={{ border: '1px solid black', padding: '6px', textAlign: 'center' }}>
-                      Bench {i + 1}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: room.maxRow }, (_, ri) => {
-                  const row = ri + 1;
-                  return (
-                    <tr key={row}>
-                      <td style={{ border: '1px solid black', padding: '6px', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#fafafa' }}>
-                        Row {row}
-                      </td>
-                      {Array.from({ length: room.maxCol }, (_, ci) => {
-                        const col = ci + 1;
-                        const cell = room.grid[row]?.[col] || {};
-                        
-                        // Build dynamic slot display
-                        const slots = Array.from({ length: currentMaxPerSeat }, (_, posIdx) => {
-                          const rollNo = cell[posIdx];
-                          return rollNo != null ? String(rollNo).padStart(2, '0') : '—';
-                        });
-                        
-                        return (
-                          <td key={col} style={{
-                            border: '1px solid black',
-                            padding: '8px',
-                            textAlign: 'center',
-                            fontFamily: 'monospace',
-                            fontWeight: 'bold',
-                            fontSize: '14px',
-                            letterSpacing: '2px'
-                          }}>
-                            {currentMaxPerSeat === 1
-                              ? slots[0]
-                              : slots.join(' | ')
-                            }
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            
-            {/* Grid Footer Signature */}
-            <div style={{ marginTop: '20px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', fontStyle: 'italic' }}>
-              <span>* Numbers represent Roll Numbers</span>
-              <span>{formatLabel()}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Legacy Print Engine Removed -- Now utilizes visual spatial UI layout node */}
 
       {/* ── Floating Bulk Action Bar ─────────────────────────────── */}
       <AnimatePresence>
@@ -642,16 +605,16 @@ export default function SeatingPlanPanel() {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
-        <div className="grid gap-1.5">
-          <label className="text-sm font-medium text-muted-foreground">Select Exam</label>
+      <div className="flex flex-wrap items-end gap-3 print:hidden bg-muted/20 p-2.5 rounded-xl border border-border/50">
+        <div className="flex-1 min-w-[180px]">
+          <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">Select Exam</label>
           <Select value={selectedExamUuid} onValueChange={handleExamChange}>
-            <SelectTrigger id="seating-exam-select">
+            <SelectTrigger id="seating-exam-select" className="h-8 text-xs bg-card">
               <SelectValue placeholder="Choose an exam…" />
             </SelectTrigger>
             <SelectContent>
               {exams.filter(e => e.published).map((e) => (
-                <SelectItem key={e.uuid} value={e.uuid}>
+                <SelectItem key={e.uuid} value={e.uuid} className="text-xs">
                   {e.name} ({e.academicYear})
                 </SelectItem>
               ))}
@@ -659,19 +622,19 @@ export default function SeatingPlanPanel() {
           </Select>
         </div>
 
-        <div className="grid gap-1.5">
-          <label className="text-sm font-medium text-muted-foreground">Select Class</label>
+        <div className="flex-1 min-w-[120px]">
+          <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">Select Class</label>
           <Select
             value={selectedClassUuid}
             onValueChange={handleClassChange}
             disabled={!selectedExamUuid || availableClasses.length === 0}
           >
-            <SelectTrigger id="seating-class-select">
+            <SelectTrigger id="seating-class-select" className="h-8 text-xs bg-card">
               <SelectValue placeholder={availableClasses.length === 0 ? "No classes" : "Choose class…"} />
             </SelectTrigger>
             <SelectContent>
               {availableClasses.map((c) => (
-                <SelectItem key={c.uuid} value={c.uuid}>
+                <SelectItem key={c.uuid} value={c.uuid} className="text-xs">
                   {c.name}
                 </SelectItem>
               ))}
@@ -679,19 +642,19 @@ export default function SeatingPlanPanel() {
           </Select>
         </div>
 
-        <div className="grid gap-1.5">
-          <label className="text-sm font-medium text-muted-foreground">Select Schedule</label>
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">Select Schedule</label>
           <Select
             value={selectedScheduleId ? String(selectedScheduleId) : ""}
             onValueChange={handleScheduleChange}
             disabled={!selectedClassUuid || filteredSchedulesByClass.length === 0}
           >
-            <SelectTrigger id="seating-schedule-select">
+            <SelectTrigger id="seating-schedule-select" className="h-8 text-xs bg-card">
               <SelectValue placeholder={filteredSchedulesByClass.length === 0 ? "No schedules" : "Choose schedule…"} />
             </SelectTrigger>
             <SelectContent>
               {filteredSchedulesByClass.map((s) => (
-                <SelectItem key={s.scheduleId} value={String(s.scheduleId)}>
+                <SelectItem key={s.scheduleId} value={String(s.scheduleId)} className="text-xs">
                   {s.subjectName}
                   {s.sectionName ? ` (${s.sectionName})` : ""} ·{" "}
                   {new Date(s.examDate).toLocaleDateString("en-IN", {
@@ -704,84 +667,117 @@ export default function SeatingPlanPanel() {
           </Select>
         </div>
 
-        <div className="grid gap-1.5">
-          <label className="text-sm font-medium text-muted-foreground">Actions</label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search plan..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-                disabled={!selectedScheduleId}
-              />
-            </div>
-            <Button
-              onClick={handlePrintPdf}
-              variant="outline"
-              size="sm"
-              className="gap-1.5 shrink-0 h-9"
-              disabled={isPrintingPdf || !selectedScheduleId || allocations.length === 0}
-            >
-              {isPrintingPdf ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Printer className="w-4 h-4" />
-              )}
-              Print
-            </Button>
-            <Button
-              onClick={openAutoFill}
-              variant="outline"
-              size="sm"
-              className="gap-1.5 shrink-0 h-9 border-primary/20 hover:bg-primary/5 text-primary"
-              disabled={!selectedScheduleId}
-            >
-              <Sparkles className="w-4 h-4" />
-              Auto Fill
-            </Button>
-            <Button
-              onClick={openAssign}
-              size="sm"
-              className="gap-1.5 shrink-0 h-9"
-              disabled={!selectedScheduleId}
-            >
-              <Plus className="w-4 h-4" />
-              Assign Seat
-            </Button>
-          </div>
+        <div className="relative flex-1 min-w-[140px]">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search plan..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 h-8 text-xs bg-card"
+            disabled={!selectedScheduleId}
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handlePrintPdf}
+            variant="outline"
+            size="sm"
+            className="gap-1.5 shrink-0 h-8 text-xs bg-card hover:bg-muted"
+            disabled={isPrintingPdf || !selectedScheduleId || allocations.length === 0}
+          >
+            {isPrintingPdf ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Printer className="w-3.5 h-3.5" />
+            )}
+            Print
+          </Button>
+          <Button
+            onClick={openAutoFill}
+            variant="outline"
+            size="sm"
+            className="gap-1.5 shrink-0 h-8 text-xs border-primary/20 hover:bg-primary/5 text-primary bg-card"
+            disabled={!selectedScheduleId}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Auto Fill
+          </Button>
+          <Button
+            onClick={openAssign}
+            size="sm"
+            className="gap-1.5 shrink-0 h-8 text-xs shadow-sm hover:shadow-md transition-shadow"
+            disabled={!selectedScheduleId}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Assign Seat
+          </Button>
         </div>
       </div>
 
-      {/* ── Summary badges ──────────────────────────────────────── */}
+      {/* ── Visual Layout vs Table Toggle ───────────────────────── */}
       {selectedScheduleId > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-wrap items-center gap-3 print:hidden"
-        >
-          <Badge variant="secondary" className="gap-1.5 px-3 py-1">
-            <Users className="w-3.5 h-3.5" />
-            {seatedCount} / {totalStudents} Students Seated
-          </Badge>
-          <Badge variant="outline" className="gap-1.5 px-3 py-1 border-primary/20 text-primary bg-primary/5">
-            <Armchair className="w-3.5 h-3.5" />
-            Config: {currentMaxPerSeat} per seat
-            {currentMaxPerSeat > 1 && ` (${currentMaxPerSeat === 2 ? "Double" : "Triple"})`}
-          </Badge>
-          {selectedExam && (
-            <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" />
-              {selectedExam.name}
-            </span>
-          )}
-        </motion.div>
+        <div className="flex flex-col gap-4 print:hidden">
+          <div className="flex items-center justify-between border-b pb-4 mt-2">
+            <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+              <Button
+                variant={viewMode === "admin" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("admin")}
+                className="transition-all"
+              >
+                Table View
+              </Button>
+              <Button
+                variant={viewMode === "seatcheck" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("seatcheck")}
+                className="transition-all gap-1.5"
+              >
+                <CheckSquare className="w-3.5 h-3.5" />
+                Seat Check
+              </Button>
+            </div>
+            {viewMode === "seatcheck" && (
+              <div className="flex flex-col text-sm font-semibold text-muted-foreground mr-4 text-right">
+                <span>Legend: L = Left, M = Middle, R = Right | Format: [Roll (SUBJ)]</span>
+                {currentMaxPerSeat > 1 && (
+                  <span className="text-xs text-destructive font-medium">
+                    Warning: Students from the same exam cannot share a bench
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Summary badges ──────────────────────────────────────── */}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-wrap items-center gap-3"
+          >
+            <Badge variant="secondary" className="gap-1.5 px-3 py-1">
+              <Users className="w-3.5 h-3.5" />
+              {seatedCount} / {totalStudents} Students Seated
+            </Badge>
+            <Badge variant="outline" className="gap-1.5 px-3 py-1 border-primary/20 text-primary bg-primary/5">
+              <Armchair className="w-3.5 h-3.5" />
+              Max Sharing: {currentMaxPerSeat}
+              {currentMaxPerSeat > 1 && ` (Different exams only)`}
+            </Badge>
+            {selectedExam && (
+              <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                {selectedExam.name}
+              </span>
+            )}
+          </motion.div>
+        </div>
       )}
 
       {/* ── Content ─────────────────────────────────────────────── */}
       {!selectedScheduleId ? (
-        <div className="flex flex-col items-center justify-center min-h-[300px] rounded-2xl border-2 border-dashed border-border/60 gap-3 text-center">
+        <div className="flex flex-col items-center justify-center min-h-[300px] rounded-2xl border-2 border-dashed border-border/60 gap-3 text-center print:hidden">
           <div className="p-4 rounded-full bg-muted">
             <Armchair className="w-7 h-7 text-muted-foreground" />
           </div>
@@ -791,11 +787,11 @@ export default function SeatingPlanPanel() {
           </p>
         </div>
       ) : isLoading ? (
-        <div className="flex items-center justify-center min-h-[250px]">
+        <div className="flex items-center justify-center min-h-[250px] print:hidden">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
       ) : filteredAllocations.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[250px] rounded-2xl border-2 border-dashed border-border/60 gap-3 text-center">
+        <div className="flex flex-col items-center justify-center min-h-[250px] rounded-2xl border-2 border-dashed border-border/60 gap-3 text-center print:hidden">
           <div className="p-4 rounded-full bg-muted">
             <Armchair className="w-6 h-6 text-muted-foreground" />
           </div>
@@ -804,105 +800,322 @@ export default function SeatingPlanPanel() {
           </p>
         </div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-border/60 overflow-hidden bg-card print:hidden"
-        >
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label="Select all rows"
-                    className="translate-y-[1px]"
-                  />
-                </TableHead>
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>Student</TableHead>
-                <TableHead>Time Block</TableHead>
-                <TableHead>Room</TableHead>
-                <TableHead>Seat Label</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <AnimatePresence>
-                {filteredAllocations.map((alloc, idx) => {
-                  const isSelected = selectedIds.has(alloc.allocationId);
-                  return (
-                    <motion.tr
-                      key={alloc.allocationId}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className={`group cursor-pointer transition-colors ${
-                        isSelected ? "bg-destructive/5 hover:bg-destructive/10" : "hover:bg-muted/30"
-                      }`}
-                      onClick={(e) => {
-                        if ((e.target as HTMLElement).closest("button")) return;
-                        toggleSelect(alloc.allocationId);
-                      }}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSelect(alloc.allocationId)}
-                          aria-label={`Select ${alloc.studentName}`}
-                          className="translate-y-[1px]"
-                        />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm font-mono">
-                        {idx + 1}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 font-semibold text-xs">
-                            {alloc.studentName.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{alloc.studentName}</span>
-                            <span className="text-[10px] text-muted-foreground font-medium">Roll No: {alloc.rollNo ?? '-'}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {new Date(alloc.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{" "}
-                          {new Date(alloc.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="gap-1 border-border/50 bg-secondary/50">
-                          <DoorOpen className="w-3 h-3" />
-                          {alloc.roomName}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="flex items-center gap-1 font-mono font-medium text-primary bg-primary/5 px-2 py-1 rounded">
-                          <Armchair className="w-3.5 h-3.5" />
-                          {alloc.seatLabel}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => setDeleteTarget(alloc)}
+        <>
+          {viewMode === "admin" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl border border-border/60 overflow-hidden bg-card print:hidden"
+            >
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all rows"
+                        className="translate-y-[1px]"
+                      />
+                    </TableHead>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Time Block</TableHead>
+                    <TableHead>Room</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Seat Label</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <AnimatePresence>
+                    {filteredAllocations.map((alloc, idx) => {
+                      const isSelected = selectedIds.has(alloc.allocationId);
+                      return (
+                        <motion.tr
+                          key={alloc.allocationId}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className={`group cursor-pointer transition-colors ${isSelected ? "bg-destructive/5 hover:bg-destructive/10" : "hover:bg-muted/30"
+                            }`}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest("button")) return;
+                            toggleSelect(alloc.allocationId);
+                          }}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </TableCell>
-                    </motion.tr>
-                  );
-                })}
-              </AnimatePresence>
-            </TableBody>
-          </Table>
-        </motion.div>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(alloc.allocationId)}
+                              aria-label={`Select ${alloc.studentName}`}
+                              className="translate-y-[1px]"
+                            />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm font-mono">
+                            {idx + 1}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 font-semibold text-xs">
+                                {alloc.studentName.substring(0, 2).toUpperCase()}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{alloc.studentName}</span>
+                                <span className="text-[10px] text-muted-foreground font-medium">Roll No: {alloc.rollNo ?? '-'}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {new Date(alloc.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -{" "}
+                              {new Date(alloc.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="gap-1 border-border/50 bg-secondary/50">
+                              <DoorOpen className="w-3 h-3" />
+                              {alloc.roomName}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs font-medium text-muted-foreground">{alloc.subjectName}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="flex items-center gap-1 font-mono font-medium text-primary bg-primary/5 px-2 py-1 rounded">
+                              <Armchair className="w-3.5 h-3.5" />
+                              {alloc.seatLabel}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => setDeleteTarget(alloc)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </TableCell>
+                        </motion.tr>
+                      );
+                    })}
+                  </AnimatePresence>
+                </TableBody>
+              </Table>
+            </motion.div>
+          )}
+
+
+          {viewMode === "seatcheck" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-8 print:space-y-0"
+            >
+              {tableRoomGrids.length === 0 ? (
+                <div className="flex flex-col items-center justify-center min-h-[250px] rounded-2xl border-2 border-dashed border-border/60 gap-3 text-center">
+                  <div className="p-4 rounded-full bg-muted">
+                    <Armchair className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="font-semibold text-foreground">No rooms allocated yet</p>
+                  <p className="text-sm text-muted-foreground">Use Auto Fill to allocate seats first</p>
+                </div>
+              ) : (
+                tableRoomGrids.map((room, idx) => (
+                  <div
+                    key={room.roomUuid}
+                    className="rounded-xl border border-border/60 overflow-hidden bg-card print:block print:w-full print:rounded-none print:border-2 print:border-black print:m-0 print:p-0"
+                    style={{
+                      pageBreakBefore: idx === 0 ? 'auto' : 'always',
+                      breakBefore: idx === 0 ? 'auto' : 'page',
+                      pageBreakInside: 'avoid',
+                      breakInside: 'avoid'
+                    }}
+                  >
+                    {/* Room Header */}
+                    <div className="bg-primary/5 border-b border-primary/20 p-4 text-center print:bg-white print:border-b-2 print:border-black">
+                      <h3 className="text-xl font-bold uppercase tracking-wider print:text-black print:text-2xl">
+                        ROOM: {room.roomName}
+                        {room.floorNumber != null ? ` — FLOOR: ${room.floorNumber}` : ""}
+                      </h3>
+                      <p className="text-sm font-semibold text-muted-foreground mt-1 print:text-black print:text-base print:font-bold">
+                        {selectedSchedule?.subjectName?.toUpperCase()} | {room.seated} STUDENTS
+                      </p>
+                      <div className="text-xs font-medium mt-2 flex justify-center gap-6 text-muted-foreground print:text-black print:text-sm">
+                        <span>Current Exam Seated: <strong className="text-foreground print:text-black">{room.seated}</strong></span>
+                        <span>Total Seats: <strong className="text-foreground print:text-black">{room.capacity}</strong></span>
+                        <span>Room Occupancy: <strong className="text-foreground print:text-black">{room.occupiedTotal}/{room.totalCapacity}</strong></span>
+                      </div>
+                      {/* Legend */}
+                      <div className="flex justify-center gap-4 mt-3 text-xs print:text-black print:text-[10px] print:mt-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-sm bg-blue-100 border border-blue-300 dark:bg-blue-900 dark:border-blue-700" />
+                          Current Exam
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-sm bg-amber-100 border border-amber-300 dark:bg-amber-900 dark:border-amber-700" />
+                          Other Exam (Blocked)
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-sm bg-green-50 border border-green-200 dark:bg-green-950 dark:border-green-800" />
+                          Available
+                        </span>
+                      </div>
+                    </div>
+
+                    {room.isGridLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                        <span className="ml-2 text-sm text-muted-foreground">Loading seat grid…</span>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto print:overflow-visible">
+                        <table className="w-full text-sm border-collapse min-w-max print:text-black print:text-xs">
+                          <thead>
+                            <tr className="bg-muted/40 border-b print:bg-gray-100">
+                              <th className="border border-border/50 p-2 w-14 text-center font-bold sticky left-0 bg-muted/60 z-10 print:static print:bg-gray-100 print:border-black print:text-black">Row</th>
+                              {Array.from({ length: room.mxCol }, (_, i) => (
+                                <th
+                                  key={i}
+                                  colSpan={room.maxPerSeat}
+                                  className="border border-border/50 p-1.5 text-center font-bold text-xs print:border-black print:text-black"
+                                >
+                                  Bench {i + 1}
+                                </th>
+                              ))}
+                            </tr>
+                            {room.maxPerSeat > 1 && (
+                              <tr className="bg-muted/20 border-b print:bg-white">
+                                <th className="border border-border/50 p-1 sticky left-0 bg-muted/30 z-10 print:static print:bg-white print:border-black" />
+                                {Array.from({ length: room.mxCol }).flatMap((_, benchIdx) =>
+                                  Array.from({ length: room.maxPerSeat }, (__, posIdx) => (
+                                    <th
+                                      key={`${benchIdx}-${posIdx}`}
+                                      className="border border-border/50 p-1 text-center text-[10px] font-bold text-muted-foreground w-20 print:border-black print:text-black"
+                                    >
+                                      {POSITION_LABELS[posIdx] || `P${posIdx}`}
+                                    </th>
+                                  ))
+                                )}
+                              </tr>
+                            )}
+                          </thead>
+                          <tbody>
+                            {Array.from({ length: room.mxRow }, (_, rowIdx) => {
+                              const rowNum = rowIdx + 1;
+                              return (
+                                <tr key={rowNum} className="hover:bg-muted/10 transition-colors print:hover:bg-white">
+                                  <td className="border border-border/50 p-2 text-center font-bold bg-muted/30 sticky left-0 z-10 print:static print:bg-white print:border-black print:text-black">
+                                    Row {rowNum}
+                                  </td>
+                                  {Array.from({ length: room.mxCol }).flatMap((_, colIdx) => {
+                                    const colNum = colIdx + 1;
+                                    const seat = room.seatMap[`${rowNum}-${colNum}`];
+
+                                    return Array.from({ length: room.maxPerSeat }, (__, posIdx) => {
+                                      if (!seat) {
+                                        return (
+                                          <td
+                                            key={`${colNum}-${posIdx}`}
+                                            className="border border-border/50 p-1.5 text-center text-muted-foreground/30 text-xs print:border-black print:text-black/20"
+                                          >
+                                            —
+                                          </td>
+                                        );
+                                      }
+
+                                      const slot = seat.occupiedSlots?.find(
+                                        (s) => s.positionIndex === posIdx
+                                      );
+
+                                      if (!slot) {
+                                        return (
+                                          <td
+                                            key={`${colNum}-${posIdx}`}
+                                            className="border border-border/50 p-1.5 text-center bg-green-50/50 dark:bg-green-950/20 print:bg-white print:border-black"
+                                          >
+                                            <span className="text-xs text-green-600/40 font-medium print:text-black/20">-</span>
+                                          </td>
+                                        );
+                                      }
+
+                                      const alloc = room.allocLookup[`${rowNum}-${colNum}-${posIdx}`];
+                                      const isCurrentExam = !!alloc;
+                                      const subjectAbbr = slot.subjectName
+                                        .substring(0, 3)
+                                        .toUpperCase();
+
+                                      if (isCurrentExam) {
+                                        const shortName = alloc.studentName?.split(" ")[0] ?? "";
+                                        return (
+                                          <td
+                                            key={`${colNum}-${posIdx}`}
+                                            className="border border-border/50 p-1 text-center bg-blue-50 dark:bg-blue-950/30 print:bg-white print:border-black"
+                                          >
+                                            <div className="flex flex-col items-center gap-[1px]">
+                                              <span className="font-mono font-bold text-[13px] text-blue-800 dark:text-blue-300 print:text-black leading-none mt-1">
+                                                {alloc.rollNo ?? "—"}
+                                              </span>
+                                              <span className="text-[10px] font-semibold text-blue-900/90 dark:text-blue-100/90 print:text-black leading-tight uppercase truncate max-w-[60px]">
+                                                {shortName}
+                                              </span>
+                                              <span className="text-[8px] font-medium text-blue-600/90 dark:text-blue-400/90 print:text-black leading-none">
+                                                {subjectAbbr} | {alloc.className}
+                                              </span>
+                                            </div>
+                                          </td>
+                                        );
+                                      }
+
+                                      // Other exam occupant
+                                      const shortName = slot.studentName?.split(" ")[0] ?? "";
+                                      return (
+                                        <td
+                                          key={`${colNum}-${posIdx}`}
+                                          className="border border-border/50 p-1 text-center bg-amber-50 dark:bg-amber-950/30 print:bg-white print:border-black"
+                                        >
+                                          <TooltipProvider delayDuration={100}>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <div className="flex flex-col items-center gap-[1px] cursor-help">
+                                                  <span className="font-mono font-bold text-[13px] text-amber-800 dark:text-amber-300 print:text-black leading-none mt-1">
+                                                    🔒
+                                                  </span>
+                                                  <span className="text-[10px] font-semibold text-amber-900/90 dark:text-amber-100/90 print:text-black leading-tight uppercase truncate max-w-[60px]">
+                                                    {shortName.length > 0 ? shortName : "BLOCKED"}
+                                                  </span>
+                                                  <span className="text-[8px] font-medium text-amber-700/90 dark:text-amber-400/90 print:text-black leading-none">
+                                                    {subjectAbbr} | {slot.className}
+                                                  </span>
+                                                </div>
+                                              </TooltipTrigger>
+                                              <TooltipContent side="top" className="text-xs max-w-[220px]">
+                                                <p className="font-semibold">🔒 Seat Reserved (Other Exam)</p>
+                                                <p className="text-muted-foreground mt-1">{slot.studentName}</p>
+                                                <p className="text-muted-foreground">
+                                                  {slot.subjectName} ({slot.className})
+                                                </p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        </td>
+                                      );
+                                    });
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </motion.div>
+          )}
+        </>
       )}
 
       {/* ── Assign Manual Dialog (With Visual Grid) ───────────────── */}
@@ -933,7 +1146,7 @@ export default function SeatingPlanPanel() {
 
                 <label className="text-sm font-medium mt-4">2. Select Target Room</label>
                 {isLoadingRooms ? (
-                  <div className="h-10 flex items-center text-sm text-muted-foreground"><Loader2 className="w-3 h-3 mr-2 animate-spin"/> Loading capacities...</div>
+                  <div className="h-10 flex items-center text-sm text-muted-foreground"><Loader2 className="w-3 h-3 mr-2 animate-spin" /> Loading capacities...</div>
                 ) : (
                   <Select value={formRoomUuid} onValueChange={(r) => { setFormRoomUuid(r); setFormSeatId(0); }}>
                     <SelectTrigger>
@@ -943,12 +1156,12 @@ export default function SeatingPlanPanel() {
                       {availableRooms.map((r) => {
                         const isTrulyFull = r.totalSeats > 0 && r.isFull;
                         if (isTrulyFull) return null;
-                        
+
                         return (
                           <SelectItem key={r.roomUuid} value={r.roomUuid} disabled={r.totalSeats === 0 || r.isFull}>
                             <div className="flex flex-col">
                               <span className="flex items-center gap-2">
-                                {r.roomName} 
+                                {r.roomName}
                                 {r.totalSeats === 0 ? (
                                   <Badge variant="destructive" className="text-[10px] ml-2 font-mono">
                                     No Seating Configured
@@ -970,7 +1183,7 @@ export default function SeatingPlanPanel() {
                                 <div className="flex flex-wrap gap-1 mt-1 pl-1">
                                   {r.occupiedBy.map((o, idx) => (
                                     <span key={idx} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground whitespace-nowrap">
-                                      {o.subjectName} ({o.className}): {o.count}
+                                      {o.subjectName.substring(0, 3)} ({o.className}): {o.count}
                                     </span>
                                   ))}
                                 </div>
@@ -982,8 +1195,13 @@ export default function SeatingPlanPanel() {
                     </SelectContent>
                   </Select>
                 )}
-                <div className="mt-auto pt-4 text-xs text-muted-foreground">
-                  Time bounds are enforced automatically at the API layer based on schedule duration. You cannot double-book a seat.
+                <div className="mt-auto pt-4 text-xs space-y-2">
+                  <div className="text-muted-foreground">
+                    Time bounds are enforced automatically at the API layer based on schedule duration. You cannot double-book a seat.
+                  </div>
+                  <div className="text-destructive font-medium border-t pt-2">
+                    ⚠ Warning: Students from the same exam cannot share a bench.
+                  </div>
                 </div>
               </div>
 
@@ -996,15 +1214,15 @@ export default function SeatingPlanPanel() {
                   </div>
                 ) : isLoadingGrid ? (
                   <div className="h-[200px] bg-muted/30 rounded-xl flex items-center justify-center text-sm text-muted-foreground border">
-                    <Loader2 className="w-5 h-5 animate-spin"/>
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   </div>
                 ) : (
                   <div className="p-4 bg-muted/20 border rounded-xl overflow-x-auto">
-                    <div 
+                    <div
                       className="grid gap-2 outline-none w-max mx-auto"
-                      style={{ 
+                      style={{
                         gridTemplateColumns: `repeat(${maxCol}, minmax(0, 1fr))`,
-                        gridTemplateRows: `repeat(${maxRow}, minmax(0, 1fr))` 
+                        gridTemplateRows: `repeat(${maxRow}, minmax(0, 1fr))`
                       }}
                     >
                       <TooltipProvider delayDuration={200}>
@@ -1030,7 +1248,7 @@ export default function SeatingPlanPanel() {
                           // Build tooltip content from occupied slots
                           const slots = seat.occupiedSlots || [];
                           const tooltipLines = slots.map(s =>
-                            `${POSITION_FULL_LABELS[s.positionIndex] || `POS ${s.positionIndex}`}: ${s.studentName} (${s.subjectName} / ${s.className})`
+                            `${POSITION_FULL_LABELS[s.positionIndex] || `POS ${s.positionIndex}`}: ${s.studentName} (${s.subjectName.substring(0, 3)} / ${s.className})`
                           );
                           // Add available slots info
                           for (let i = 0; i < seatCapacity; i++) {
@@ -1074,7 +1292,7 @@ export default function SeatingPlanPanel() {
                 )}
               </div>
             </div>
-            
+
             <div className="flex justify-end gap-2 pt-4 border-t mt-2">
               <Button variant="ghost" onClick={() => setAssignOpen(false)}>Cancel</Button>
               <Button onClick={handleAssign} disabled={assignSeatMutation.isPending || !formSeatId}>
@@ -1122,10 +1340,10 @@ export default function SeatingPlanPanel() {
                     </div>
                   </div>
                   {willSeatCount < remainingToSeat && (
-                     <div className="text-[11px] text-amber-600 font-medium bg-amber-500/10 p-2 rounded border border-amber-500/20 mt-2 flex items-start gap-1">
-                       <span className="text-xl leading-none -mt-1">⚠</span>
-                       <span>Capacity deficit detected. You will need to run a secondary execution on another room to seat the final {remainingToSeat - willSeatCount} students.</span>
-                     </div>
+                    <div className="text-[11px] text-amber-600 font-medium bg-amber-500/10 p-2 rounded border border-amber-500/20 mt-2 flex items-start gap-1">
+                      <span className="text-xl leading-none -mt-1">⚠</span>
+                      <span>Capacity deficit detected. You will need to run a secondary execution on another room to seat the final {remainingToSeat - willSeatCount} students.</span>
+                    </div>
                   )}
                 </>
               )}
@@ -1136,7 +1354,7 @@ export default function SeatingPlanPanel() {
                 Destination Pool <span className="text-destructive">*</span>
               </label>
               {isLoadingRooms ? (
-                <div className="h-10 flex items-center text-sm text-muted-foreground border rounded-md px-3"><Loader2 className="w-3 h-3 mr-2 animate-spin"/> Loading pools...</div>
+                <div className="h-10 flex items-center text-sm text-muted-foreground border rounded-md px-3"><Loader2 className="w-3 h-3 mr-2 animate-spin" /> Loading pools...</div>
               ) : (
                 <Select value={autoFillRoomUuid} onValueChange={setAutoFillRoomUuid}>
                   <SelectTrigger className="h-11 shadow-sm">
@@ -1144,62 +1362,62 @@ export default function SeatingPlanPanel() {
                   </SelectTrigger>
                   <SelectContent position="popper" className="max-h-[200px] overflow-y-auto">
                     {availableRooms.map((r) => {
-                        const isTrulyFull = r.totalSeats > 0 && r.isFull;
-                        if (isTrulyFull) return null;
-                        
-                        return (
-                          <SelectItem key={r.roomUuid} value={r.roomUuid} disabled={r.totalSeats === 0 || r.isFull}>
-                            <div className="flex flex-col text-left py-0.5">
-                              <span className="font-medium flex items-center gap-2">
-                                {r.roomName}
-                                {r.totalSeats === 0 && <span className="text-[10px] uppercase text-destructive font-bold bg-destructive/10 px-1 rounded">No Config</span>}
-                                {r.mode && r.totalSeats > 0 && (
-                                   <Badge variant={r.mode === "TRIPLE" ? "default" : "outline"} className="text-[9px] h-4 font-mono ml-auto">
-                                     {r.mode}
-                                   </Badge>
-                                )}
-                              </span>
-                              <span className="text-xs text-muted-foreground mt-0.5">
-                                {r.totalSeats === 0 ? "Generate seats in infrastructure first" : `${r.occupiedCapacity} in-use • ${r.availableCapacity} available slots`}
-                              </span>
-                              {r.occupiedBy && r.occupiedBy.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {r.occupiedBy.map((o, idx) => (
-                                    <span key={idx} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground whitespace-nowrap">
-                                      {o.subjectName} ({o.className}): {o.count}
-                                    </span>
-                                  ))}
-                                </div>
+                      const isTrulyFull = r.totalSeats > 0 && r.isFull;
+                      if (isTrulyFull) return null;
+
+                      return (
+                        <SelectItem key={r.roomUuid} value={r.roomUuid} disabled={r.totalSeats === 0 || r.isFull}>
+                          <div className="flex flex-col text-left py-0.5">
+                            <span className="font-medium flex items-center gap-2">
+                              {r.roomName}
+                              {r.totalSeats === 0 && <span className="text-[10px] uppercase text-destructive font-bold bg-destructive/10 px-1 rounded">No Config</span>}
+                              {r.mode && r.totalSeats > 0 && (
+                                <Badge variant={r.mode === "TRIPLE" ? "default" : "outline"} className="text-[9px] h-4 font-mono ml-auto">
+                                  {r.mode}
+                                </Badge>
                               )}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
+                            </span>
+                            <span className="text-xs text-muted-foreground mt-0.5">
+                              {r.totalSeats === 0 ? "Generate seats in infrastructure first" : `${r.occupiedCapacity} in-use • ${r.availableCapacity} available slots`}
+                            </span>
+                            {r.occupiedBy && r.occupiedBy.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {r.occupiedBy.map((o, idx) => (
+                                  <span key={idx} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground whitespace-nowrap">
+                                    {o.subjectName.substring(0, 3)} ({o.className}): {o.count}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t text-muted-foreground">
-               <span className="text-xs flex-1 my-auto">Pessimistic locking prevents double-insertion.</span>
-              <Button variant="ghost" onClick={() => setAutoFillOpen(false)}>
-                Abort
-              </Button>
-              <Button
-                onClick={handleAutoFill}
-                disabled={autoFillMutation.isPending || !autoFillRoomUuid}
-                className="gap-1.5 min-w-[120px]"
-              >
-                {autoFillMutation.isPending && (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                )}
-                Execute Sync
-              </Button>
+            <div className="flex flex-col gap-2 pt-2 border-t text-muted-foreground w-full">
+              <span className="text-xs">Pessimistic locking prevents double-insertion.</span>
+              <span className="text-[11px] text-destructive font-semibold">⚠ Warning: Capacity rules strictly follow "one exam per bench" sharing constraints.</span>
             </div>
+            <Button variant="ghost" onClick={() => setAutoFillOpen(false)}>
+              Abort
+            </Button>
+            <Button
+              onClick={handleAutoFill}
+              disabled={autoFillMutation.isPending || !autoFillRoomUuid}
+              className="gap-1.5 min-w-[120px]"
+            >
+              {autoFillMutation.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
-      
+
       {/* ── Delete Single Confirmation ───────────────────────────── */}
       <AlertDialog
         open={!!deleteTarget}

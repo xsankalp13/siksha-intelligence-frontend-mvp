@@ -62,6 +62,27 @@ interface StudentsWithGuardiansUploadProps {
   onUploadComplete?: (report: BulkImportReportDTO) => void;
 }
 
+function ErrorCell({ message, maxLength = 120 }: { message: string; maxLength?: number }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!message) return null;
+  const needsTruncation = message.length > maxLength;
+  const displayMessage = expanded || !needsTruncation ? message : message.slice(0, maxLength) + "...";
+
+  return (
+    <div className="flex flex-col items-start gap-1 w-full max-w-[350px]">
+      <span className="whitespace-pre-wrap break-words">{displayMessage}</span>
+      {needsTruncation && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-[10px] uppercase tracking-wider font-semibold text-primary hover:underline focus:outline-none"
+        >
+          {expanded ? "Show Less" : "Show More"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Mini FileCard — a compact file selector card
 // ─────────────────────────────────────────────────────────────────────────────
@@ -951,12 +972,12 @@ export default function StudentsWithGuardiansUpload({
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                          <td className="px-4 py-3 text-xs text-muted-foreground align-top">
                             {isSuccess
                               ? guardianDetails
                                 ? `Guardians: ${guardianDetails}`
                                 : "Imported successfully."
-                              : row.status.error ?? "Unknown error"}
+                              : <ErrorCell message={row.status.error ?? "Unknown error"} />}
                           </td>
                         </tr>
                       );

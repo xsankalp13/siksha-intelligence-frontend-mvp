@@ -18,9 +18,10 @@ export interface IdCardPreviewProps {
 export function IdCardPreview({ onDownload, className = "" }: IdCardPreviewProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   // Fetch rendered HTML from backend
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["id-card", "preview-html"],
     queryFn: async () => (await idCardService.getIdCardPreviewHtml()).data,
   });
@@ -83,11 +84,22 @@ export function IdCardPreview({ onDownload, className = "" }: IdCardPreviewProps
   const cardWidth = 215;
   const cardHeight = 340;
 
-  if (isLoading) {
+  const showSkeleton = isLoading || isFetching || (!iframeLoaded && splitContent);
+
+  if (showSkeleton) {
     return (
-      <div className="flex flex-col items-center gap-4">
+      <div className={`flex flex-col items-center gap-4 ${className}`}>
+        {/* Invisible iframe to load content and trigger onLoad while showing skeleton */}
+        {splitContent && !iframeLoaded && !isLoading && !isFetching && (
+          <iframe
+            srcDoc={splitContent.front}
+            style={{ width: 0, height: 0, border: 'none', position: 'absolute', opacity: 0 }}
+            onLoad={() => setIframeLoaded(true)}
+            title="Preload"
+          />
+        )}
         <Skeleton className={`rounded-xl shadow-lg border border-border/50`} style={{ width: cardWidth, height: cardHeight }} />
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative z-10 w-full justify-center">
           <Skeleton className="h-8 w-24 rounded-full" />
           <Skeleton className="h-8 w-24 rounded-full" />
         </div>
@@ -129,6 +141,7 @@ export function IdCardPreview({ onDownload, className = "" }: IdCardPreviewProps
                 className="w-full h-full border-none pointer-events-none"
                 style={{ overflow: 'hidden' }}
                 scrolling="no"
+                onLoad={() => setIframeLoaded(true)}
               />
             </motion.div>
           ) : (

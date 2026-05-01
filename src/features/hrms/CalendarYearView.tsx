@@ -1,16 +1,21 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Printer } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Printer, Plus, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { settingsService } from "@/features/super-admin/services/superAdminService";
 import type { CalendarEventResponseDTO, DayType } from "@/services/types/hrms";
+import { format } from "date-fns";
 
 /* ── Constants ──────────────────────────────────────────────────────── */
 
@@ -21,25 +26,42 @@ const MONTH_NAMES = [
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const DAY_STYLES: Record<DayType, { bg: string; border: string; text: string; label: string; printBg: string }> = {
-  HOLIDAY:             { bg: "bg-green-200 dark:bg-green-700/50",      border: "border-green-400 dark:border-green-500",    text: "text-green-900 dark:text-green-100", label: "Government / General Holiday", printBg: "#bbf7d0" },
-  HALF_DAY:            { bg: "bg-yellow-200 dark:bg-yellow-700/50",    border: "border-yellow-400 dark:border-yellow-500",  text: "text-yellow-900 dark:text-yellow-100", label: "Half Day",                   printBg: "#fef08a" },
-  RESTRICTED_HOLIDAY:  { bg: "bg-orange-200 dark:bg-orange-700/50",    border: "border-orange-400 dark:border-orange-500",  text: "text-orange-900 dark:text-orange-100", label: "Restricted Holiday",        printBg: "#fed7aa" },
-  VACATION:            { bg: "bg-cyan-200 dark:bg-cyan-700/50",        border: "border-cyan-400 dark:border-cyan-500",      text: "text-cyan-900 dark:text-cyan-100",   label: "Vacation",                    printBg: "#a5f3fc" },
-  EXAM_DAY:            { bg: "bg-fuchsia-200 dark:bg-fuchsia-700/50",  border: "border-fuchsia-400 dark:border-fuchsia-500",text: "text-fuchsia-900 dark:text-fuchsia-100", label: "Exam Day",                printBg: "#f5d0fe" },
-  WORKING:             { bg: "",                                        border: "",                                          text: "",                                    label: "Working Day",                 printBg: "#ffffff" },
+// We will use standard color names for print, but solid colors via Tailwind for headers
+const MONTH_COLORS = [
+  "bg-cyan-600",     // Jan
+  "bg-pink-500",     // Feb
+  "bg-red-500",      // Mar
+  "bg-emerald-600",  // Apr
+  "bg-amber-500",    // May
+  "bg-sky-600",      // Jun
+  "bg-teal-600",     // Jul
+  "bg-green-600",    // Aug
+  "bg-orange-500",   // Sep
+  "bg-rose-500",     // Oct
+  "bg-violet-600",   // Nov
+  "bg-blue-600",     // Dec
+];
+
+const DAY_STYLES: Record<DayType, { bg: string; border: string; text: string; label: string; printBg: string; dot: string }> = {
+  HOLIDAY:             { bg: "bg-red-100 dark:bg-red-900/30",         border: "border-red-300 dark:border-red-800",       text: "text-red-900 dark:text-red-100",           label: "Government / General Holiday", printBg: "#fee2e2", dot: "bg-red-500" },
+  HALF_DAY:            { bg: "bg-amber-100 dark:bg-amber-900/30",      border: "border-amber-300 dark:border-amber-800",   text: "text-amber-900 dark:text-amber-100",       label: "Half Day",                   printBg: "#fef3c7", dot: "bg-amber-500" },
+  RESTRICTED_HOLIDAY:  { bg: "bg-orange-100 dark:bg-orange-900/30",    border: "border-orange-300 dark:border-orange-800", text: "text-orange-900 dark:text-orange-100",     label: "Restricted Holiday",        printBg: "#ffedd5", dot: "bg-orange-500" },
+  VACATION:            { bg: "bg-cyan-100 dark:bg-cyan-900/30",        border: "border-cyan-300 dark:border-cyan-800",     text: "text-cyan-900 dark:text-cyan-100",         label: "Vacation",                    printBg: "#cffafe", dot: "bg-cyan-500" },
+  EXAM_DAY:            { bg: "bg-fuchsia-100 dark:bg-fuchsia-900/30",  border: "border-fuchsia-300 dark:border-fuchsia-800",text: "text-fuchsia-900 dark:text-fuchsia-100",  label: "Exam Day",                printBg: "#fae8ff", dot: "bg-fuchsia-500" },
+  WORKING:             { bg: "",                                        border: "",                                          text: "",                                         label: "Working Day",                 printBg: "#ffffff", dot: "" },
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */
 
-interface CalendarCell {
+export interface CalendarCell {
   day: number;
-  month: number;
+  month: number; // 0-11
   year: number;
   isCurrentMonth: boolean;
   isToday: boolean;
   isSunday: boolean;
   events: CalendarEventResponseDTO[];
+  dateStr: string; // YYYY-MM-DD
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -67,7 +89,7 @@ function buildMonthGrid(year: number, month: number, eventsByDate: Map<string, C
     const key = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     cells.push({
       day: d, month: prevMonth, year: prevYear, isCurrentMonth: false, isToday: false,
-      isSunday: cells.length % 7 === 0, events: eventsByDate.get(key) ?? [],
+      isSunday: cells.length % 7 === 0, events: eventsByDate.get(key) ?? [], dateStr: key
     });
   }
 
@@ -76,11 +98,11 @@ function buildMonthGrid(year: number, month: number, eventsByDate: Map<string, C
     const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     cells.push({
       day: d, month, year, isCurrentMonth: true, isToday: key === todayStr,
-      isSunday: cells.length % 7 === 0, events: eventsByDate.get(key) ?? [],
+      isSunday: cells.length % 7 === 0, events: eventsByDate.get(key) ?? [], dateStr: key
     });
   }
 
-  // Next month fill (to complete last row)
+  // Next month fill
   const remainder = cells.length % 7;
   if (remainder > 0) {
     const nextMonth = month === 11 ? 0 : month + 1;
@@ -89,7 +111,7 @@ function buildMonthGrid(year: number, month: number, eventsByDate: Map<string, C
       const key = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       cells.push({
         day: d, month: nextMonth, year: nextYear, isCurrentMonth: false, isToday: false,
-        isSunday: cells.length % 7 === 0, events: eventsByDate.get(key) ?? [],
+        isSunday: cells.length % 7 === 0, events: eventsByDate.get(key) ?? [], dateStr: key
       });
     }
   }
@@ -102,123 +124,17 @@ function buildMonthGrid(year: number, month: number, eventsByDate: Map<string, C
   return weeks;
 }
 
-/* ── Print helper ────────────────────────────────────────────────────── */
-
-function generatePrintHtml(
-  year: number,
-  month: number,
-  grid: CalendarCell[][],
-  events: CalendarEventResponseDTO[],
-  schoolName?: string,
-  logoUrl?: string,
-): string {
-  const monthEvents = events.filter(
-    (e) => e.date.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`) && e.dayType !== "WORKING",
-  );
-
-  const tableRows = monthEvents
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map(
-      (e) => `<tr>
-        <td style="padding:6px 10px;border:1px solid #e5e7eb;">${e.date}</td>
-        <td style="padding:6px 10px;border:1px solid #e5e7eb;">${e.title || "-"}</td>
-        <td style="padding:6px 10px;border:1px solid #e5e7eb;background:${DAY_STYLES[e.dayType]?.printBg ?? "#fff"}">${e.dayType.replace(/_/g, " ")}</td>
-        <td style="padding:6px 10px;border:1px solid #e5e7eb;">${e.appliesToStaff ? "Staff" : ""}${e.appliesToStaff && e.appliesToStudents ? ", " : ""}${e.appliesToStudents ? "Students" : ""}</td>
-      </tr>`,
-    )
-    .join("");
-
-  const calendarCells = grid
-    .map(
-      (week) =>
-        `<tr>${week
-          .map((cell) => {
-            const ev = cell.events.find((e) => e.dayType !== "WORKING");
-            const bg = ev ? DAY_STYLES[ev.dayType]?.printBg ?? "#fff" : cell.isSunday && cell.isCurrentMonth ? "#f9fafb" : "#fff";
-            const opacity = cell.isCurrentMonth ? "1" : "0.3";
-            const border = cell.isToday ? "2px solid #2563eb" : "1px solid #e5e7eb";
-            const dot = ev ? `<div style="width:6px;height:6px;border-radius:50%;background:${ev.dayType === 'HOLIDAY' ? '#dc2626' : ev.dayType === 'HALF_DAY' ? '#d97706' : '#6366f1'};margin:2px auto 0;"></div>` : "";
-            return `<td style="width:14.28%;text-align:center;padding:8px 4px;border:${border};background:${bg};opacity:${opacity};vertical-align:top;font-size:13px;">
-              <div style="font-weight:${cell.isToday ? 700 : 400}">${cell.day}</div>${dot}
-            </td>`;
-          })
-          .join("")}</tr>`,
-    )
-    .join("");
-
-  const legendItems = Object.entries(DAY_STYLES)
-    .filter(([key]) => key !== "WORKING")
-    .map(
-      ([, style]) => `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:16px;">
-        <span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:${style.printBg};border:1px solid #d1d5db;"></span>
-        <span style="font-size:11px;">${style.label}</span>
-      </span>`,
-    )
-    .join("");
-
-  return `<!DOCTYPE html>
-<html><head>
-<title>${MONTH_NAMES[month]} ${year} — Leave Calendar</title>
-<style>
-  @page { size: A4 landscape; margin: 12mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: #1f2937; }
-  table { border-collapse: collapse; width: 100%; }
-  .header { margin-bottom: 16px; }
-  .brand-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .header h1 { font-size: 22px; font-weight: 700; margin: 10px 0 2px; text-align: center; }
-  .header h2 { font-size: 16px; font-weight: 400; color: #6b7280; text-align: center; }
-  .logo { width: 48px; height: 48px; object-fit: contain; border-radius: 6px; }
-  .school-name { font-size: 20px; font-weight: 700; color: #334155; }
-  .dow-header th { padding: 8px; background: #1e293b; color: #fff; text-align: center; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-  .legend { margin: 12px 0; padding: 8px 0; border-top: 1px solid #e5e7eb; }
-  .events-section { margin-top: 20px; page-break-inside: avoid; }
-  .events-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-  .events-table th { padding: 6px 10px; background: #f3f4f6; border: 1px solid #e5e7eb; font-size: 12px; text-align: left; }
-  .events-table td { font-size: 12px; }
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style>
-</head><body>
-  <div class="header">
-    <div class="brand-row">
-      ${logoUrl ? `<img src="${logoUrl}" alt="School logo" class="logo" />` : ""}
-      ${schoolName ? `<p class="school-name">${schoolName}</p>` : ""}
-    </div>
-    <h1>Academic Calendar ${year}</h1>
-    <h2>${MONTH_NAMES[month]} ${year}</h2>
-  </div>
-
-  <table>
-    <thead><tr class="dow-header">${DOW.map((d) => `<th>${d}</th>`).join("")}</tr></thead>
-    <tbody>${calendarCells}</tbody>
-  </table>
-
-  <div class="legend">${legendItems}</div>
-
-  ${
-    monthEvents.length > 0
-      ? `<div class="events-section">
-      <h3>Holidays &amp; Events — ${MONTH_NAMES[month]} ${year}</h3>
-      <table class="events-table">
-        <thead><tr><th>Date</th><th>Event</th><th>Type</th><th>Applies To</th></tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    </div>`
-      : ""
-  }
-
-  <script>window.onload = function() { window.print(); }</script>
-</body></html>`;
-}
+/* ── Print Helper ────────────────────────────────────────────────────── */
 
 function generateYearPrintHtml(
-  year: number,
-  monthGrids: CalendarCell[][][],
+  startYear: number,
+  endYear: number,
+  monthGrids: { year: number; month: number; grid: CalendarCell[][] }[],
   eventsByDate: Map<string, CalendarEventResponseDTO[]>,
   schoolName?: string,
   logoUrl?: string,
 ): string {
-  const legendItems = Object.entries(DAY_STYLES)
+   const legendItems = Object.entries(DAY_STYLES)
     .filter(([key]) => key !== "WORKING")
     .map(
       ([, style]) => `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:14px;">
@@ -228,136 +144,86 @@ function generateYearPrintHtml(
     )
     .join("");
 
-  const monthEventsMap = new Map<number, CalendarEventResponseDTO[]>();
-  for (let month = 0; month < 12; month++) {
-    const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
-    const monthEvents = Array.from(eventsByDate.entries())
-      .filter(([date]) => date.startsWith(monthPrefix))
-      .flatMap(([, events]) => events)
-      .filter((event) => event.dayType !== "WORKING")
-      .sort((a, b) => a.date.localeCompare(b.date));
-    monthEventsMap.set(month, monthEvents);
-  }
-
-  const renderMonth = (month: number): string => {
-    const grid = monthGrids[month];
-    const eventCount = monthEventsMap.get(month)?.length ?? 0;
-
-    const rows = grid
-      .map(
-        (week) => `<tr>${week
-          .map((cell) => {
-            const key = `${cell.year}-${String(cell.month + 1).padStart(2, "0")}-${String(cell.day).padStart(2, "0")}`;
+    const renderMonth = (mInfo: { year: number; month: number; grid: CalendarCell[][] }): string => {
+        const rows = mInfo.grid.map((week) => `<tr>${week.map((cell) => {
+            const key = cell.dateStr;
             const events = eventsByDate.get(key) ?? [];
             const primary = events.find((e) => e.dayType !== "WORKING");
             const bg = primary
               ? DAY_STYLES[primary.dayType]?.printBg ?? "#ffffff"
               : cell.isSunday && cell.isCurrentMonth
-                ? "#f8fafc"
+                ? "#fff1f2" // lightly red tinted sunday
                 : "#ffffff";
             const opacity = cell.isCurrentMonth ? "1" : "0.28";
             const fontWeight = cell.isToday ? "700" : "400";
-            return `<td style="width:14.28%;border:1px solid #e5e7eb;text-align:center;padding:3px 0;font-size:10px;background:${bg};opacity:${opacity};font-weight:${fontWeight};">${cell.day}</td>`;
-          })
-          .join("")}</tr>`,
-      )
-      .join("");
+            return `<td style="width:14.28%;border:1px solid #e5e7eb;text-align:center;padding:5px 0;font-size:11px;background:${bg};opacity:${opacity};font-weight:${fontWeight};">${cell.day}</td>`;
+          }).join("")}</tr>`).join("");
+    
+        return `<section class="month-card">
+          <div class="month-head">
+            <span>${MONTH_NAMES[mInfo.month]} ${mInfo.year}</span>
+          </div>
+          <table>
+            <thead><tr>${DOW.map((d) => `<th style="${d==='Sun'?'color:#ef4444':''}">${d}</th>`).join("")}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </section>`;
+    };
 
-    return `<section class="month-card">
-      <div class="month-head">
-        <span>${MONTH_NAMES[month]} ${year}</span>
-        <span>${eventCount} ${eventCount === 1 ? "event" : "events"}</span>
+    const monthsGrid = monthGrids.map(renderMonth).join("");
+
+    return `<!DOCTYPE html>
+    <html><head>
+    <title>${startYear}-${endYear} Academic Calendar</title>
+    <style>
+      @page { size: A4 landscape; margin: 10mm; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: #0f172a; }
+      .page { min-height: 100%; }
+      .header { margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;}
+      .brand-row { display: flex; align-items: center; gap: 12px; }
+      .header h1 { font-size: 20px; line-height: 1.2; }
+      .logo { width: 42px; height: 42px; object-fit: contain; border-radius: 4px; }
+      .school-name { font-size: 22px; font-weight: 700; color: #1e293b; }
+      .legend { margin: 6px 0 12px; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 8px 0; }
+      .months { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+      .month-card { border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; break-inside: avoid; }
+      .month-head { padding: 6px 8px; background: #0f172a; color: #f8fafc; text-align: center; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      th { background: #f8fafc; border: 1px solid #e2e8f0; font-size: 9px; padding: 4px 0; color: #475569; text-transform: uppercase; }
+      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    </style>
+    </head><body>
+      <div class="page">
+        <div class="header">
+          <div class="brand-row">
+            ${logoUrl ? `<img src="${logoUrl}" alt="School logo" class="logo" />` : ""}
+            ${schoolName ? `<p class="school-name">${schoolName}</p>` : ""}
+          </div>
+          <h1>Academic Calendar ${startYear} - ${endYear}</h1>
+        </div>
+        <div class="legend">${legendItems}</div>
+        <div class="months">${monthsGrid}</div>
       </div>
-      <table>
-        <thead><tr>${DOW.map((d) => `<th>${d}</th>`).join("")}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </section>`;
-  };
-
-  const monthsGrid = Array.from({ length: 12 }, (_, i) => renderMonth(i)).join("");
-
-  const monthTables = Array.from({ length: 12 }, (_, month) => {
-    const monthEvents = monthEventsMap.get(month) ?? [];
-    if (monthEvents.length === 0) {
-      return "";
-    }
-
-    const rows = monthEvents
-      .map(
-        (event) => `<tr>
-          <td>${event.date}</td>
-          <td>${event.title || "-"}</td>
-          <td style="background:${DAY_STYLES[event.dayType]?.printBg ?? "#fff"}">${event.dayType.replace(/_/g, " ")}</td>
-          <td>${event.appliesToStaff ? "Staff" : ""}${event.appliesToStaff && event.appliesToStudents ? ", " : ""}${event.appliesToStudents ? "Students" : ""}</td>
-        </tr>`,
-      )
-      .join("");
-
-    return `<section class="month-table-wrap">
-      <h3>${MONTH_NAMES[month]} ${year}</h3>
-      <table class="events-table">
-        <thead><tr><th>Date</th><th>Leave / Event</th><th>Type</th><th>Applies To</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </section>`;
-  }).join("");
-
-  return `<!DOCTYPE html>
-<html><head>
-<title>${year} Leave Calendar</title>
-<style>
-  @page { size: A4 portrait; margin: 7mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: #0f172a; }
-  .page { min-height: 100%; }
-  .header { margin-bottom: 6px; }
-  .brand-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
-  .header h1 { font-size: 16px; line-height: 1.2; text-align: center; margin-top: 10px; }
-  .logo { width: 34px; height: 34px; object-fit: contain; border-radius: 4px; }
-  .school-name { font-size: 20px; font-weight: 700; color: #334155; }
-  .legend { margin: 4px 0 7px; border-top: 1px solid #e2e8f0; padding-top: 6px; }
-  .months { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .month-card { border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; break-inside: avoid; }
-  .month-head { padding: 4px 6px; background: #0f172a; color: #f8fafc; display: flex; justify-content: space-between; font-size: 9px; font-weight: 600; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  th { background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 8px; padding: 2px 0; color: #334155; }
-  .tables-page { margin-top: 8px; }
-  .tables-page h2 { font-size: 14px; margin-bottom: 6px; }
-  .month-table-wrap { margin-bottom: 8px; page-break-inside: avoid; }
-  .month-table-wrap h3 { font-size: 11px; margin-bottom: 3px; color: #0f172a; }
-  .events-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .events-table th { padding: 5px 6px; font-size: 9px; border: 1px solid #e2e8f0; text-align: left; }
-  .events-table td { padding: 4px 6px; font-size: 9px; border: 1px solid #e2e8f0; vertical-align: top; }
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-</style>
-</head><body>
-  <div class="page">
-    <div class="header">
-      <div class="brand-row">
-        ${logoUrl ? `<img src="${logoUrl}" alt="School logo" class="logo" />` : ""}
-        ${schoolName ? `<p class="school-name">${schoolName}</p>` : ""}
-      </div>
-      <h1>Academic Calendar ${year}</h1>
-    </div>
-    <div class="legend">${legendItems}</div>
-    <div class="months">${monthsGrid}</div>
-  </div>
-  ${monthTables ? `<div class="tables-page"><h2>Leaves / Holidays Table (Month-wise)</h2>${monthTables}</div>` : ""}
-  <script>window.onload = function() { window.print(); }</script>
-</body></html>`;
+      <script>window.onload = function() { window.print(); }</script>
+    </body></html>`;
 }
 
 /* ── Component ───────────────────────────────────────────────────────── */
 
 interface CalendarYearViewProps {
-  year: number;
-  onYearChange: (year: number) => void;
+  startYear: number;
+  endYear: number;
   events: CalendarEventResponseDTO[];
+  onAddEvent?: (date: string) => void;
+  onEditEvent?: (event: CalendarEventResponseDTO) => void;
+  onDeleteEvent?: (event: CalendarEventResponseDTO) => void;
 }
 
-export default function CalendarYearView({ year, onYearChange, events }: CalendarYearViewProps) {
+export default function CalendarYearView({ startYear, endYear, events, onAddEvent, onEditEvent, onDeleteEvent }: CalendarYearViewProps) {
   const printRef = useRef<Window | null>(null);
+  const [activeMonthDetails, setActiveMonthDetails] = useState<{ year: number, month: number, grid: CalendarCell[][] } | null>(null);
+
   const { data: whiteLabel } = useQuery({
     queryKey: ["settings", "whitelabel"],
     queryFn: () => settingsService.getWhiteLabel().then((res) => res.data),
@@ -367,7 +233,7 @@ export default function CalendarYearView({ year, onYearChange, events }: Calenda
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEventResponseDTO[]>();
     for (const event of events) {
-      const key = event.date; // already "YYYY-MM-DD"
+      const key = event.date;
       const existing = map.get(key);
       if (existing) existing.push(event);
       else map.set(key, [event]);
@@ -375,47 +241,25 @@ export default function CalendarYearView({ year, onYearChange, events }: Calenda
     return map;
   }, [events]);
 
-  // Build grids for all 12 months
-  const monthGrids = useMemo(
-    () => Array.from({ length: 12 }, (_, i) => buildMonthGrid(year, i, eventsByDate)),
-    [year, eventsByDate],
-  );
+  // Order: April to Dec of startYear, Jan to March of endYear
+  const monthSequence = useMemo(() => {
+     const seq: { year: number, month: number }[] = [];
+     for(let m = 3; m <= 11; m++) seq.push({ year: startYear, month: m }); // Apr-Dec (0-indexed 3-11)
+     for(let m = 0; m <= 2; m++) seq.push({ year: endYear, month: m });    // Jan-Mar (0-indexed 0-2)
+     return seq;
+  }, [startYear, endYear]);
 
-  // Count non-working events per month
-  const monthEventCounts = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, month) =>
-        events.filter(
-          (e) =>
-            e.date.startsWith(`${year}-${String(month + 1).padStart(2, "0")}`) &&
-            e.dayType !== "WORKING",
-        ).length,
-      ),
-    [year, events],
-  );
-
-  const handlePrintMonth = useCallback(
-    (month: number) => {
-      const html = generatePrintHtml(
-        year,
-        month,
-        monthGrids[month],
-        events,
-        whiteLabel?.schoolName,
-        whiteLabel?.logoUrl,
-      );
-      const win = window.open("", "_blank");
-      if (!win) return;
-      printRef.current = win;
-      win.document.write(html);
-      win.document.close();
-    },
-    [year, monthGrids, events, whiteLabel?.schoolName, whiteLabel?.logoUrl],
-  );
+  const monthGrids = useMemo(() => {
+     return monthSequence.map(seq => ({
+         ...seq,
+         grid: buildMonthGrid(seq.year, seq.month, eventsByDate)
+     }));
+  }, [monthSequence, eventsByDate]);
 
   const handlePrintYear = useCallback(() => {
     const html = generateYearPrintHtml(
-      year,
+      startYear,
+      endYear,
       monthGrids,
       eventsByDate,
       whiteLabel?.schoolName,
@@ -426,70 +270,108 @@ export default function CalendarYearView({ year, onYearChange, events }: Calenda
     printRef.current = win;
     win.document.write(html);
     win.document.close();
-  }, [year, monthGrids, eventsByDate, whiteLabel?.schoolName, whiteLabel?.logoUrl]);
-
-  // Active dayType legend entries (only show types that exist in current year)
-  const activeDayTypes = useMemo(() => {
-    const types = new Set(events.filter((e) => e.dayType !== "WORKING").map((e) => e.dayType));
-    return Object.entries(DAY_STYLES).filter(([key]) => key !== "WORKING" && types.has(key as DayType));
-  }, [events]);
+  }, [startYear, endYear, monthGrids, eventsByDate, whiteLabel?.schoolName, whiteLabel?.logoUrl]);
 
   return (
-    <div className="space-y-5">
-      {/* Year Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={() => onYearChange(year - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="text-xl font-bold tabular-nums">{year}</h2>
-          <Button variant="outline" size="icon" onClick={() => onYearChange(year + 1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          {events.filter((e) => e.dayType !== "WORKING").length} holidays/events marked
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={handlePrintYear}>
-          <Printer className="mr-2 h-4 w-4" /> Print 12-Month Calendar
-        </Button>
-      </div>
-
-      {/* Legend */}
-      {activeDayTypes.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 px-4 py-2.5">
-          <span className="mr-1 text-xs font-medium text-muted-foreground">Legend:</span>
-          {activeDayTypes.map(([key, style]) => (
-            <span key={key} className="inline-flex items-center gap-1.5">
-              <span className={`inline-block h-3 w-3 rounded-sm border ${style.bg} ${style.border}`} />
-              <span className="text-xs">{style.label}</span>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center mb-2">
+         <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background px-3 py-1.5 shadow-sm">
+            {Object.entries(DAY_STYLES).filter(([key]) => key !== "WORKING").map(([key, style]) => (
+                <span key={key} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <span className={`inline-block h-2.5 w-2.5 rounded-full ${style.dot}`} />
+                  <span className="text-[11px] font-medium text-muted-foreground mr-2">{style.label}</span>
+                </span>
+            ))}
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span className="inline-block h-2.5 w-2.5 rounded border border-red-200 bg-red-50 dark:bg-red-900/20" />
+                <span className="text-[11px] font-medium text-muted-foreground">Sunday</span>
             </span>
-          ))}
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-sm border bg-muted" />
-            <span className="text-xs">Sunday</span>
-          </span>
-        </div>
-      )}
+         </div>
+         <Button variant="outline" size="sm" onClick={handlePrintYear}>
+            <Printer className="mr-2 h-4 w-4" /> Print Academic Calendar
+         </Button>
+      </div>
 
-      {/* 12 Month Grid */}
-      <TooltipProvider delayDuration={200}>
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {monthGrids.map((grid, monthIdx) => (
-            <MonthCard
-              key={monthIdx}
-              year={year}
-              month={monthIdx}
-              grid={grid}
-              eventCount={monthEventCounts[monthIdx]}
-              onPrint={() => handlePrintMonth(monthIdx)}
-            />
-          ))}
-        </div>
-      </TooltipProvider>
+      <div className="h-[calc(100vh-250px)] min-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 pb-10">
+           {monthGrids.map((mInfo, idx) => (
+              <MonthCard
+                key={idx}
+                year={mInfo.year}
+                month={mInfo.month}
+                grid={mInfo.grid}
+                onHeaderClick={() => setActiveMonthDetails(mInfo)}
+                onAddEvent={onAddEvent}
+                onEditEvent={onEditEvent}
+                onDeleteEvent={onDeleteEvent}
+              />
+           ))}
+         </div>
+      </div>
+
+      <Dialog open={Boolean(activeMonthDetails)} onOpenChange={(o) => { if (!o) setActiveMonthDetails(null); }}>
+          <DialogContent className="max-w-4xl p-6">
+              {activeMonthDetails && (
+                 <>
+                   <DialogHeader className="mb-4">
+                     <DialogTitle className="text-2xl">{MONTH_NAMES[activeMonthDetails.month]} {activeMonthDetails.year}</DialogTitle>
+                   </DialogHeader>
+                   <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-8">
+                       {/* Expanded Calendar View */}
+                       <div className="border rounded-xl overflow-hidden shadow-sm">
+                          <div className={`p-3 text-center text-white font-semibold text-lg tracking-wide ${MONTH_COLORS[activeMonthDetails.month]}`}>
+                             {MONTH_NAMES[activeMonthDetails.month]} {activeMonthDetails.year}
+                          </div>
+                          <div className="grid grid-cols-7 border-b bg-muted/30">
+                            {DOW.map((d) => (
+                              <div key={d} className={`py-3 text-center text-xs font-semibold uppercase tracking-wider ${d === "Sun" ? "text-red-500" : "text-muted-foreground"}`}>
+                                {d}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="p-1">
+                            {activeMonthDetails.grid.map((week, wi) => (
+                              <div key={wi} className="grid grid-cols-7">
+                                {week.map((cell, di) => (
+                                  <ExpandedDayCell 
+                                      key={`${wi}-${di}`} 
+                                      cell={cell} 
+                                      onAddEvent={onAddEvent}
+                                      onEditEvent={onEditEvent}
+                                      onDeleteEvent={onDeleteEvent}
+                                  />
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                       </div>
+
+                       {/* Events List for this month */}
+                       <div className="space-y-4">
+                          <h3 className="font-semibold border-b pb-2">Events & Holidays this Month</h3>
+                          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                             {activeMonthDetails.grid.flat().filter(c => c.isCurrentMonth && c.events.some(e => e.dayType !== "WORKING")).flatMap(c => c.events.filter(e => e.dayType !== "WORKING")).map((event, idx) => (
+                                <div key={idx} className="p-3 border rounded-lg bg-card shadow-sm space-y-2">
+                                   <div className="flex justify-between items-start">
+                                      <span className="font-medium text-sm">{event.title || event.dayType.replace(/_/g, " ")}</span>
+                                      <span className="text-xs text-muted-foreground">{format(new Date(event.date), "MMM d")}</span>
+                                   </div>
+                                   <div className="flex items-center gap-2">
+                                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${DAY_STYLES[event.dayType].dot}`} />
+                                      <span className="text-xs text-muted-foreground">{DAY_STYLES[event.dayType].label}</span>
+                                   </div>
+                                </div>
+                             ))}
+                             {activeMonthDetails.grid.flat().filter(c => c.isCurrentMonth && c.events.some(e => e.dayType !== "WORKING")).length === 0 && (
+                                <div className="text-sm text-muted-foreground text-center py-10 border border-dashed rounded-lg">No events recorded this month.</div>
+                             )}
+                          </div>
+                       </div>
+                   </div>
+                 </>
+              )}
+          </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -500,57 +382,42 @@ interface MonthCardProps {
   year: number;
   month: number;
   grid: CalendarCell[][];
-  eventCount: number;
-  onPrint: () => void;
+  onHeaderClick: () => void;
+  onAddEvent?: (date: string) => void;
+  onEditEvent?: (event: CalendarEventResponseDTO) => void;
+  onDeleteEvent?: (event: CalendarEventResponseDTO) => void;
 }
 
-function MonthCard({ year, month, grid, eventCount, onPrint }: MonthCardProps) {
+function MonthCard({ year, month, grid, onHeaderClick, onAddEvent, onEditEvent, onDeleteEvent }: MonthCardProps) {
+  const bgColorClass = MONTH_COLORS[month];
+
   return (
-    <div className="overflow-hidden rounded-xl border shadow-sm transition-shadow hover:shadow-md">
-      {/* Month Header */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-700 px-4 py-2.5 dark:from-slate-700 dark:to-slate-600">
-        <div>
-          <h3 className="text-sm font-semibold text-white">{MONTH_NAMES[month]}</h3>
-          <span className="text-[11px] text-slate-300">{year}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {eventCount > 0 && (
-            <Badge variant="secondary" className="h-5 text-[10px]">
-              {eventCount} {eventCount === 1 ? "event" : "events"}
-            </Badge>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-white/70 hover:bg-white/10 hover:text-white"
-            onClick={onPrint}
-            title={`Print ${MONTH_NAMES[month]} ${year}`}
-          >
-            <Printer className="h-3.5 w-3.5" />
-          </Button>
+    <div className="group overflow-hidden rounded-xl border bg-card shadow-sm transition-all hover:shadow-md h-full flex flex-col">
+      {/* SOLID Color Month Header */}
+      <div 
+        className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-opacity hover:opacity-90 ${bgColorClass}`}
+        onClick={onHeaderClick}
+        title="Click to expand month details"
+      >
+        <span className="text-sm font-semibold text-white tracking-wide">{MONTH_NAMES[month]} {year}</span>
+        <div className="flex gap-1">
+           {grid.flat().filter(c => c.isCurrentMonth && c.events.some(e=>e.dayType === "HOLIDAY")).length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" title="Holidays in this month" />}
         </div>
       </div>
 
-      {/* Day-of-week header */}
-      <div className="grid grid-cols-7 border-b bg-muted/40">
+      <div className="grid grid-cols-7 border-b bg-muted/20">
         {DOW.map((d) => (
-          <div
-            key={d}
-            className={`py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider ${
-              d === "Sun" ? "text-red-500" : "text-muted-foreground"
-            }`}
-          >
+          <div key={d} className={`py-1 text-center text-[10px] font-bold uppercase tracking-wider ${d === "Sun" ? "text-red-500" : "text-muted-foreground"}`}>
             {d}
           </div>
         ))}
       </div>
 
-      {/* Calendar grid */}
-      <div className="p-1">
+      <div className="flex-1 p-[2px] bg-background">
         {grid.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7">
+          <div key={wi} className="grid grid-cols-7 gap-[2px]">
             {week.map((cell, di) => (
-              <DayCell key={`${wi}-${di}`} cell={cell} />
+              <InteractiveDayCell key={`${wi}-${di}`} cell={cell} onAddEvent={onAddEvent} onEditEvent={onEditEvent} onDeleteEvent={onDeleteEvent} />
             ))}
           </div>
         ))}
@@ -559,53 +426,133 @@ function MonthCard({ year, month, grid, eventCount, onPrint }: MonthCardProps) {
   );
 }
 
-/* ── Day Cell ────────────────────────────────────────────────────────── */
+/* ── Day Cell (Interactive Popover) ──────────────────────────────────── */
 
-function DayCell({ cell }: { cell: CalendarCell }) {
+interface DayCellProps {
+  cell: CalendarCell;
+  onAddEvent?: (date: string) => void;
+  onEditEvent?: (event: CalendarEventResponseDTO) => void;
+  onDeleteEvent?: (event: CalendarEventResponseDTO) => void;
+}
+
+function InteractiveDayCell({ cell, onAddEvent, onEditEvent, onDeleteEvent }: DayCellProps) {
+  const [open, setOpen] = useState(false);
   const primaryEvent = cell.events.find((e) => e.dayType !== "WORKING");
   const style = primaryEvent ? DAY_STYLES[primaryEvent.dayType] : null;
 
-  const base = "relative flex aspect-square items-center justify-center rounded-md text-xs transition-all";
-  const opacity = cell.isCurrentMonth ? "" : "opacity-25";
-  const todayRing = cell.isToday ? "ring-2 ring-primary ring-offset-1" : "";
-  const sundayStyle = cell.isSunday && cell.isCurrentMonth && !style ? "bg-muted/60 text-muted-foreground" : "";
-  const eventBg = style ? `${style.bg} ${style.border} border ${style.text} font-medium` : "";
-  const hover = cell.isCurrentMonth && primaryEvent ? "cursor-pointer hover:scale-110 hover:shadow-md" : "";
+  const base = "relative flex flex-col pt-1 items-center justify-start rounded-md transition-all min-h-[46px] w-full border border-transparent";
+  const opacity = cell.isCurrentMonth ? "" : "opacity-30";
+  const todayStyles = cell.isToday ? "ring-2 ring-primary ring-inset shadow-inner font-bold text-primary animate-pulse shadow-[inset_0_0_8px_rgba(37,99,235,0.2)]" : "font-medium text-slate-700 dark:text-slate-200";
+  const sundayStyle = cell.isSunday && cell.isCurrentMonth && !style ? "bg-red-50/50 dark:bg-red-950/20 text-red-700 dark:text-red-300" : "";
+  const eventBg = style ? `${style.bg} ${style.border}` : "hover:bg-slate-100 dark:hover:bg-slate-800";
+  const cursor = cell.isCurrentMonth ? "cursor-pointer" : "cursor-default pointer-events-none";
 
   const content = (
-    <div className={`${base} ${opacity} ${todayRing} ${sundayStyle} ${eventBg} ${hover}`}>
-      <span>{cell.day}</span>
-      {primaryEvent && cell.isCurrentMonth && (
-        <span className="absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-current" />
-      )}
+    <div className={`${base} ${opacity} ${todayStyles} ${sundayStyle} ${eventBg} ${cursor} group/cell`}>
+      <span className="text-[11px] leading-tight z-10">{cell.day}</span>
+      
+      {/* Event Dots Container */}
+      <div className="absolute bottom-1 w-full flex justify-center gap-[2px] flex-wrap px-0.5">
+          {cell.events.filter(e => e.dayType !== "WORKING").map((e, idx) => (
+             <span key={idx} className={`w-1.5 h-1.5 rounded-full ${DAY_STYLES[e.dayType].dot}`} />
+          ))}
+      </div>
     </div>
   );
 
-  if (!primaryEvent || !cell.isCurrentMonth) return content;
+  if (!cell.isCurrentMonth) return content;
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>{content}</TooltipTrigger>
-      <TooltipContent side="top" className="max-w-[220px] space-y-1">
-        {cell.events
-          .filter((e) => e.dayType !== "WORKING")
-          .map((e) => (
-            <div key={e.eventId}>
-              <p className="font-medium">{e.title || e.dayType.replace(/_/g, " ")}</p>
-              <p className="text-[10px] opacity-80">
-                {e.dayType.replace(/_/g, " ")}
-                {e.appliesToStaff && e.appliesToStudents
-                  ? " · All"
-                  : e.appliesToStaff
-                    ? " · Staff"
-                    : e.appliesToStudents
-                      ? " · Students"
-                      : ""}
-              </p>
-              {e.description && <p className="text-[10px] opacity-70">{e.description}</p>}
-            </div>
+    <Popover open={open} onOpenChange={setOpen}>
+       <PopoverTrigger asChild>{content}</PopoverTrigger>
+       <PopoverContent className="w-64 p-3 shadow-xl border-border" align="center" side="top" sideOffset={5}>
+          <div className="space-y-3">
+             <div className="flex justify-between items-center border-b pb-2">
+                <span className="font-semibold text-sm">{format(new Date(cell.dateStr), "PPPP")}</span>
+             </div>
+
+             {cell.events.length > 0 ? (
+                <div className="space-y-2">
+                   {cell.events.map(e => (
+                      <div key={e.eventId} className="bg-muted p-2 rounded-md space-y-1 group relative pr-8">
+                         <div className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${DAY_STYLES[e.dayType].dot}`} />
+                            <span className="text-xs font-semibold leading-tight">{e.title || e.dayType.replace(/_/g, " ")}</span>
+                         </div>
+                         <div className="text-[10px] text-muted-foreground ml-3.5">
+                            {e.appliesToStaff && e.appliesToStudents ? "Applies to All" : e.appliesToStaff ? "Applies to Staff" : "Applies to Students"}
+                         </div>
+
+                         {/* Quick actions wrapper */}
+                         <div className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {onEditEvent && (
+                               <Button variant="ghost" size="icon" className="w-5 h-5 hover:bg-white text-muted-foreground hover:text-primary" onClick={() => { setOpen(false); onEditEvent(e); }}>
+                                  <Edit className="w-3 h-3" />
+                               </Button>
+                            )}
+                            {onDeleteEvent && (
+                               <Button variant="ghost" size="icon" className="w-5 h-5 hover:bg-white text-muted-foreground hover:text-destructive" onClick={() => { setOpen(false); onDeleteEvent(e); }}>
+                                  <Trash2 className="w-3 h-3" />
+                               </Button>
+                            )}
+                         </div>
+                      </div>
+                   ))}
+                </div>
+             ) : (
+                <p className="text-xs text-muted-foreground text-center py-2">No events recorded on this day.</p>
+             )}
+
+             {onAddEvent && (
+                <Button variant="outline" size="sm" className="w-full text-xs h-7" onClick={() => { setOpen(false); onAddEvent(cell.dateStr); }}>
+                   <Plus className="w-3 h-3 mr-1" /> Add Event Here
+                </Button>
+             )}
+          </div>
+       </PopoverContent>
+    </Popover>
+  );
+}
+
+
+/* ── Expanded Day Cell (For the Full Screen Modal) ────────────────────── */
+
+function ExpandedDayCell({ cell, onAddEvent, onEditEvent, onDeleteEvent }: DayCellProps) {
+  const primaryEvent = cell.events.find((e) => e.dayType !== "WORKING");
+  const style = primaryEvent ? DAY_STYLES[primaryEvent.dayType] : null;
+
+  const base = "relative flex flex-col p-2 min-h-[90px] border border-border/50";
+  const opacity = cell.isCurrentMonth ? "bg-background hover:bg-muted/30" : "bg-muted/10 text-muted-foreground opacity-50";
+  const todayStyles = cell.isToday ? "ring-2 ring-primary ring-inset z-10" : "";
+  const eventBg = style ? `${style.bg}` : "";
+  const sundayStyle = cell.isSunday && cell.isCurrentMonth && !style ? "bg-red-50/30 dark:bg-red-950/10 text-red-700" : "";
+
+  return (
+    <div className={`${base} ${opacity} ${todayStyles} ${eventBg} ${sundayStyle} group`}>
+       <div className="flex justify-between items-start mb-1">
+          <span className={`font-semibold ${cell.isToday ? 'text-primary' : ''}`}>{cell.day}</span>
+          {cell.isCurrentMonth && onAddEvent && (
+             <Button variant="ghost" size="icon" className="w-5 h-5 opacity-0 group-hover:opacity-100 htransition-opacity -mr-1 -mt-1" onClick={() => onAddEvent(cell.dateStr)}>
+                <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+             </Button>
+          )}
+       </div>
+
+       <div className="flex-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar pr-0.5">
+          {cell.events.map(e => (
+             <div key={e.eventId} className="bg-background border shadow-sm rounded-sm px-1.5 py-1 text-[10px] leading-tight relative group/event cursor-pointer">
+                <div className="flex items-center gap-1 mb-0.5">
+                   <span className={`w-1.5 h-1.5 rounded-full ${DAY_STYLES[e.dayType].dot}`} />
+                   <span className="font-medium truncate">{e.title || e.dayType.replace(/_/g, " ")}</span>
+                </div>
+                
+                <div className="hidden absolute right-0 inset-y-0 bg-background/90 group-hover/event:flex items-center px-0.5">
+                   {onEditEvent && <Edit className="w-3 h-3 text-muted-foreground hover:text-primary mx-0.5" onClick={(ev) => { ev.stopPropagation(); onEditEvent(e);} } />}
+                   {onDeleteEvent && <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive mx-0.5" onClick={(ev) => { ev.stopPropagation(); onDeleteEvent(e);}} />}
+                </div>
+             </div>
           ))}
-      </TooltipContent>
-    </Tooltip>
+       </div>
+    </div>
   );
 }

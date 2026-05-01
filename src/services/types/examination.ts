@@ -13,6 +13,7 @@ export interface ExamRequestDTO {
 }
 
 export interface ExamResponseDTO {
+  id: number;                     // Numeric DB primary key (Long)
   uuid: string;
   name: string;
   academicYear: string;
@@ -27,6 +28,9 @@ export interface ExamResponseDTO {
   updatedBy: string;
   published: boolean;
   timetablePublished: boolean;
+  assignedControllerId?: number;
+  assignedControllerName?: string;
+  remainingAttempts?: number;
 }
 
 // Exam Schedules

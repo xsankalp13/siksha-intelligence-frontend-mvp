@@ -111,7 +111,7 @@ export default function StudentResultsPage() {
 
 function StudentResultCard({ resultId }: { resultId: number }) {
   const [expanded, setExpanded] = useState(false);
-  const { data: detail, isLoading } = useStudentResultDetail(resultId, expanded);
+  const { data: detail } = useStudentResultDetail(resultId, expanded);
   const downloadMutation = useDownloadResultPdf();
 
   if (!detail && !expanded) {

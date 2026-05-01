@@ -32,6 +32,26 @@ import UploadingProgress, { type RowStatus } from "./components/UploadingProgres
 // ─── Upload phases ───────────────────────────────────────────────────────────
 type Phase = "idle" | "validating" | "ready" | "uploading" | "success" | "error";
 
+function ErrorCell({ message, maxLength = 120 }: { message: string; maxLength?: number }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!message) return null;
+  const needsTruncation = message.length > maxLength;
+  const displayMessage = expanded || !needsTruncation ? message : message.slice(0, maxLength) + "...";
+
+  return (
+    <div className="flex flex-col items-start gap-1 w-full max-w-[350px]">
+      <span className="whitespace-pre-wrap break-words">{displayMessage}</span>
+      {needsTruncation && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-[10px] uppercase tracking-wider font-semibold text-primary hover:underline focus:outline-none"
+        >
+          {expanded ? "Show Less" : "Show More"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface BulkDataUploadProps {
   defaultUserType?: BulkImportUserType;
@@ -204,62 +224,26 @@ export default function BulkDataUpload({
   const [activeRowNumber, setActiveRowNumber] = useState(1);
   const [isMinimized, setIsMinimized] = useState(false);
   const sseCtrlRef = useRef<AbortController | null>(null);
-  const toastIdRef = useRef<string | number | null>(null);
-
-  // ── Toast progress renderer ────────────────────────────────────────────────
-  const showProgressToast = useCallback((
-    done: number,
-    total: number,
-    failed: number,
-    label: string,
-    onRestore: () => void
-  ) => {
-    const toastContent = (
-      <div className="w-full">
-        <div className="flex items-center justify-between mb-1.5">
-          <p className="text-sm font-semibold flex items-center gap-1.5">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-            Importing {label}…
-          </p>
-          <span className="text-xs text-muted-foreground tabular-nums">{done}/{total}</span>
-        </div>
-        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden flex mb-1.5">
-          <div
-            className="h-full rounded-l-full bg-green-500 transition-all duration-300"
-            style={{ width: `${total > 0 ? ((done - failed) / total) * 100 : 0}%` }}
-          />
-          <div
-            className="h-full bg-destructive transition-all duration-300"
-            style={{ width: `${total > 0 ? (failed / total) * 100 : 0}%` }}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          {failed > 0 && <span className="text-xs text-destructive">{failed} failed</span>}
-          <button
-            type="button"
-            onClick={onRestore}
-            className="ml-auto text-xs text-primary underline-offset-2 hover:underline"
-          >
-            View Full Progress
-          </button>
-        </div>
-      </div>
-    );
-
-    if (toastIdRef.current) {
-      toast.custom(() => toastContent, { id: toastIdRef.current as string, duration: Infinity });
-    } else {
-      const id = toast.custom(() => toastContent, { duration: Infinity });
-      toastIdRef.current = id;
-    }
-  }, []);
 
   const handleRestore = useCallback(() => {
     setIsMinimized(false);
-    if (toastIdRef.current) {
-      toast.dismiss(toastIdRef.current);
-      toastIdRef.current = null;
-    }
+  }, []);
+
+  const showProgressToast = useCallback((
+    done: number,
+    total: number,
+    failures: number,
+    typeLabel: string,
+    onRestore: () => void
+  ) => {
+    toast(`Importing ${typeLabel} (${done}/${total})`, {
+      description: failures > 0 ? `${failures} failures` : 'In progress...',
+      action: {
+        label: 'View',
+        onClick: onRestore,
+      },
+      id: 'bulk-import-progress',
+    });
   }, []);
 
   // ── File change ──────────────────────────────────────────────────────────
@@ -346,7 +330,6 @@ export default function BulkDataUpload({
                 setReport(r);
                 setPhase("success");
                 setIsMinimized(false);
-                if (toastIdRef.current) { toast.dismiss(toastIdRef.current); toastIdRef.current = null; }
                 if (d.failureCount === 0) {
                   toast.success("Import Successful", { description: `${d.successCount} of ${d.totalRows} records imported.` });
                 } else {
@@ -361,7 +344,6 @@ export default function BulkDataUpload({
               setFileError(message);
               setPhase("error");
               setIsMinimized(false);
-              if (toastIdRef.current) { toast.dismiss(toastIdRef.current); toastIdRef.current = null; }
               toast.error("Import Failed", { description: message });
             }
           } catch {/* ignore json parse errors */}
@@ -402,7 +384,6 @@ export default function BulkDataUpload({
   // ── Reset ──────────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
     if (sseCtrlRef.current) { sseCtrlRef.current.abort(); sseCtrlRef.current = null; }
-    if (toastIdRef.current) { toast.dismiss(toastIdRef.current); toastIdRef.current = null; }
     setPhase("idle");
     setFile(null);
     setFileError(null);
@@ -552,6 +533,7 @@ export default function BulkDataUpload({
         {phase === "uploading" && parsedData && (
           <motion.div key="uploading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {isMinimized ? (
+              /* Placeholder when minimized — panel is in fixed overlay below */
               <div className="flex items-center justify-between rounded-xl border border-border bg-card/70 px-4 py-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -568,16 +550,88 @@ export default function BulkDataUpload({
                 typeLabel={selectedTypeLabel}
                 rowProgress={rowProgress}
                 activeRowNumber={activeRowNumber}
-                onMinimize={() => {
-                  setIsMinimized(true);
-                  const successes = Array.from(rowProgress.values()).filter(v => v.kind === "success").length;
-                  const failures = Array.from(rowProgress.values()).filter(v => v.kind === "failure").length;
-                  showProgressToast(successes + failures, parsedData.rows.length, failures, selectedTypeLabel, handleRestore);
-                }}
+                onMinimize={() => setIsMinimized(true)}
               />
             )}
           </motion.div>
         )}
+
+        {/* ── Fixed floating progress panel (shown while minimized + uploading) ── */}
+        <AnimatePresence>
+          {phase === "uploading" && isMinimized && parsedData && (() => {
+            const done = Array.from(rowProgress.values()).length;
+            const successes = Array.from(rowProgress.values()).filter(v => v.kind === "success").length;
+            const failures = Array.from(rowProgress.values()).filter(v => v.kind === "failure").length;
+            const total = parsedData.rows.length;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            return (
+              <motion.div
+                key="float-panel"
+                initial={{ opacity: 0, y: 24, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 16, scale: 0.96 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl border border-border bg-background shadow-2xl overflow-hidden"
+              >
+                {/* Gradient top bar */}
+                <div className="h-1.5 w-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-violet-600 transition-all duration-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="p-4 space-y-3">
+                  {/* Title row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold leading-tight">Importing {selectedTypeLabel}…</p>
+                        <p className="text-xs text-muted-foreground">{done} / {total} records · {pct}%</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsMinimized(false)}
+                      className="h-6 w-6 rounded-md hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                      title="Close panel (import continues)"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Stats row */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg bg-muted/50 px-2 py-1.5">
+                      <p className="text-xs text-muted-foreground">Done</p>
+                      <p className="text-sm font-bold tabular-nums">{done}</p>
+                    </div>
+                    <div className="rounded-lg bg-emerald-500/10 px-2 py-1.5">
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400">Success</p>
+                      <p className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{successes}</p>
+                    </div>
+                    <div className="rounded-lg bg-destructive/10 px-2 py-1.5">
+                      <p className="text-xs text-destructive">Failed</p>
+                      <p className="text-sm font-bold tabular-nums text-destructive">{failures}</p>
+                    </div>
+                  </div>
+
+                  {/* Action button */}
+                  <Button
+                    size="sm"
+                    className="w-full gap-1.5"
+                    onClick={handleRestore}
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                    View Full Progress
+                  </Button>
+                </div>
+              </motion.div>
+            );
+          })()}
+        </AnimatePresence>
 
         {/* ── SUCCESS ── */}
         {phase === "success" && (
@@ -654,8 +708,8 @@ export default function BulkDataUpload({
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">
-                            {errorText || "Imported successfully."}
+                          <td className="px-4 py-3 text-xs text-muted-foreground align-top">
+                            {errorText ? <ErrorCell message={errorText} /> : "Imported successfully."}
                           </td>
                         </tr>
                       );

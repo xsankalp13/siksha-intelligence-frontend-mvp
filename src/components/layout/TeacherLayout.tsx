@@ -11,13 +11,13 @@ export default function TeacherLayout() {
   const [collapsed, setCollapsed] = useState(true);
   const { data: homeroom } = useTeacherHomeroom();
 
-  const navItems = homeroom?.classTeacher
-    ? TEACHER_NAV_ITEMS
-    : TEACHER_NAV_ITEMS.filter(
+  const navItems = homeroom?.classTeacher === false
+    ? TEACHER_NAV_ITEMS.filter(
         (item) =>
           item.path !== "/dashboard/teacher/my-class" &&
           item.path !== "/dashboard/teacher/attendance"
-      );
+      )
+    : TEACHER_NAV_ITEMS;
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">

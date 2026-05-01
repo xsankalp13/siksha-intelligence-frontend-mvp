@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Plus, Pencil, Wrench, Search, Bus, CheckCircle2, AlertTriangle, XCircle,
+  Plus, Pencil, Wrench, Search, Bus, CheckCircle2, XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

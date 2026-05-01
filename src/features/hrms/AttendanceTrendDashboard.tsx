@@ -49,9 +49,9 @@ export default function AttendanceTrendDashboard() {
         staffPresent: dayStaff.filter(r => r.shortCode === 'P').length,
         staffAbsent: dayStaff.filter(r => r.shortCode === 'A' || r.shortCode === 'LV').length,
         staffLate: dayStaff.filter(r => r.shortCode === 'L').length,
-        studentPresent: dayStudent.filter(r => r.shortCode === 'P').length,
-        studentAbsent: dayStudent.filter(r => r.shortCode === 'A' || r.shortCode === 'LV').length,
-        studentLate: dayStudent.filter(r => r.shortCode === 'L').length,
+        studentPresent: dayStudent.filter(r => r.attendanceTypeShortCode === 'P').length,
+        studentAbsent: dayStudent.filter(r => r.attendanceTypeShortCode === 'A' || r.attendanceTypeShortCode === 'LV').length,
+        studentLate: dayStudent.filter(r => r.attendanceTypeShortCode === 'L').length,
       };
     });
   }, [dateRange, staffData, studentData]);
@@ -63,34 +63,41 @@ export default function AttendanceTrendDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight">Attendance Trends</h2>
-          <p className="text-sm text-muted-foreground">Monitor daily check-in patterns and absent rates.</p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="View" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="both">All Entities</SelectItem>
-              <SelectItem value="staff">Staff Only</SelectItem>
-              <SelectItem value="student">Students Only</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Select value={days} onValueChange={setDays}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Duration" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 Days</SelectItem>
-              <SelectItem value="14">Last 14 Days</SelectItem>
-              <SelectItem value="30">Last 30 Days</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg">
+        <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10 blur-xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner">
+              📈
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Attendance Trends</h2>
+              <p className="text-sm text-white/70">Monitor daily check-in patterns and absent rates</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger className="w-[150px] bg-white/20 border-white/30 text-white h-9 backdrop-blur-sm">
+                <SelectValue placeholder="View" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="both">All Entities</SelectItem>
+                <SelectItem value="staff">Staff Only</SelectItem>
+                <SelectItem value="student">Students Only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={days} onValueChange={setDays}>
+              <SelectTrigger className="w-[140px] bg-white/20 border-white/30 text-white h-9 backdrop-blur-sm">
+                <SelectValue placeholder="Duration" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 Days</SelectItem>
+                <SelectItem value="14">Last 14 Days</SelectItem>
+                <SelectItem value="30">Last 30 Days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -104,10 +111,11 @@ export default function AttendanceTrendDashboard() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Staff Present (Today)</CardTitle>
-                <UserCheck className="h-4 w-4 text-emerald-500" />
+                <div className="rounded-lg bg-emerald-50 p-1.5"><UserCheck className="h-4 w-4 text-emerald-500" /></div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-emerald-600">{latestStaffPresent}</div>
@@ -115,21 +123,23 @@ export default function AttendanceTrendDashboard() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-rose-400 to-red-500" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Staff Absent (Today)</CardTitle>
-                <UserX className="h-4 w-4 text-[var(--attendance-absent-bg)]" />
+                <div className="rounded-lg bg-rose-50 p-1.5"><UserX className="h-4 w-4 text-rose-500" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-[var(--attendance-absent-bg)]">{chartData[chartData.length - 1]?.staffAbsent || 0}</div>
+                <div className="text-2xl font-bold text-rose-600">{chartData[chartData.length - 1]?.staffAbsent || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">Includes on-leave staff</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-500" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Student Present</CardTitle>
-                <Users className="h-4 w-4 text-blue-500" />
+                <div className="rounded-lg bg-blue-50 p-1.5"><Users className="h-4 w-4 text-blue-500" /></div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">{latestStudentPresent}</div>
@@ -137,10 +147,11 @@ export default function AttendanceTrendDashboard() {
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Staff Late (Avg)</CardTitle>
-                <Clock className="h-4 w-4 text-[var(--attendance-late-bg)]" />
+                <div className="rounded-lg bg-amber-50 p-1.5"><Clock className="h-4 w-4 text-amber-500" /></div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-amber-500">

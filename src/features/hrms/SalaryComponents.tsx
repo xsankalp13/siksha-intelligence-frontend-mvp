@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import {} from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import DataTable, { type Column } from "@/components/common/DataTable";
@@ -165,11 +165,33 @@ export default function SalaryComponents() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold">Salary Components</h3>
-        <Button size="sm" onClick={() => { setEditing(null); setForm(initialForm); setFieldErrors({}); setFormOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" /> Add Component
-        </Button>
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner">
+              💰
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Salary Components</h2>
+              <p className="text-sm text-white/70">Define earnings & deductions that build salary templates</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1.5 rounded-xl bg-white/20 px-3 py-1.5 text-xs font-medium">
+              <span className="text-emerald-300">⬆️ Earnings</span>
+              <span className="text-white/40">/</span>
+              <span className="text-rose-300">⬇️ Deductions</span>
+            </div>
+            <Button
+              onClick={() => { setEditing(null); setForm(initialForm); setFieldErrors({}); setFormOpen(true); }}
+              className="bg-white text-cyan-700 hover:bg-white/90 font-semibold gap-1.5 shadow-sm"
+            >
+              ➕ Add Component
+            </Button>
+          </div>
+        </div>
       </div>
 
       <DataTable

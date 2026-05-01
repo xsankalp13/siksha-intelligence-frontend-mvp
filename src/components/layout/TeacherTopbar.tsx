@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import RoleSwitcher from "./RoleSwitcher";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,13 @@ export default function TeacherTopbar() {
     navigate("/login", { replace: true });
     toast.success("Logged out successfully");
   };
+
+  const isSuperAdmin = user?.roles?.includes("ROLE_SUPER_ADMIN");
+  const displayName = isSuperAdmin 
+    ? "Super Admin" 
+    : (user?.firstName || user?.lastName) 
+      ? `${user.firstName || ""} ${user.lastName || ""}`.trim() 
+      : (user?.username ?? "Teacher");
 
   // Format today's date
   const today = new Date();
@@ -109,16 +117,18 @@ export default function TeacherTopbar() {
 
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium text-foreground leading-tight">
-            {user?.username ?? "Teacher"}
+            {displayName}
           </p>
           <p className="text-xs text-muted-foreground">
             {user?.roles?.[0]?.replace("ROLE_", "") ?? "TEACHER"}
           </p>
         </div>
 
+        <RoleSwitcher />
+
         {/* Avatar */}
         <UserAvatar
-          name={user?.username}
+          name={displayName}
           profileUrl={user?.profileUrl}
           className="h-9 w-9 ring-2 ring-primary/20"
         />

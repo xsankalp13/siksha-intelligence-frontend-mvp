@@ -77,6 +77,8 @@ export function LiveActivityFeed({ activities }: { activities: SystemEvent[] }) 
       case 'finance': return <IndianRupee className="h-3.5 w-3.5 text-emerald-600" />;
       case 'hrms': return <UserPlus className="h-3.5 w-3.5 text-blue-600" />;
       case 'attendance': return <Clock className="h-3.5 w-3.5 text-amber-600" />;
+      case 'proxy': return <CheckCircle className="h-3.5 w-3.5 text-violet-600" />;
+      case 'late-clockin': return <Clock className="h-3.5 w-3.5 text-rose-600" />;
       default: return <CheckCircle className="h-3.5 w-3.5 text-violet-600" />;
     }
   };
@@ -86,6 +88,8 @@ export function LiveActivityFeed({ activities }: { activities: SystemEvent[] }) 
       case 'finance': return 'bg-emerald-500/10';
       case 'hrms': return 'bg-blue-500/10';
       case 'attendance': return 'bg-amber-500/10';
+      case 'proxy': return 'bg-violet-500/10';
+      case 'late-clockin': return 'bg-rose-500/10';
       default: return 'bg-violet-500/10';
     }
   };

@@ -1,18 +1,36 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CalendarCheck2, Pencil } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarCheck2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { attendanceService } from "@/services/attendance";
-import { hrmsService } from "@/services/hrms";
 import { handleAttendanceError } from "@/features/attendance/utils/attendanceError";
 import { getLocalDateString } from "@/lib/dateUtils";
+import { useAttendanceTypes, useCalendarEventsForDate } from "@/features/teacher/queries/useAttendanceQueries";
 import type { StudentAttendanceRequestDTO } from "@/services/types/attendance";
 import type { TeacherStudentResponseDto } from "@/services/types/teacher";
-import StudentAttendanceModal from "./StudentAttendanceModal";
+import AttendanceRoster from "./AttendanceRoster";
+import SequentialMarkingView from "./SequentialMarkingView";
+import SubmitConfirmDialog from "./SubmitConfirmDialog";
+import type { LocalCode } from "./AttendanceRoster";
 
-type LocalCode = "P" | "A" | "L";
+// ─────────────────────────────────────────────────────────────────────
+// localStorage key for persisting the user's mode preference
+type Mode = "roster" | "sequential";
 
+// Separate localStorage keys per device class so a desktop session never
+// overrides what a phone should see (and vice-versa).
+function getModeKey(): string {
+  return window.innerWidth < 768 ? "ams-marking-mode-mobile" : "ams-marking-mode-desktop";
+}
+
+function getDefaultMode(): Mode {
+  const isMobile = window.innerWidth < 768;
+  const stored = localStorage.getItem(getModeKey());
+  if (stored === "roster" || stored === "sequential") return stored;
+  // First visit: pick the sensible default for this device class
+  return isMobile ? "sequential" : "roster";
+}
+
+// ─────────────────────────────────────────────────────────────────────
 type Props = {
   students: TeacherStudentResponseDto[];
   sectionUuid: string;
@@ -30,13 +48,8 @@ export default function QuickAttendanceGrid({
   initialRecords,
   onSubmitSuccess,
 }: Props) {
-  const [open, setOpen] = useState(false);
-
-  const { data: attendanceTypes } = useQuery({
-    queryKey: ["ams", "types"],
-    queryFn: async () => (await attendanceService.getAllTypes()).data,
-    staleTime: 5 * 60 * 1000,
-  });
+  // ── Attendance types (for short-code mapping) ──────────────────────
+  const { data: attendanceTypes } = useAttendanceTypes();
 
   const shortCodeMap = useMemo(() => {
     if (!attendanceTypes || attendanceTypes.length === 0) return null;
@@ -46,14 +59,28 @@ export default function QuickAttendanceGrid({
     return { P: pCode ?? "P", A: aCode ?? "A", L: lCode ?? "L" };
   }, [attendanceTypes]);
 
-  const modalInitialState = useMemo<Record<string, LocalCode>>(() => {
+  // ── Calendar / holiday check ───────────────────────────────────────
+  const attendanceDate = selectedDate || getLocalDateString();
+
+  const { data: calendarEvents } = useCalendarEventsForDate(attendanceDate);
+
+  const holidayEvent = useMemo(
+    () =>
+      calendarEvents?.find(
+        (e) =>
+          (e.dayType === "HOLIDAY" || e.dayType === "VACATION") &&
+          e.date === attendanceDate
+      ),
+    [calendarEvents, attendanceDate]
+  );
+  const isHoliday = !!holidayEvent;
+
+  // ── Convert initialRecords → LocalCode map ─────────────────────────
+  const initialCodeMap = useMemo<Record<string, LocalCode>>(() => {
     const next: Record<string, LocalCode> = {};
     students.forEach((s) => {
       const backendCode = initialRecords?.[s.uuid];
-      if (!backendCode) {
-        next[s.uuid] = "P";
-        return;
-      }
+      if (!backendCode) { next[s.uuid] = "P"; return; }
       if (backendCode === shortCodeMap?.A) next[s.uuid] = "A";
       else if (backendCode === shortCodeMap?.L) next[s.uuid] = "L";
       else next[s.uuid] = "P";
@@ -61,35 +88,48 @@ export default function QuickAttendanceGrid({
     return next;
   }, [initialRecords, shortCodeMap, students]);
 
-  const attendanceDate = selectedDate || getLocalDateString();
-  const { data: calendarEvents } = useQuery({
-    queryKey: ["hrms", "calendar", "events", attendanceDate],
-    queryFn: () => {
-      const d = new Date(attendanceDate);
-      const m = d.getMonth() + 1;
-      const y = d.getFullYear();
-      const ay = m >= 4 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
-      return hrmsService.listCalendarEvents({ month: m, academicYear: ay, fromDate: attendanceDate, toDate: attendanceDate }).then(r => r.data);
-    },
-  });
+  // ── 🔑 Attendance state — single source of truth ──────────────────
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, LocalCode>>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const holidayEvent = useMemo(() => {
-    return calendarEvents?.find(e => (e.dayType === "HOLIDAY" || e.dayType === "VACATION") && e.date === attendanceDate);
-  }, [calendarEvents, attendanceDate]);
+  // Sync when students load or initialRecords change
+  useEffect(() => {
+    setAttendanceMap(initialCodeMap);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, initialRecords, shortCodeMap]);
 
-  const isHoliday = !!holidayEvent;
+  const mark = (uuid: string, code: LocalCode) =>
+    setAttendanceMap((prev) => ({ ...prev, [uuid]: code }));
 
-  const submit = async (state: Record<string, LocalCode>) => {
+  const markAll = (code: LocalCode) => {
+    if (isHoliday) return;
+    setAttendanceMap(
+      students.reduce<Record<string, LocalCode>>((acc, s) => {
+        acc[s.uuid] = code;
+        return acc;
+      }, {})
+    );
+  };
+
+  const summary = useMemo(() => {
+    const vals = Object.values(attendanceMap);
+    return {
+      P: vals.filter((v) => v === "P").length,
+      A: vals.filter((v) => v === "A").length,
+      L: vals.filter((v) => v === "L").length,
+    };
+  }, [attendanceMap]);
+
+  // ── Submit ─────────────────────────────────────────────────────────
+  const submit = async () => {
     if (students.length === 0) return;
     if (!shortCodeMap) {
       toast.error("Attendance types are not configured.");
       return;
     }
-
-    const attendanceDate = selectedDate || getLocalDateString();
-
+    setSubmitting(true);
     const payload: StudentAttendanceRequestDTO[] = students.map((student) => {
-      const code = state[student.uuid] ?? "P";
+      const code = attendanceMap[student.uuid] ?? "P";
       return {
         studentUuid: student.uuid,
         attendanceShortCode: shortCodeMap[code] ?? "P",
@@ -97,54 +137,78 @@ export default function QuickAttendanceGrid({
         takenByStaffUuid: staffUuid,
       };
     });
-
     try {
       await attendanceService.createStudentAttendanceBatch(payload);
-      toast.success(`Attendance submitted for ${sectionUuid}`);
+      toast.success(`Attendance saved for ${sectionUuid}`);
       onSubmitSuccess?.();
     } catch (error) {
       handleAttendanceError(error, "Failed to submit attendance");
-      throw error;
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  // ── Mode (roster vs sequential) ────────────────────────────────────
+  const [mode, setMode] = useState<Mode>(getDefaultMode);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const switchMode = () => {
+    const next: Mode = mode === "roster" ? "sequential" : "roster";
+    setMode(next);
+    localStorage.setItem(getModeKey(), next);
+  };
+
+  // ── Shared props ───────────────────────────────────────────────────
+  const sharedProps = {
+    students,
+    state: attendanceMap,
+    mark,
+    summary,
+    onSubmit: () => { setShowConfirm(true); return Promise.resolve(); },
+    submitting,
+    isHoliday,
+    onSwitchMode: switchMode,
+    hasExistingRecords: Boolean(initialRecords),
+  };
+
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-      {isHoliday ? (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg flex items-start gap-3 mb-4">
+    <div className="space-y-3">
+      {/* Holiday banner */}
+      {isHoliday && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg flex items-start gap-3">
           <CalendarCheck2 className="h-5 w-5 mt-0.5 text-amber-600 shrink-0" />
           <div>
-            <p className="font-semibold text-sm">Holiday: {holidayEvent?.title || "Non-Working Day"}</p>
-            <p className="text-xs mt-0.5 text-amber-700">Student attendance cannot be recorded on a holiday.</p>
+            <p className="font-semibold text-sm">
+              Holiday: {holidayEvent?.title || "Non-Working Day"}
+            </p>
+            <p className="text-xs mt-0.5 text-amber-700">
+              Student attendance cannot be recorded on a holiday.
+            </p>
           </div>
         </div>
-      ) : null}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold">Student Attendance</p>
-          <p className="text-xs text-muted-foreground">
-            {initialRecords
-              ? `Attendance recorded for ${Object.keys(initialRecords).length} student(s). Tap to modify.`
-              : "Mark attendance for all students in this section."}
-          </p>
-        </div>
-        <Button onClick={() => setOpen(true)} className="gap-2" disabled={students.length === 0 || isHoliday}
-          variant={initialRecords ? "outline" : "default"}
-        >
-          {initialRecords ? (
-            <><Pencil className="h-4 w-4" /> Edit Attendance</>
-          ) : (
-            <><CalendarCheck2 className="h-4 w-4" /> Take Attendance</>
-          )}
-        </Button>
-      </div>
+      )}
 
-      <StudentAttendanceModal
-        open={open}
-        onOpenChange={setOpen}
+      {mode === "sequential" ? (
+        <SequentialMarkingView {...sharedProps} />
+      ) : (
+        <AttendanceRoster {...sharedProps} markAll={markAll} />
+      )}
+
+      <SubmitConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        onConfirm={async () => {
+          setShowConfirm(false);
+          await submit();
+        }}
         students={students}
-        initialState={modalInitialState}
-        onSubmit={submit}
+        state={attendanceMap}
+        initialState={initialRecords ? initialCodeMap : undefined}
+        summary={summary}
+        submitting={submitting}
+        isUpdate={Boolean(initialRecords)}
+        attendanceDate={attendanceDate}
+        sectionName={sectionUuid}
       />
     </div>
   );

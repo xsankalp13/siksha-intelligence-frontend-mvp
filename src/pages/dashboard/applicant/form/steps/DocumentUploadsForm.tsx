@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api as axios } from "@/lib/axios";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Upload, FileText, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, FileText, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 

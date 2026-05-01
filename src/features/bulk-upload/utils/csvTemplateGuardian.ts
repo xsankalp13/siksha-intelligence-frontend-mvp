@@ -169,6 +169,7 @@ export function downloadGuardiansTemplate(): void {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STAFF_TEMPLATE_ROWS: string[][] = [
+  // Header row — must match STAFF_HEADERS in csvValidation.ts AND backend STAFF_HEADER constant exactly
   [
     "firstName",
     "lastName",
@@ -178,22 +179,23 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "gender",
     "employeeId",
     "joiningDate",
-    "jobTitle",
-    "department",
-    "staffType",
-    "staffCategory",
+    "designationCode", // col 8 — OPTIONAL; leave blank to assign later via Admin > Designations > Bulk Assign
+    "department",      // col 9 — must be a Department enum: ACADEMICS | ADMINISTRATION | LIBRARY | FINANCE | ADMISSION | IT | FACILITIES | HUMAN_RESOURCE
+    "staffType",       // col 10 — TEACHER | PRINCIPAL | LIBRARIAN
+    "staffCategory",   // col 11 — TEACHING | NON_TEACHING_ADMIN | NON_TEACHING_SUPPORT
     "certifications",
     "specializations",
     "yearsOfExperience",
-    "educationLevel",
+    "educationLevel",  // BACHELORS | MASTERS | PHD
     "stateLicenseNumber",
     "administrativeCertifications",
-    "schoolLevelManaged",
+    "schoolLevelManaged", // PRIMARY | MIDDLE | HIGH | ALL
     "librarySystemPermissions",
     "mlisDegree",
     "assignedGate",
     "shiftTiming",
   ],
+  // Sample: Teacher
   [
     "Priya",
     "Verma",
@@ -203,8 +205,8 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "FEMALE",
     "EMP001",
     "2020-06-01",
-    "Mathematics Teacher",
-    "ACADEMICS",
+    "MATH_TEACHER",   // designationCode — free text code, e.g. your internal designation code
+    "ACADEMICS",      // Department enum value
     "TEACHER",
     "TEACHING",
     "B.Ed",
@@ -219,6 +221,7 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "",
     "",
   ],
+  // Sample: Principal
   [
     "Rajesh",
     "Kumar",
@@ -228,8 +231,8 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "MALE",
     "EMP002",
     "2018-07-15",
-    "Vice Principal",
-    "Administration",
+    "VICE_PRINCIPAL", // designationCode
+    "ADMINISTRATION", // Department enum value
     "PRINCIPAL",
     "NON_TEACHING_ADMIN",
     "",
@@ -244,6 +247,7 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "",
     "",
   ],
+  // Sample: Librarian
   [
     "Anita",
     "Singh",
@@ -253,8 +257,8 @@ const STAFF_TEMPLATE_ROWS: string[][] = [
     "FEMALE",
     "EMP003",
     "2022-01-10",
-    "Librarian",
-    "Library",
+    "HEAD_LIBRARIAN", // designationCode
+    "LIBRARY",        // Department enum value
     "LIBRARIAN",
     "NON_TEACHING_SUPPORT",
     "",

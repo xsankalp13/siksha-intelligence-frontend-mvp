@@ -93,7 +93,7 @@ export default function InvigilationPanel() {
     data: invigilations = [],
     isLoading,
   } = useGetInvigilationsByExam(selectedScheduleId);
-  const { data: allRooms = [] } = useGetRooms();
+  const { data: _allRooms = [] } = useGetRooms();
   const { data: roomsAvailability = [] } = useGetAvailableRooms(selectedScheduleId);
 
   // Derive rooms where students are actually sitting

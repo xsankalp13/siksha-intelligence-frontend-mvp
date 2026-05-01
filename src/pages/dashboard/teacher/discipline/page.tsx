@@ -14,15 +14,13 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from "@/components/ui/select";
+
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import {
   Plus, MessageSquare, Loader2, Search, Sparkles,
-  ThumbsUp, ThumbsDown, Minus, Star, AlertTriangle
+  ThumbsUp, ThumbsDown, Minus, AlertTriangle
 } from "lucide-react";
 
 const TAG_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {

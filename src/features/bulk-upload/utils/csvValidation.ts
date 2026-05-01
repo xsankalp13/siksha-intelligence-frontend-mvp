@@ -23,7 +23,7 @@ export const STAFF_HEADERS: string[] = [
   "gender",
   "employeeId",
   "joiningDate",
-  "jobTitle",
+  "designationCode", // col 8 — OPTIONAL. Leave blank; admin can bulk-assign via Designations page later
   "department",
   "staffType",
   "staffCategory",

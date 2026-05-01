@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { api as axios } from "@/lib/axios";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Search, Filter, CheckCircle2, Eye, Reply, XCircle, FileText, User, Home, ShieldAlert } from "lucide-react";
+import { Loader2, Search, Filter, CheckCircle2, Eye, Reply, FileText, User, Home, ShieldAlert } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function AdminAdmissionDashboard() {

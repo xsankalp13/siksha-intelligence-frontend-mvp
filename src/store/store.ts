@@ -69,6 +69,10 @@ initializeAxiosAuth({
     // Navigation to /login only happens after the user clicks OK.
     store.dispatch(markSessionExpired())
   },
+  navigateTo403: () => {
+    // Navigate to 403 page - page uses navigate(-1) to go back safely
+    window.location.replace('/403')
+  },
 })
 
 export type RootState = ReturnType<typeof store.getState>

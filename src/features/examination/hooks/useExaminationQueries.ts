@@ -14,10 +14,6 @@ import type {
   PastPaperQueryParams,
   StudentMarkRequestDTO,
   ExamResponseDTO,
-  AdmitCardGenerationResponseDTO,
-  AdmitCardResponseDTO,
-  AdmitCardGenerationProgressDTO,
-  ScheduleAdmitCardStatusDTO,
 } from "@/services/types/examination";
 import type { ExamTemplateRequestDTO } from "@/services/types/examTemplate";
 

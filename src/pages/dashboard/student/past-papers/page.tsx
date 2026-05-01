@@ -123,13 +123,13 @@ export default function StudentPastPapersPage() {
 
               <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/40 w-full">
                 <span className="text-xs text-muted-foreground font-medium">
-                  PDF • {(paper.fileSizeKb / 1024).toFixed(1)} MB
+                  PDF • {((paper.fileSizeKb ?? 0) / 1024).toFixed(1)} MB
                 </span>
                 <Button 
                   size="sm" 
                   variant="secondary" 
                   className="h-8 gap-1.5 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors"
-                  onClick={() => handleDownload(paper.fileUrl)}
+                  onClick={() => handleDownload(paper.fileUrl!)}
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download

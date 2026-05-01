@@ -10,9 +10,9 @@ import {
   CheckCircle2,
   Clock,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+
 import {
-  BarChart, Bar, AreaChart, Area, XAxis, YAxis,
+  BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import type { Vehicle, Route, Driver, StudentAssignment } from "@/services/transportMock";
@@ -149,8 +149,8 @@ export function TransportOverview({ vehicles, routes, drivers, assignments }: Tr
                   active && payload?.length ? (
                     <div className="rounded-xl border border-border bg-card p-3 shadow-lg text-xs min-w-[140px]">
                       <p className="mb-2 font-semibold text-foreground">{label}</p>
-                      {payload.map((p: { name: string; value: number; color: string }) => (
-                        <div key={p.name} className="flex items-center justify-between gap-4">
+                      {payload.map((p) => (
+                        <div key={String(p.name)} className="flex items-center justify-between gap-4">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
                             <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
                             {p.name}

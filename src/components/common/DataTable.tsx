@@ -24,6 +24,8 @@ interface DataTableProps<T> {
   pageSize?: number;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
+  /** Render additional action buttons per row */
+  customActions?: (row: T) => React.ReactNode;
   searchPlaceholder?: string;
   emptyMessage?: string;
 }
@@ -35,6 +37,7 @@ export default function DataTable<T extends object>({
   pageSize = 10,
   onEdit,
   onDelete,
+  customActions,
   searchPlaceholder = "Search…",
   emptyMessage = "No records found.",
 }: DataTableProps<T>) {
@@ -65,7 +68,7 @@ export default function DataTable<T extends object>({
   const safePage = Math.min(page, totalPages - 1);
   const slice = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
-  const hasActions = Boolean(onEdit || onDelete);
+  const hasActions = Boolean(onEdit || onDelete || customActions);
 
   return (
     <div className="space-y-4">
@@ -84,19 +87,19 @@ export default function DataTable<T extends object>({
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-border">
+      <div className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground w-12">
+              <tr className="border-b border-border/70 bg-gradient-to-b from-muted/60 to-muted/30">
+                <th className="h-11 px-4 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-12">
                   #
                 </th>
                 {columns.map((col) => (
                   <th
                     key={col.key}
                     className={cn(
-                      "px-4 py-3 text-left font-semibold text-muted-foreground",
+                      "h-11 px-4 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground",
                       col.className
                     )}
                   >
@@ -104,7 +107,7 @@ export default function DataTable<T extends object>({
                   </th>
                 ))}
                 {hasActions && (
-                  <th className="px-4 py-3 text-right font-semibold text-muted-foreground w-24">
+                  <th className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground w-24">
                     Actions
                   </th>
                 )}
@@ -115,11 +118,13 @@ export default function DataTable<T extends object>({
                 <tr>
                   <td
                     colSpan={columns.length + (hasActions ? 2 : 1)}
-                    className="py-16 text-center"
+                    className="py-20 text-center"
                   >
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                      <Inbox className="h-10 w-10 opacity-40" />
-                      <p className="text-sm">{emptyMessage}</p>
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
+                        <Inbox className="h-7 w-7 opacity-50" />
+                      </div>
+                      <p className="text-sm font-medium">{emptyMessage}</p>
                     </div>
                   </td>
                 </tr>
@@ -127,7 +132,7 @@ export default function DataTable<T extends object>({
                 slice.map((row, idx) => (
                   <tr
                     key={getRowId(row)}
-                    className="border-b border-border/50 transition-colors hover:bg-muted/30 last:border-0"
+                    className="border-b border-border/40 even:bg-muted/20 transition-colors duration-150 hover:bg-primary/5 last:border-0"
                   >
                     <td className="px-4 py-3 text-muted-foreground tabular-nums">
                       {safePage * pageSize + idx + 1}
@@ -147,6 +152,7 @@ export default function DataTable<T extends object>({
                     {hasActions && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {customActions && customActions(row)}
                           {onEdit && (
                             <Button
                               variant="ghost"
@@ -181,10 +187,14 @@ export default function DataTable<T extends object>({
       {/* Pagination */}
       {filtered.length > pageSize && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <p>
-            Showing {safePage * pageSize + 1}–
-            {Math.min((safePage + 1) * pageSize, filtered.length)} of{" "}
-            {filtered.length}
+          <p className="tabular-nums">
+            Showing{" "}
+            <span className="font-medium text-foreground">
+              {safePage * pageSize + 1}–
+              {Math.min((safePage + 1) * pageSize, filtered.length)}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-foreground">{filtered.length}</span>
           </p>
           <div className="flex items-center gap-1">
             <Button
@@ -206,12 +216,16 @@ export default function DataTable<T extends object>({
                   : safePage >= totalPages - 2
                   ? totalPages - 5 + i
                   : safePage - 2 + i;
+              const isActive = pageNum === safePage;
               return (
                 <Button
                   key={pageNum}
-                  variant={pageNum === safePage ? "default" : "outline"}
+                  variant={isActive ? "default" : "outline"}
                   size="icon"
-                  className="h-8 w-8"
+                  className={cn(
+                    "h-8 w-8 tabular-nums",
+                    isActive && "shadow-sm"
+                  )}
                   onClick={() => setPage(pageNum)}
                 >
                   {pageNum + 1}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameMonth, isToday, isFuture, isSameDay } from "date-fns";
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameMonth, isToday, isFuture } from "date-fns";
 import { attendanceService } from "@/services/attendance";
 import { hrmsService } from "@/services/hrms";
 import { useTeacherSchedule } from "@/features/teacher/queries/useTeacherQueries";
@@ -253,7 +253,7 @@ export default function StaffAttendanceCalendar() {
                     {record?.timeIn && (
                       <span className={`text-[9px] font-mono mt-0.5 flex items-center justify-center ${style?.text ?? "text-muted-foreground"}`}>
                         {record.timeIn.slice(0, 5)}
-                        {record.earlyLeave && <AlertTriangle size={8} className="ml-1 text-rose-500" title="Clocked out early" />}
+                        {record.earlyLeave && <AlertTriangle size={8} className="ml-1 text-rose-500" aria-label="Clocked out early" />}
                       </span>
                     )}
                   </button>

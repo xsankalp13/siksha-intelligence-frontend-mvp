@@ -32,6 +32,8 @@ import {
   Bus,
   MessageSquare,
   ClipboardSignature,
+  HeartPulse,
+  Radio,
 } from "lucide-react";
 
 export type NavItem = {
@@ -175,6 +177,13 @@ export const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "App Logs", path: "/dashboard/super-admin/logs", icon: Terminal },
   { label: "Configuration", path: "/dashboard/super-admin/configuration", icon: Settings2 },
   { label: "Security", path: "/dashboard/super-admin/security", icon: Lock },
+  { label: "Users", path: "/dashboard/super-admin/users", icon: Users },
+  { label: "Roles & RBAC", path: "/dashboard/super-admin/rbac", icon: Shield },
+  { label: "System Health", path: "/dashboard/super-admin/health", icon: Activity },
+  { label: "Audit Logs", path: "/dashboard/super-admin/audit-logs", icon: ClipboardList },
+  { label: "App Logs", path: "/dashboard/super-admin/logs", icon: Terminal },
+  { label: "Configuration", path: "/dashboard/super-admin/configuration", icon: Settings2 },
+  { label: "Security", path: "/dashboard/super-admin/security", icon: Lock },
 ];
 
 export const TEACHER_NAV_ITEMS: NavItem[] = [
@@ -195,7 +204,7 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
     icon: UserCheck,
   },
   {
-    label: "Class Attendance",
+    label: "Take Attendance",
     path: "/dashboard/teacher/attendance",
     icon: CalendarCheck,
   },
@@ -247,5 +256,45 @@ export const SECURITY_GUARD_NAV_ITEMS: NavItem[] = [
     label: "Pickup Scanner",
     path: "/dashboard/security-guard/pickup-scanner",
     icon: QrCode,
+  },
+];
+
+export const PARENT_NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard", path: "/dashboard/parent", icon: LayoutDashboard, end: true },
+  { label: "Academics", path: "/dashboard/parent/academics", icon: BookOpen },
+  { label: "Attendance", path: "/dashboard/parent/attendance", icon: CalendarCheck },
+  { label: "Homework", path: "/dashboard/parent/homework", icon: FileText },
+  { label: "Fees", path: "/dashboard/parent/fees", icon: Receipt },
+  { label: "Communication", path: "/dashboard/parent/communication", icon: MessageSquare },
+  { label: "Calendar", path: "/dashboard/parent/calendar", icon: CalendarDays },
+  { label: "Transport", path: "/dashboard/parent/transport", icon: Bus },
+  { label: "Health", path: "/dashboard/parent/health", icon: HeartPulse },
+  { label: "Notifications", path: "/dashboard/parent/notifications", icon: Bell },
+  { label: "Profile", path: "/dashboard/parent/profile", icon: User },
+  {
+    label: "Exam Attendance",
+    path: "/dashboard/invigilator/attendance",
+    icon: DoorOpen,
+  },
+];
+
+export const EXAM_CONTROLLER_NAV_ITEMS: NavItem[] = [
+  // ── Live Monitoring ──
+  {
+    label: "Control Tower",
+    path: "/dashboard/exam-controller",
+    icon: Radio,
+    end: true,
+  },
+  {
+    label: "Class View",
+    path: "/dashboard/exam-controller/class",
+    icon: Users,
+  },
+  // ── Exam Management ──
+  {
+    label: "Examinations",
+    path: "/dashboard/exam-controller/examinations",
+    icon: ClipboardCheck,
   },
 ];

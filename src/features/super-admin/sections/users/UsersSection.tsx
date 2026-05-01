@@ -26,74 +26,215 @@ import { BulkPhotoUploadDialog } from '@/features/uis/id-card/BulkPhotoUploadDia
 
 // ── Create School Admin Dialog ────────────────────────────────────────
 
-function CreateSchoolAdminDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [form, setForm] = useState({ username: '', email: '', password: '', firstName: '', lastName: '' })
+type SchoolAdminMode = 'map' | 'create'
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: () => api.post('/auth/admin/users/school-admin', {
-      username: form.username,
-      email: form.email,
-      initialPassword: form.password,
-      firstName: form.firstName,
-      lastName: form.lastName,
-    }),
+function CreateSchoolAdminDialog({
+  open,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean
+  onClose: () => void
+  onSuccess?: () => void
+}) {
+  const [mode, setMode] = useState<SchoolAdminMode>('map')
+  const [selectedStaffUuid, setSelectedStaffUuid] = useState('')
+
+  // Mode: Create New
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    username: '',
+    password: '',
+    designation: '',
+    department: '',
+  })
+
+  const reset = () => {
+    setMode('map')
+    setSelectedStaffUuid('')
+    setForm({ firstName: '', lastName: '', email: '', username: '', password: '', designation: '', department: '' })
+  }
+
+  const handleClose = () => { reset(); onClose() }
+
+  // Mode A: Map existing staff → promote
+  const { mutate: promoteExisting, isPending: isPromoting } = useMutation({
+    mutationFn: () =>
+      api.post(`/auth/admin/users/school-admin/promote`, { staffUuid: selectedStaffUuid }),
     onSuccess: () => {
-      toast.success('School Admin account created')
-      setForm({ username: '', email: '', password: '', firstName: '', lastName: '' })
-      onClose()
+      toast.success('✅ Staff promoted to School Admin')
+      handleClose()
+      onSuccess?.()
     },
-    onError: () => toast.error('Failed to create account — username or email may be taken'),
+    onError: () => toast.error('Failed to promote — staff may already be a School Admin'),
+  })
+
+  // Mode B: Create new staff + grant School Admin role
+  const { mutate: createNew, isPending: isCreating } = useMutation({
+    mutationFn: () =>
+      api.post('/auth/admin/users/school-admin', {
+        username: form.username,
+        email: form.email,
+        initialPassword: form.password,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        designation: form.designation || undefined,
+        department: form.department || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('🎉 School Admin account created with staff record')
+      handleClose()
+      onSuccess?.()
+    },
+    onError: () => toast.error('Failed to create account — username or email may already be taken'),
   })
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [k]: e.target.value }))
 
-  const isValid = form.username && form.email && form.password && form.firstName && form.lastName
+  const isMapValid = selectedStaffUuid.trim().length > 0
+  const isCreateValid = form.firstName && form.lastName && form.email && form.username && form.password
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Create School Admin
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <ShieldCheck className="h-4 w-4 text-violet-600" />
+            Add School Admin
           </DialogTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            A School Admin <strong>must be a staff member</strong>. Choose how to add them:
+          </p>
         </DialogHeader>
-        <div className="space-y-3 py-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">First Name</label>
-              <Input placeholder="First name" value={form.firstName} onChange={set('firstName')} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Last Name</label>
-              <Input placeholder="Last name" value={form.lastName} onChange={set('lastName')} />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Username</label>
-            <Input placeholder="username" value={form.username} onChange={set('username')} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Email</label>
-            <Input type="email" placeholder="admin@school.edu" value={form.email} onChange={set('email')} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Initial Password</label>
-            <Input type="password" placeholder="Temporary password" value={form.password} onChange={set('password')} />
-          </div>
+
+        {/* Mode Switcher */}
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-border p-1 bg-muted/40">
+          <button
+            onClick={() => setMode('map')}
+            className={cn(
+              'relative rounded-md px-3 py-2 text-xs font-medium transition-all',
+              mode === 'map'
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            🔗 Map Existing Staff
+          </button>
+          <button
+            onClick={() => setMode('create')}
+            className={cn(
+              'relative rounded-md px-3 py-2 text-xs font-medium transition-all',
+              mode === 'create'
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            ➕ Create New Staff
+          </button>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!isValid || isPending} onClick={() => mutate()} className="gap-2">
-            {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Create Admin
-          </Button>
+
+        {/* MODE A: Map existing staff */}
+        {mode === 'map' && (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
+              <strong>How it works:</strong> Select an existing staff member to grant them School Admin privileges.
+              Their current role (Teacher, Principal, etc.) is preserved.
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Search Staff Member</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-8 text-sm"
+                  placeholder="Type name or employee ID…"
+                  onChange={(e) => {
+                    // Simple text-to-uuid stub: real impl uses a staff search dropdown
+                    setSelectedStaffUuid(e.target.value)
+                  }}
+                  value={selectedStaffUuid}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Paste the Staff UUID or use the search to find a staff member
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* MODE B: Create new staff + admin */}
+        {mode === 'create' && (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 p-3 text-xs text-emerald-800 dark:text-emerald-300">
+              <strong>How it works:</strong> This creates a new staff record and grants School Admin role simultaneously.
+              The person will appear in both Staff and School Admins tabs.
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">First Name *</label>
+                <Input placeholder="First name" value={form.firstName} onChange={set('firstName')} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Last Name *</label>
+                <Input placeholder="Last name" value={form.lastName} onChange={set('lastName')} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Email *</label>
+              <Input type="email" placeholder="admin@school.edu" value={form.email} onChange={set('email')} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Username *</label>
+                <Input placeholder="username" value={form.username} onChange={set('username')} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Temp Password *</label>
+                <Input type="password" placeholder="••••••••" value={form.password} onChange={set('password')} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Designation</label>
+                <Input placeholder="e.g. Principal" value={form.designation} onChange={set('designation')} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Department</label>
+                <Input placeholder="e.g. Administration" value={form.department} onChange={set('department')} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={handleClose} className="text-xs">Cancel</Button>
+          {mode === 'map' ? (
+            <Button
+              disabled={!isMapValid || isPromoting}
+              onClick={() => promoteExisting()}
+              className="gap-2 bg-violet-600 hover:bg-violet-700 text-white text-xs"
+            >
+              {isPromoting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              🔗 Promote to School Admin
+            </Button>
+          ) : (
+            <Button
+              disabled={!isCreateValid || isCreating}
+              onClick={() => createNew()}
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+            >
+              {isCreating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              ➕ Create Staff + Admin
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
+
 
 // ── Shared skeleton row ───────────────────────────────────────────────
 
@@ -111,12 +252,34 @@ function SkeletonRow() {
 
 // ── Staff Row ─────────────────────────────────────────────────────────
 
-function StaffRow({ member }: { member: StaffSummaryDTO }) {
-  const { mutate: forceLogout, isPending } = useMutation({
+function StaffRow({ member, onHrAdminChanged }: { member: StaffSummaryDTO; onHrAdminChanged?: () => void }) {
+  const { mutate: forceLogout, isPending: isLoggingOut } = useMutation({
     mutationFn: () => sessionService.forceLogoutUser(member.uuid).then((r) => r.data),
     onSuccess: (data) => toast.success(data.message),
     onError: () => toast.error('Failed to force logout'),
   })
+
+  const isHrAdmin = (member as any).hrAdmin === true || (member as any).roles?.includes('ROLE_HR_ADMIN')
+
+  const { mutate: promoteHrAdmin, isPending: isPromoting } = useMutation({
+    mutationFn: () => adminService.promoteToHrAdmin(String(member.staffId)),
+    onSuccess: () => {
+      toast.success(`🎉 ${member.firstName} is now an HR Admin`)
+      onHrAdminChanged?.()
+    },
+    onError: () => toast.error('Failed to grant HR Admin role'),
+  })
+
+  const { mutate: demoteHrAdmin, isPending: isDemoting } = useMutation({
+    mutationFn: () => adminService.demoteFromHrAdmin(String(member.staffId)),
+    onSuccess: () => {
+      toast.success(`HR Admin role removed from ${member.firstName}`)
+      onHrAdminChanged?.()
+    },
+    onError: () => toast.error('Failed to revoke HR Admin role'),
+  })
+
+  const isHrPending = isPromoting || isDemoting
 
   return (
     <div className="flex items-center gap-3 border-b border-border px-5 py-3 last:border-0 hover:bg-muted/30 transition-colors">
@@ -132,6 +295,11 @@ function StaffRow({ member }: { member: StaffSummaryDTO }) {
       <Badge variant="outline" className="shrink-0 text-xs capitalize">
         {member.staffType.replace(/_/g, ' ').toLowerCase()}
       </Badge>
+      {isHrAdmin && (
+        <Badge className="shrink-0 text-xs bg-violet-100 text-violet-700 border-violet-200">
+          👑 HR Admin
+        </Badge>
+      )}
       <Badge
         variant="outline"
         className={cn('shrink-0 text-xs', member.active
@@ -140,6 +308,24 @@ function StaffRow({ member }: { member: StaffSummaryDTO }) {
       >
         {member.active ? 'Active' : 'Inactive'}
       </Badge>
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn(
+          'shrink-0 gap-1.5 text-xs',
+          isHrAdmin
+            ? 'text-violet-600 hover:text-red-600 hover:bg-red-50'
+            : 'text-muted-foreground hover:text-violet-600 hover:bg-violet-50'
+        )}
+        disabled={isHrPending}
+        onClick={() => isHrAdmin ? demoteHrAdmin() : promoteHrAdmin()}
+        title={isHrAdmin ? 'Revoke HR Admin role' : 'Grant HR Admin role'}
+      >
+        {isHrPending
+          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          : <ShieldCheck className="h-3.5 w-3.5" />}
+        {isHrAdmin ? 'Revoke HR' : '👑 HR Admin'}
+      </Button>
       <Button
         variant="ghost"
         size="sm"
@@ -160,10 +346,10 @@ function StaffRow({ member }: { member: StaffSummaryDTO }) {
         variant="ghost"
         size="sm"
         className="shrink-0 gap-1.5 text-muted-foreground hover:text-destructive text-xs"
-        disabled={isPending}
+        disabled={isLoggingOut}
         onClick={() => forceLogout()}
       >
-        {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
+        {isLoggingOut ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
         Force Logout
       </Button>
     </div>
@@ -171,6 +357,7 @@ function StaffRow({ member }: { member: StaffSummaryDTO }) {
 }
 
 // ── Guardian Row ──────────────────────────────────────────────────────
+
 // Uses GuardianSummaryDto from GET /super/users/guardians
 // linkedStudents are already embedded — no extra fetches needed.
 
@@ -287,7 +474,7 @@ export default function UsersSection() {
   const [promoteStep, setPromoteStep] = useState<1 | 2>(1)
   const [promoteConfirmText, setPromoteConfirmText] = useState('')
 
-  const { data: staffPage, isLoading: staffLoading } = useQuery({
+  const { data: staffPage, isLoading: staffLoading, refetch: refetchStaff } = useQuery({
     queryKey: ['admin', 'staff', staffSearch],
     queryFn: () => adminService.listStaff({ search: staffSearch || undefined, size: 30 }).then((r) => r.data),
   })
@@ -460,7 +647,7 @@ export default function UsersSection() {
                   <p className="text-sm">No staff found</p>
                 </div>
               ) : (
-                staff.map((m) => <StaffRow key={m.staffId} member={m} />)
+                staff.map((m) => <StaffRow key={m.staffId} member={m} onHrAdminChanged={refetchStaff} />)
               )}
             </div>
           </div>
@@ -728,7 +915,11 @@ export default function UsersSection() {
         </DialogContent>
       </Dialog>
 
-      <CreateSchoolAdminDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateSchoolAdminDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={() => { refetchSchoolAdmins(); refetchPromotionCandidates(); }}
+      />
       <IdCardBatchDialog open={batchDialogOpen} onClose={() => setBatchDialogOpen(false)} />
       <BulkPhotoUploadDialog open={bulkPhotoOpen} onClose={() => setBulkPhotoOpen(false)} userType={bulkPhotoType} />
     </div>

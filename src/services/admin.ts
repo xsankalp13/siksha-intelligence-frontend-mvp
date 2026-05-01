@@ -63,13 +63,20 @@ export interface StaffSummaryDTO {
 
 export interface PageResponse<T> {
   content: T[];
-  totalElements: number;
-  totalPages: number;
-  number: number;          // current page (0-indexed)
-  size: number;
-  first: boolean;
-  last: boolean;
-  empty: boolean;
+  totalElements?: number;  // Old Spring Boot format (at root level)
+  totalPages?: number;
+  number?: number;          // current page (0-indexed)
+  size?: number;
+  first?: boolean;
+  last?: boolean;
+  empty?: boolean;
+  // New Spring Boot 3.x format - pagination info in nested 'page' object
+  page?: {
+    totalElements: number;
+    totalPages: number;
+    number: number;
+    size: number;
+  };
 }
 
 export interface ListStudentsParams {
@@ -226,7 +233,46 @@ export const adminService = {
       },
     });
   },
+
+  // ── HR Admin Promotion ───────────────────────────────────────────────
+
+  /**
+   * POST /auth/admin/users/staff/{staffId}/promote-hr-admin
+   * Additively grants ROLE_HR_ADMIN to a staff member. Preserves all existing roles.
+   * Accessible by SUPER_ADMIN and SCHOOL_ADMIN.
+   */
+  promoteToHrAdmin(staffId: string) {
+    return api.post<string>(`/auth/admin/users/staff/${staffId}/promote-hr-admin`);
+  },
+
+  /**
+   * DELETE /auth/admin/users/staff/{staffId}/demote-hr-admin
+   * Removes ROLE_HR_ADMIN from a staff member. Preserves all other roles.
+   * Accessible by SUPER_ADMIN and SCHOOL_ADMIN.
+   */
+  demoteFromHrAdmin(staffId: string) {
+    return api.delete<string>(`/auth/admin/users/staff/${staffId}/demote-hr-admin`);
+  },
+
+  /**
+   * GET /auth/admin/users/generate-username
+   * Returns a unique username suggestion derived from the given firstName and lastName.
+   */
+  generateUsername(firstName: string, lastName: string) {
+    return api.get<{ username: string; available: boolean }>(
+      "/auth/admin/users/generate-username",
+      { params: { firstName, lastName } }
+    );
+  },
+
+  checkUsername(username: string) {
+    return api.get<{ username: string; available: boolean }>(
+      "/auth/admin/users/check-username",
+      { params: { username } }
+    );
+  },
 };
+
 
 export interface BulkUploadReportDTO {
   success: number;

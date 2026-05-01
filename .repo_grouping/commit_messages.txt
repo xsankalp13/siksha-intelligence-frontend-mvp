@@ -1,0 +1,21 @@
+chore(grouping): add components grouping document
+chore(grouping): add layouts grouping document
+chore(grouping): add ui primitives grouping document
+chore(grouping): add services grouping document
+chore(grouping): add lib/hooks/utils grouping document
+chore(grouping): add pages & routes grouping document
+chore(store): add store & slices grouping document
+chore(types): add types & assets grouping document
+chore(config): add config & features grouping document
+chore(hrms): add hrms & attendance grouping document
+chore(academics): add academics & student grouping document
+chore(roles): add teacher & super-admin grouping document
+chore(forms): add forms & validation grouping document
+chore(media): add media upload & idcard grouping document
+chore(auth): add preload & refresh token grouping document
+chore(timetable): add timetable & invigilation grouping document
+chore(finance): add finance & hrms grouping document
+chore(evaluation): add evaluation & examination grouping document
+chore(dashboard): add dashboard & analytics grouping document
+chore(security): add security & access control grouping document
+docs(changelog): add docs and changeplan grouping document

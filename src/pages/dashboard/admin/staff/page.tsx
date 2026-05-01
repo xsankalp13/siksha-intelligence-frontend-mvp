@@ -4,18 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import {
-  Plus,
-  Loader2,
-  Users,
-  Upload,
-  ChevronRight,
-  RefreshCw,
-  Search,
-  ChevronLeft,
-  CreditCard,
-  Camera,
-} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Users, Upload, ChevronRight, RefreshCw, Search, ChevronLeft, CreditCard, Camera, Plus, Loader2, Sparkles, Pencil, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import StatusBadge from "@/components/common/StatusBadge";
@@ -44,6 +34,7 @@ import {
   adminService,
   type StaffSummaryDTO,
 } from "@/services/admin";
+import { hrmsService } from "@/services/hrms";
 
 import BulkDataUpload from "@/features/bulk-upload/BulkDataUpload";
 import { BulkPhotoUploadDialog } from "@/features/uis/id-card/BulkPhotoUploadDialog";
@@ -59,15 +50,10 @@ const STAFF_TYPE_OPTIONS: { value: StaffType; label: string }[] = [
   { value: "SECURITY_GUARD", label: "Security Guard" },
 ];
 
-interface Designation {
-  designationId: number;
-  designationName: string;
-  category: string;
-}
-
 // ── Zod Schema ──────────────────────────────────────────────────────
 const staffSchema = z.object({
-  username: z.string().min(3, "Min 3 characters").max(50),
+  // Auto-generated on create; optional at schema level (enforced in submit handler)
+  username: z.string().optional(),
   email: z.string().email("Invalid email"),
   firstName: z.string().min(1, "Required"),
   middleName: z.string().optional(),
@@ -75,8 +61,11 @@ const staffSchema = z.object({
   jobTitle: z.string().min(1, "Required"),
   category: z.enum(["TEACHING", "NON_TEACHING_SUPPORT", "NON_TEACHING_ADMIN"]),
   department: z.string().min(1, "Required"),
+  // designationCode used on create; optional — designation picker provides value
+  designationCode: z.string().optional(),
   hireDate: z.string().min(1, "Required"),
-  designationId: z.string().min(1, "Required"),
+  // designationId only used when editing; passed through to update call
+  designationId: z.string().optional(),
   staffType: z.enum(["TEACHER", "PRINCIPAL", "LIBRARIAN", "SECURITY_GUARD"]),
   gender: z.string().optional(),
   dateOfBirth: z.string().optional(),
@@ -118,23 +107,70 @@ export default function StaffPage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedStaffType, setSelectedStaffType] = useState<StaffType>("TEACHER");
   const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
-  const [designations, setDesignations] = useState<Designation[]>([]);
-  
+
+  // ── Username auto-generation state ────────────────────────────────
+  const [generatingUsername, setGeneratingUsername] = useState(false);
+  const [usernameOverride, setUsernameOverride] = useState(false);
+  const usernameDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [validatingUsername, setValidatingUsername] = useState(false);
+  const usernameCheckDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const form = useForm<StaffFormData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(staffSchema) as any,
     defaultValues: {
       username: "", email: "", firstName: "", middleName: "", lastName: "",
       jobTitle: "", hireDate: "", staffType: "TEACHER", gender: "", designationId: "",
+      category: "TEACHING", department: "", designationCode: "",
       dateOfBirth: "", officeLocation: "", initialPassword: "",
     },
   });
 
+  const watchUsername = form.watch("username");
+
   useEffect(() => {
-    adminService.listDesignations()
-      .then(res => setDesignations(res.data))
-      .catch(console.error);
-  }, []);
+    if (!usernameOverride || editingStaff || !watchUsername) {
+      setUsernameAvailable(null);
+      return;
+    }
+    
+    if (usernameCheckDebounce.current) clearTimeout(usernameCheckDebounce.current);
+    setUsernameAvailable(null);
+    setValidatingUsername(true);
+    
+    usernameCheckDebounce.current = setTimeout(async () => {
+      try {
+        const res = await adminService.checkUsername(watchUsername);
+        setUsernameAvailable(res.data.available);
+      } catch {
+        setUsernameAvailable(null);
+      } finally {
+        setValidatingUsername(false);
+      }
+    }, 500);
+  }, [watchUsername, usernameOverride, editingStaff]);
+
+  // ── Auto-generate username from firstName + lastName ──────────────
+  const triggerUsernameGeneration = useCallback(
+    (firstName: string, lastName: string) => {
+      if (usernameOverride || editingStaff || !firstName || !lastName) return;
+      if (usernameDebounce.current) clearTimeout(usernameDebounce.current);
+      usernameDebounce.current = setTimeout(async () => {
+        try {
+          setGeneratingUsername(true);
+          const res = await adminService.generateUsername(firstName, lastName);
+          form.setValue("username", res.data.username, { shouldValidate: false });
+        } catch {
+          // silently ignore — user can type manually via Override
+        } finally {
+          setGeneratingUsername(false);
+        }
+      }, 500);
+    },
+    [usernameOverride, editingStaff, form]
+  );
 
   // ── Fetch staff (server-side) ─────────────────────────────────────
   const fetchStaff = useCallback(
@@ -150,8 +186,8 @@ export default function StaffPage() {
           sortDir: "asc",
         });
         setStaff(res.data.content);
-        setTotalElements(res.data.totalElements);
-        setTotalPages(res.data.totalPages);
+        setTotalElements(res.data.totalElements ?? 0);
+        setTotalPages(res.data.totalPages ?? 0);
       } catch {
         toast.error("Failed to load staff");
       } finally {
@@ -164,6 +200,11 @@ export default function StaffPage() {
   useEffect(() => {
     fetchStaff(page, search, staffTypeFilter);
   }, [fetchStaff, page, search, staffTypeFilter]);
+
+  const { data: designations = [] } = useQuery({
+    queryKey: ["hrms", "designations"],
+    queryFn: () => hrmsService.listDesignations({ active: true }).then(res => res.data),
+  });
 
   // ── Debounced search ──────────────────────────────────────────────
   const handleSearchChange = (val: string) => {
@@ -185,6 +226,7 @@ export default function StaffPage() {
   const openCreate = () => {
     setEditingStaff(null);
     setSelectedStaffType("TEACHER");
+    setUsernameOverride(false);
     form.reset({ staffType: "TEACHER" });
     setFormOpen(true);
   };
@@ -199,6 +241,7 @@ export default function StaffPage() {
       lastName: s.lastName,
       jobTitle: s.jobTitle,
       hireDate: s.hireDate || "",
+      designationCode: "",
       staffType: s.staffType as StaffType,
       gender: s.gender || "",
       dateOfBirth: s.dateOfBirth || "",
@@ -211,7 +254,7 @@ export default function StaffPage() {
   // ── Submit ────────────────────────────────────────────────────────
   const onSubmit = (data: StaffFormData) => {
     if (editingStaff) {
-      setPendingEditData(data); // triggers confirmation dialog
+      setPendingEditData(data);
     } else {
       handleCreate(data);
     }
@@ -254,14 +297,18 @@ export default function StaffPage() {
 
   const handleCreate = async (data: StaffFormData) => {
     setSubmitting(true);
-    const selectedDesig = designations.find(d => String(d.designationId) === data.designationId);
-    const desigId = selectedDesig?.designationId;
-    const cat = selectedDesig?.category;
+    // Resolve the effective username — auto-generated value or manual override
+    const effectiveUsername = (data.username || "").trim();
+    if (!effectiveUsername) {
+      toast.error("Username is required. Please wait for auto-generation or click Override.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       if (data.staffType === "TEACHER") {
         await adminService.createTeacher({
-          username: data.username,
+          username: effectiveUsername,
           email: data.email,
           initialPassword: data.initialPassword || undefined,
           firstName: data.firstName,
@@ -279,10 +326,11 @@ export default function StaffPage() {
           certifications: data.certifications ? [data.certifications] : [],
           yearsOfExperience: data.yearsOfExperience,
           educationLevel: data.educationLevel,
+          designationCode: data.designationCode ?? "",
         });
       } else if (data.staffType === "PRINCIPAL") {
         await adminService.createPrincipal({
-          username: data.username,
+          username: effectiveUsername,
           email: data.email,
           initialPassword: data.initialPassword || undefined,
           firstName: data.firstName,
@@ -298,10 +346,11 @@ export default function StaffPage() {
           department: data.department as any,
           schoolLevelManaged: data.schoolLevelManaged as never,
           administrativeCertifications: data.adminCertifications ? [data.adminCertifications] : [],
+          designationCode: data.designationCode ?? "",
         });
       } else if (data.staffType === "LIBRARIAN") {
         await adminService.createLibrarian({
-          username: data.username,
+          username: effectiveUsername,
           email: data.email,
           initialPassword: data.initialPassword || undefined,
           firstName: data.firstName,
@@ -316,10 +365,12 @@ export default function StaffPage() {
           category: data.category as any,
           department: data.department as any,
           hasMlisDegree: data.hasMlisDegree,
+          designationCode: data.designationCode ?? "",
         });
       } else if (data.staffType === "SECURITY_GUARD") {
+        const selectedDesig = designations.find(d => String(d.designationId) === data.designationId);
         await adminService.createSecurityGuard({
-          username: data.username,
+          username: effectiveUsername,
           email: data.email,
           initialPassword: data.initialPassword || undefined,
           firstName: data.firstName,
@@ -331,8 +382,8 @@ export default function StaffPage() {
           gender: data.gender as never,
           dateOfBirth: data.dateOfBirth,
           staffType: data.staffType,
-          designationId: desigId,
-          category: cat,
+          designationId: selectedDesig?.designationId,
+          category: selectedDesig?.category,
         });
       }
       toast.success("Staff member hired successfully");
@@ -348,7 +399,7 @@ export default function StaffPage() {
     }
   };
 
-  // ── Toggle Activation ────────────────────────────────────────────────────────
+  // ── Toggle Activation ─────────────────────────────────────────────
   const handleToggleActive = async () => {
     if (!actionTarget) return;
     setSubmitting(true);
@@ -369,7 +420,6 @@ export default function StaffPage() {
   };
 
   const handleBulkUploadComplete = async () => {
-    // Keep dialog open so users can review row-level result details after import.
     setPage(0);
     setSearch("");
     setSearchInput("");
@@ -499,7 +549,7 @@ export default function StaffPage() {
                     {page * PAGE_SIZE + idx + 1}
                   </td>
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <Link to={`/dashboard/admin/users/staff/${s.uuid}`} className="hover:underline text-primary transition-colors">
+                    <Link to={`/dashboard/admin/hrms/staff/${s.uuid}`} className="hover:underline text-primary transition-colors">
                       {s.firstName} {s.lastName}
                     </Link>
                   </td>
@@ -530,7 +580,7 @@ export default function StaffPage() {
                               const res = await idCardService.downloadStaffIdCard(s.staffId);
                               triggerBlobDownload(res.data, `staff-id-${s.staffId}.pdf`);
                               toast.success("ID Card downloaded");
-                            } catch (e) {
+                            } catch {
                               toast.error("Failed to download ID Card");
                             }
                           }}
@@ -538,7 +588,7 @@ export default function StaffPage() {
                           <CreditCard className="h-3.5 w-3.5" />
                         </Button>
                       </motion.div>
-                      <Link to={`/dashboard/admin/users/staff/${s.uuid}`}>
+                      <Link to={`/dashboard/admin/hrms/staff/${s.uuid}`}>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -626,15 +676,9 @@ export default function StaffPage() {
       >
         <DialogContent
           className="max-w-4xl max-h-[85vh] overflow-y-auto"
-          onInteractOutside={(event) => {
-            if (isBulkUploading) event.preventDefault();
-          }}
-          onPointerDownOutside={(event) => {
-            if (isBulkUploading) event.preventDefault();
-          }}
-          onEscapeKeyDown={(event) => {
-            if (isBulkUploading) event.preventDefault();
-          }}
+          onInteractOutside={(event) => { if (isBulkUploading) event.preventDefault(); }}
+          onPointerDownOutside={(event) => { if (isBulkUploading) event.preventDefault(); }}
+          onEscapeKeyDown={(event) => { if (isBulkUploading) event.preventDefault(); }}
         >
           <DialogHeader>
             <DialogTitle>Bulk Staff Upload</DialogTitle>
@@ -650,14 +694,14 @@ export default function StaffPage() {
           />
         </DialogContent>
       </Dialog>
-      
-      <BulkPhotoUploadDialog 
-        open={photoUploadOpen} 
-        onClose={() => setPhotoUploadOpen(false)} 
+
+      <BulkPhotoUploadDialog
+        open={photoUploadOpen}
+        onClose={() => setPhotoUploadOpen(false)}
         userType="staff"
       />
 
-      {/* Create / Edit Dialog */}
+      {/* ── Create / Edit Dialog ─────────────────────────────────── */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -667,7 +711,8 @@ export default function StaffPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Staff Classification Row (create only) */}
+
+            {/* Staff Classification (create only) */}
             {!editingStaff && (
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -679,9 +724,7 @@ export default function StaffPage() {
                       form.setValue("staffType", val as StaffType);
                     }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                     <SelectContent>
                       {STAFF_TYPE_OPTIONS.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
@@ -692,9 +735,7 @@ export default function StaffPage() {
                 <div className="space-y-2">
                   <Label>Category *</Label>
                   <Select value={form.watch("category")} onValueChange={(val) => form.setValue("category", val as any)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="TEACHING">Teaching</SelectItem>
                       <SelectItem value="NON_TEACHING_SUPPORT">Non-Teaching Support</SelectItem>
@@ -708,9 +749,7 @@ export default function StaffPage() {
                 <div className="space-y-2">
                   <Label>Department *</Label>
                   <Select value={form.watch("department")} onValueChange={(val) => form.setValue("department", val as any)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select dept" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select dept" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ACADEMICS">Academics</SelectItem>
                       <SelectItem value="ADMINISTRATION">Administration</SelectItem>
@@ -729,29 +768,114 @@ export default function StaffPage() {
               </div>
             )}
 
-            {/* Username & Email */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Username *</Label>
-                <Input {...form.register("username")} placeholder="john.doe" disabled={!!editingStaff} />
-                {form.formState.errors.username && (
-                  <p className="text-xs text-destructive">{form.formState.errors.username.message}</p>
+            {/* Designation + Job Title (create only) */}
+            {!editingStaff && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Designation *</Label>
+                  <Select value={form.watch("designationCode")} onValueChange={(val) => form.setValue("designationCode", val)}>
+                    <SelectTrigger><SelectValue placeholder="Select Designation" /></SelectTrigger>
+                    <SelectContent>
+                      {designations.map(d => (
+                        <SelectItem key={d.uuid} value={d.designationCode}>
+                          <div className="flex flex-col">
+                            <span>{d.designationName}</span>
+                            {(d.defaultSalaryTemplateName || d.defaultGradeCode) && (
+                              <span className="text-[10px] text-muted-foreground">
+                                Defaults: {d.defaultSalaryTemplateName || "No Salary"} | {d.defaultGradeCode || "No Grade"}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Job Title *</Label>
+                  <Input {...form.register("jobTitle")} placeholder="e.g. Senior Math Teacher" />
+                  {form.formState.errors.jobTitle && (
+                    <p className="text-xs text-destructive">{form.formState.errors.jobTitle.message}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Username — auto-generated chip (create only) */}
+            {!editingStaff && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label>Username</Label>
+                  <button
+                    type="button"
+                    onClick={() => setUsernameOverride((v) => !v)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {usernameOverride ? (
+                      <><Sparkles className="h-3 w-3" /> Auto-generate</>
+                    ) : (
+                      <><Pencil className="h-3 w-3" /> Override</>
+                    )}
+                  </button>
+                </div>
+                {usernameOverride ? (
+                  <div className="space-y-1.5">
+                    <div className="relative">
+                      <Input {...form.register("username")} placeholder="e.g. john.doe" className="pr-10" />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+                        {validatingUsername && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                        {!validatingUsername && usernameAvailable === true && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                        {!validatingUsername && usernameAvailable === false && <XCircle className="h-4 w-4 text-destructive" />}
+                      </div>
+                    </div>
+                    {usernameAvailable === false && (
+                      <div className="text-xs flex flex-col gap-1 mt-1 bg-destructive/10 text-destructive p-2 rounded-md">
+                        <span className="font-medium flex items-center gap-1">
+                          <XCircle className="h-3.5 w-3.5" /> Username is taken
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
+                    {generatingUsername ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                    )}
+                    <span className="font-mono text-sm text-foreground">
+                      {form.watch("username") || (
+                        <span className="text-muted-foreground italic">Enter name below to generate…</span>
+                      )}
+                    </span>
+                    {form.watch("username") && (
+                      <span className="ml-auto rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                        Available
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>Email *</Label>
-                <Input type="email" {...form.register("email")} placeholder="staff@school.edu" disabled={!!editingStaff} />
-                {form.formState.errors.email && (
-                  <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
-                )}
-              </div>
+            )}
+
+            {/* Email */}
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input type="email" {...form.register("email")} placeholder="staff@school.edu" disabled={!!editingStaff} />
+              {form.formState.errors.email && (
+                <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+              )}
             </div>
 
-            {/* Names */}
+            {/* Names — first/last trigger username generation on change */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>First Name *</Label>
-                <Input {...form.register("firstName")} />
+                <Input
+                  {...form.register("firstName", {
+                    onChange: (e) => triggerUsernameGeneration(e.target.value, form.getValues("lastName") ?? ""),
+                  })}
+                />
                 {form.formState.errors.firstName && (
                   <p className="text-xs text-destructive">{form.formState.errors.firstName.message}</p>
                 )}
@@ -762,38 +886,28 @@ export default function StaffPage() {
               </div>
               <div className="space-y-2">
                 <Label>Last Name *</Label>
-                <Input {...form.register("lastName")} />
+                <Input
+                  {...form.register("lastName", {
+                    onChange: (e) => triggerUsernameGeneration(form.getValues("firstName") ?? "", e.target.value),
+                  })}
+                />
                 {form.formState.errors.lastName && (
                   <p className="text-xs text-destructive">{form.formState.errors.lastName.message}</p>
                 )}
               </div>
             </div>
 
-            {/* Designation */}
-            <div className="space-y-2">
-              <Label>Designation *</Label>
-              <Select value={form.watch("designationId") ?? ""} onValueChange={(val) => form.setValue("designationId", val)}>
-                <SelectTrigger><SelectValue placeholder="Select Designation" /></SelectTrigger>
-                <SelectContent>
-                  {designations.map(d => (
-                    <SelectItem key={d.designationId} value={String(d.designationId)}>{d.designationName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.designationId && (
-                <p className="text-xs text-destructive">{form.formState.errors.designationId.message}</p>
-              )}
-            </div>
-
-            {/* Job Title + Hire Date */}
+            {/* Job Title (edit only) + Hire Date */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Job Title *</Label>
-                <Input {...form.register("jobTitle")} />
-                {form.formState.errors.jobTitle && (
-                  <p className="text-xs text-destructive">{form.formState.errors.jobTitle.message}</p>
-                )}
-              </div>
+              {editingStaff && (
+                <div className="space-y-2">
+                  <Label>Job Title *</Label>
+                  <Input {...form.register("jobTitle")} />
+                  {form.formState.errors.jobTitle && (
+                    <p className="text-xs text-destructive">{form.formState.errors.jobTitle.message}</p>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Hire Date *</Label>
                 <Input type="date" {...form.register("hireDate")} />
@@ -822,7 +936,7 @@ export default function StaffPage() {
               </div>
             </div>
 
-            {/* Teacher-specific */}
+            {/* Teacher-specific fields */}
             {selectedStaffType === "TEACHER" && !editingStaff && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -836,7 +950,7 @@ export default function StaffPage() {
               </div>
             )}
 
-            {/* Initial Password */}
+            {/* Initial Password (create only) */}
             {!editingStaff && (
               <div className="space-y-2">
                 <Label>Initial Password</Label>
@@ -857,7 +971,7 @@ export default function StaffPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Action confirmation (Block / Activate) */}
+      {/* Block / Activate confirmation */}
       <ConfirmDialog
         open={!!actionTarget}
         onOpenChange={(open) => !open && setActionTarget(null)}
@@ -869,6 +983,7 @@ export default function StaffPage() {
         destructive={actionTarget?.action === 'block'}
       />
 
+      {/* Edit confirmation */}
       <ConfirmDialog
         open={!!pendingEditData}
         onOpenChange={(open) => !open && setPendingEditData(null)}

@@ -67,8 +67,16 @@ export function LibraryRadialWidget() {
   ];
 
   return (
-    <div className="flex flex-col h-full p-2">
-       <div className="flex justify-between items-center mb-6">
+    <div className="flex flex-col h-full p-2 relative">
+       {/* Demo data warning banner */}
+       <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5">
+         <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+         <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+           Demo data — Library module not yet connected
+         </p>
+       </div>
+
+       <div className="flex justify-between items-center mb-4">
          <div className="flex items-center gap-3">
            <div className="p-2.5 bg-primary/10 rounded-xl">
              <BookHeart className="h-6 w-6 text-primary" />
@@ -78,17 +86,17 @@ export function LibraryRadialWidget() {
              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Total Books</p>
            </div>
          </div>
-         <span className="px-2.5 py-1 rounded-full bg-violet-500/10 text-[10px] font-bold text-violet-600 uppercase tracking-wider">Early Access</span>
+         <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-[10px] font-bold text-amber-600 uppercase tracking-wider border border-amber-500/20">Demo</span>
        </div>
 
-       <div className="grid grid-cols-2 gap-3 flex-1 mb-6">
+       <div className="grid grid-cols-2 gap-3 flex-1 mb-4">
          {libraryStats.map(stat => (
            <motion.div 
              initial={{ opacity: 0, y: 10 }}
              animate={{ opacity: 1, y: 0 }}
              transition={{ duration: 0.4 }}
              key={stat.label} 
-             className={`p-3 rounded-xl border ${stat.bg} ${stat.label.includes('Available') ? 'col-span-2' : 'col-span-1'}`}
+             className={`p-3 rounded-xl border ${stat.bg} ${stat.label.includes('Available') ? 'col-span-2' : 'col-span-1'} opacity-70`}
            >
              <div className="flex items-center gap-2 mb-1.5">
                <stat.icon className={`h-4 w-4 ${stat.color}`} />
@@ -99,8 +107,8 @@ export function LibraryRadialWidget() {
          ))}
        </div>
 
-       <button className="w-full py-2.5 bg-accent/50 border border-border hover:bg-accent rounded-xl text-xs font-bold text-foreground transition-colors shadow-sm active:scale-95">
-         Open Library System &rarr;
+       <button disabled className="w-full py-2.5 bg-muted border border-border rounded-xl text-xs font-bold text-muted-foreground cursor-not-allowed opacity-60">
+         Library module coming soon
        </button>
     </div>
   );

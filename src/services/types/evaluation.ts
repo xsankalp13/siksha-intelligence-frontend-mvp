@@ -20,6 +20,10 @@ export type EvaluationResultStatus =
 
 export type AnnotationType = "TICK" | "CROSS" | "DRAW" | "NONE";
 
+export type TemplateSectionType = "FIXED" | "OPTIONAL";
+
+export type TemplateQuestionType = "NORMAL" | "INTERNAL_CHOICE";
+
 // ── Admin DTOs ─────────────────────────────────────────────────────
 
 export interface EvaluationAssignmentCreateRequestDTO {
@@ -80,15 +84,28 @@ export interface AnswerSheetImageGroupResponseDTO {
 
 // ── Evaluation Structure DTOs ───────────────────────────────────────
 
+export interface OptionDTO {
+  label: string;
+  maxMarks: number;
+  marksObtained: number | null;
+  annotationType?: AnnotationType;
+}
+
 export interface EvaluationQuestionDTO {
   questionNumber: number;
   maxMarks: number;
   marksObtained: number | null;
   annotationType: AnnotationType;
+  type?: TemplateQuestionType;
+  options?: OptionDTO[];
 }
 
 export interface EvaluationSectionDTO {
   sectionName: string;
+  sectionType?: TemplateSectionType;
+  totalQuestions?: number;
+  attemptQuestions?: number;
+  helperText?: string;
   questions: EvaluationQuestionDTO[];
 }
 
@@ -106,6 +123,7 @@ export interface SaveQuestionMarkRequestDTO {
   sectionName: string;
   questionNumber: number;
   marksObtained: number;
+  optionLabel?: string;
   annotationType?: AnnotationType;
 }
 
@@ -117,6 +135,8 @@ export interface EvaluationResultResponseDTO {
   resultId: number;
   answerSheetId: number;
   totalMarks: number;
+  sectionTotals?: Record<string, number>;
+  selectedQuestions?: Record<string, string[]>;
   status: EvaluationResultStatus;
   evaluatedAt: string | null;
   submittedAt: string | null;

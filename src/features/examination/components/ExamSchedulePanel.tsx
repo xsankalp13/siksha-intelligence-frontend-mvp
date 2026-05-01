@@ -301,7 +301,13 @@ export default function ExamSchedulePanel({
             toast.success("Schedule updated");
             setDialogOpen(false);
           },
-          onError: () => toast.error("Failed to update schedule"),
+          onError: (error: any) => {
+            if (error.response?.status === 409) {
+              toast.error(error.response?.data?.message || "A duplicate schedule already exists for this subject and timeslot.");
+            } else {
+              toast.error("Failed to update schedule");
+            }
+          },
         }
       );
     } else {
@@ -312,7 +318,13 @@ export default function ExamSchedulePanel({
             toast.success("Schedule created");
             setDialogOpen(false);
           },
-          onError: () => toast.error("Failed to create schedule"),
+          onError: (error: any) => {
+             if (error.response?.status === 409) {
+              toast.error(error.response?.data?.message || "A duplicate schedule already exists for this subject and timeslot.");
+            } else {
+              toast.error("Failed to create schedule");
+            }
+          },
         }
       );
     }

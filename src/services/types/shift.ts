@@ -55,4 +55,5 @@ export interface StaffShiftMappingResponseDTO {
   shiftEndTime: string;
   effectiveFrom: string;
   effectiveTo: string | null;
+  applicableDays?: number[];
 }

@@ -25,6 +25,7 @@ export interface PayrollPreflightDTO {
   month: number;
   year: number;
   canProcess: boolean;
+  alreadyProcessed: boolean;
   blockers: PayrollBlockerDTO[];
   warnings: PayrollWarningDTO[];
   summary: PayrollPreflightSummaryDTO;

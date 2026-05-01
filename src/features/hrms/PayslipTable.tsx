@@ -5,7 +5,7 @@ import DataTable, { type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {} from "@/components/ui/label";
 import PayslipViewer from "@/features/hrms/PayslipViewer";
 import { useHrmsFormatters } from "@/features/hrms/hooks/useHrmsFormatters";
 import { triggerBlobDownload } from "@/services/idCard";
@@ -114,18 +114,33 @@ export default function PayslipTable() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-end gap-3">
-        <div className="grid gap-2">
-          <Label htmlFor="payslip-run-filter">Filter by Run ID</Label>
-          <Input
-            id="payslip-run-filter"
-            type="number"
-            min={1}
-            className="w-[140px]"
-            value={runIdFilter}
-            onChange={(e) => setRunIdFilter(e.target.value)}
-            placeholder="Latest"
-          />
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner">
+              🧾
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Payslips</h2>
+              <p className="text-sm text-white/70">View and download individual staff payslips by payroll run</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-white/70">Filter by Run ID</label>
+              <Input
+                id="payslip-run-filter"
+                type="number"
+                min={1}
+                className="w-[140px] h-8 bg-white/20 border-white/30 text-white placeholder:text-white/50 backdrop-blur-sm"
+                value={runIdFilter}
+                onChange={(e) => setRunIdFilter(e.target.value)}
+                placeholder="Latest"
+              />
+            </div>
+          </div>
         </div>
       </div>
 

@@ -51,6 +51,13 @@ function SuperAdminTopbar() {
     toast.success("Logged out successfully")
   }
 
+  const isSuperAdmin = user?.roles?.includes("ROLE_SUPER_ADMIN");
+  const displayName = isSuperAdmin 
+    ? "Super Admin" 
+    : (user?.firstName || user?.lastName) 
+      ? `${user.firstName || ""} ${user.lastName || ""}`.trim() 
+      : (user?.username ?? "superadmin");
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/80 px-6 backdrop-blur-sm">
       {/* Breadcrumbs */}
@@ -85,13 +92,13 @@ function SuperAdminTopbar() {
 
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium text-foreground leading-tight">
-            {user?.username ?? "superadmin"}
+            {displayName}
           </p>
           <p className="text-xs text-muted-foreground">Technical Administrator</p>
         </div>
 
         <UserAvatar
-          name={user?.username}
+          name={displayName}
           profileUrl={undefined}
           className="h-9 w-9 ring-2 ring-destructive/30"
         />

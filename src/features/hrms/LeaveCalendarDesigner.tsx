@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, List, Plus } from "lucide-react";
+// import { CalendarDays, List, Plus } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import DataTable, { type Column } from "@/components/common/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -73,7 +73,6 @@ export default function LeaveCalendarDesigner() {
   const queryClient = useQueryClient();
   const { formatDate } = useHrmsFormatters();
   const [academicYear, setAcademicYear] = useState(`${currentYear}-${currentYear + 1}`);
-  const [calendarYear, setCalendarYear] = useState(currentYear);
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [formOpen, setFormOpen] = useState(false);
   const [saveReviewOpen, setSaveReviewOpen] = useState(false);
@@ -135,9 +134,9 @@ export default function LeaveCalendarDesigner() {
     setFieldErrors({});
   };
 
-  const openCreate = () => {
+  const openCreate = (dateStr?: string) => {
     setEditing(null);
-    setForm({ ...initialForm, academicYear });
+    setForm({ ...initialForm, academicYear, date: dateStr || todayIso });
     setFieldErrors({});
     setFormOpen(true);
   };
@@ -193,70 +192,98 @@ export default function LeaveCalendarDesigner() {
 
   return (
     <div className="space-y-5">
+      {/* ── Unified Hero Header ──────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 px-5 py-5 sm:px-6 text-white shadow-lg">
+        <div className="pointer-events-none absolute inset-0 opacity-10">
+          <div className="absolute -right-12 -top-12 h-52 w-52 rounded-full bg-white" />
+          <div className="absolute -bottom-20 left-0 h-44 w-44 rounded-full bg-white" />
+        </div>
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm text-2xl shadow-inner">
+              🗓️
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg sm:text-xl font-bold tracking-tight text-white">Leave Calendar Designer</h2>
+              <p className="text-xs sm:text-sm text-white/75">
+                Plan working days, holidays, half-days and academic-year events
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => openCreate()}
+            className="bg-white text-indigo-700 hover:bg-white/90 shadow-md gap-1.5"
+          >
+            ➕ Add Event
+          </Button>
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Working Days</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {summaryQuery.data?.totalWorkingDays ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Holidays</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {summaryQuery.data?.totalHolidays ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Half Days</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {summaryQuery.data?.totalHalfDays ?? 0}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Academic Year</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Input
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              placeholder="e.g. 2025-2026"
-            />
-          </CardContent>
-        </Card>
+        <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+          <div className="h-1 absolute inset-x-0 top-0 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-t-2xl" />
+          <p className="text-xs font-medium text-blue-600 mt-1">Working Days</p>
+          <p className="text-3xl font-bold text-slate-800 mt-1">{summaryQuery.data?.totalWorkingDays ?? 0}</p>
+        </div>
+        <div className="relative overflow-hidden rounded-2xl border border-rose-100 bg-white p-4 shadow-sm">
+          <div className="h-1 absolute inset-x-0 top-0 bg-gradient-to-r from-rose-400 to-red-500 rounded-t-2xl" />
+          <p className="text-xs font-medium text-rose-600 mt-1">Holidays</p>
+          <p className="text-3xl font-bold text-slate-800 mt-1">{summaryQuery.data?.totalHolidays ?? 0}</p>
+        </div>
+        <div className="relative overflow-hidden rounded-2xl border border-amber-100 bg-white p-4 shadow-sm">
+          <div className="h-1 absolute inset-x-0 top-0 bg-gradient-to-r from-amber-400 to-orange-500 rounded-t-2xl" />
+          <p className="text-xs font-medium text-amber-600 mt-1">Half Days</p>
+          <p className="text-3xl font-bold text-slate-800 mt-1">{summaryQuery.data?.totalHalfDays ?? 0}</p>
+        </div>
+        <div className="relative overflow-hidden rounded-2xl border border-violet-100 bg-white p-4 shadow-sm">
+          <div className="h-1 absolute inset-x-0 top-0 bg-gradient-to-r from-violet-400 to-purple-500 rounded-t-2xl" />
+          <p className="text-xs font-medium text-violet-600 mt-1">Academic Year</p>
+          <Select value={academicYear} onValueChange={setAcademicYear}>
+            <SelectTrigger className="mt-1 h-8 text-sm border-violet-200">
+              <SelectValue placeholder="Select Year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={`${currentYear - 2}-${currentYear - 1}`}>{currentYear - 2}-{currentYear - 1}</SelectItem>
+              <SelectItem value={`${currentYear - 1}-${currentYear}`}>{currentYear - 1}-{currentYear}</SelectItem>
+              <SelectItem value={`${currentYear}-${currentYear + 1}`}>{currentYear}-{currentYear + 1}</SelectItem>
+              <SelectItem value={`${currentYear + 1}-${currentYear + 2}`}>{currentYear + 1}-{currentYear + 2}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* View Toggle + Add Event */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1 rounded-lg border p-1">
-          <Button
-            variant={viewMode === "calendar" ? "default" : "ghost"}
-            size="sm"
+        <div className="flex items-center gap-1 rounded-xl border bg-slate-50 dark:bg-slate-900 p-1">
+          <button
             onClick={() => setViewMode("calendar")}
-            className="gap-1.5"
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              viewMode === "calendar"
+                ? "bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
           >
-            <CalendarDays className="h-4 w-4" />
-            Calendar
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "default" : "ghost"}
-            size="sm"
+            🗓️ Calendar
+          </button>
+          <button
             onClick={() => setViewMode("table")}
-            className="gap-1.5"
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              viewMode === "table"
+                ? "bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
           >
-            <List className="h-4 w-4" />
-            Table
-          </Button>
+            📊 Table
+          </button>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Add Event
+        <Button
+          size="sm"
+          onClick={() => openCreate()}
+          className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-md gap-1.5"
+        >
+          ➕ Add Event
         </Button>
       </div>
 
@@ -281,12 +308,14 @@ export default function LeaveCalendarDesigner() {
         </div>
       )}
 
-      {/* Calendar View */}
       {viewMode === "calendar" && (
         <CalendarYearView
-          year={calendarYear}
-          onYearChange={setCalendarYear}
+          startYear={parseInt(academicYear.split("-")[0])}
+          endYear={parseInt(academicYear.split("-")[1])}
           events={rows}
+          onAddEvent={openCreate}
+          onEditEvent={openEdit}
+          onDeleteEvent={(row) => setDeleteTarget(row)}
         />
       )}
 

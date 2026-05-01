@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+
 import { motion, useReducedMotion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import StaffSelfCheckIn from "@/features/teacher/components/StaffSelfCheckIn";

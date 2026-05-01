@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import {} from "lucide-react";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import DataTable, { type Column } from "@/components/common/DataTable";
@@ -52,12 +52,18 @@ const initialForm: SalaryTemplateCreateDTO = {
 
 export default function SalaryTemplateBuilder() {
   const queryClient = useQueryClient();
+  const originalFormRef = useRef<SalaryTemplateCreateDTO | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<SalaryTemplateResponseDTO | null>(null);
   const [saveReviewOpen, setSaveReviewOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SalaryTemplateResponseDTO | null>(null);
   const [form, setForm] = useState<SalaryTemplateCreateDTO>(initialForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  const isDirty = useMemo(
+    () => !editing || JSON.stringify(form) !== JSON.stringify(originalFormRef.current),
+    [form, editing],
+  );
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["hrms", "salary", "templates"],
@@ -144,14 +150,16 @@ export default function SalaryTemplateBuilder() {
       .filter((item): item is { componentRef: string; value: number } => item !== null);
 
     setEditing(row);
-    setForm({
+    const editForm: SalaryTemplateCreateDTO = {
       templateName: row.templateName,
       description: row.description,
       gradeRef,
       applicableCategory: row.applicableCategory,
       academicYear: row.academicYear,
       components: mappedComponents,
-    });
+    };
+    originalFormRef.current = editForm;
+    setForm(editForm);
     setFieldErrors({});
     setFormOpen(true);
   };
@@ -235,11 +243,26 @@ export default function SalaryTemplateBuilder() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold">Salary Templates</h3>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" /> Add Template
-        </Button>
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner">
+              📄
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">Salary Templates</h2>
+              <p className="text-sm text-white/70">Bundle components into reusable salary structures for staff</p>
+            </div>
+          </div>
+          <Button
+            onClick={openCreate}
+            className="bg-white text-violet-700 hover:bg-white/90 font-semibold gap-1.5 shadow-sm"
+          >
+            ➕ Add Template
+          </Button>
+        </div>
       </div>
 
       <DataTable
@@ -365,7 +388,7 @@ export default function SalaryTemplateBuilder() {
             <Button variant="outline" onClick={closeForm}>Cancel</Button>
             <Button
               onClick={() => setSaveReviewOpen(true)}
-              disabled={createMutation.isPending || updateMutation.isPending || !form.templateName}
+              disabled={createMutation.isPending || updateMutation.isPending || !form.templateName || !isDirty}
             >
               {editing ? "Save Changes" : "Create"}
             </Button>

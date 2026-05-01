@@ -14,7 +14,7 @@ import { haversineMeters } from "@/lib/geo";
 import { useTeacherSchedule, useTeacherDashboardSummary } from "@/features/teacher/queries/useTeacherQueries";
 import { handleAttendanceError } from "@/features/attendance/utils/attendanceError";
 import { getLocalDateString } from "@/lib/dateUtils";
-import { MapPin, Clock, LogIn, LogOut, CheckCircle2, Lock, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, LogIn, LogOut, CheckCircle2, Lock, AlertTriangle, CalendarOff } from "lucide-react";
 
 // Fix vector icon bug in leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -87,26 +87,36 @@ export default function StaffSelfCheckIn() {
 
   const isHoliday = !!holidayEvent;
 
-  const { data: shiftMapping } = useQuery({
+  const { data: shiftMapping, isError: shiftMappingError, isLoading: shiftMappingLoading } = useQuery({
     queryKey: ["ams", "shifts", "mappings", "staff", schedule?.staffUuid],
     queryFn: () => shiftService.getStaffShiftMapping(schedule!.staffUuid).then((r: any) => r.data),
     enabled: !!schedule?.staffUuid,
+    retry: false,
   });
 
+  const isShiftMapped = !!shiftMapping && !shiftMappingError;
+  const todayDayOfWeek = new Date().getDay() || 7;
+  const isOffDay = isShiftMapped && shiftMapping.applicableDays && !shiftMapping.applicableDays.includes(todayDayOfWeek);
+
   const geo = useMemo(() => {
-    if (settingsError) return { enabled: false, latitude: 0, longitude: 0, radiusMeters: 200 };
+    // If settings fetch errored (e.g. 403 for teacher), fail open — don't enforce geofence
+    if (settingsError) return { enabled: false, latitude: null as number | null, longitude: null as number | null, radiusMeters: 200, configured: false };
     const settings = (attendanceSettings as Record<string, { key: string; value: string }[]> | undefined)?.ATTENDANCE ?? [];
-    const getNum = (key: string, fallback: number) => {
+    const getNum = (key: string): number | null => {
       const value = settings.find((s) => s.key === key)?.value;
+      if (value === undefined || value === null || value.trim() === "") return null;
       const parsed = Number(value);
-      return Number.isFinite(parsed) ? parsed : fallback;
+      return Number.isFinite(parsed) ? parsed : null;
     };
-    return {
-      enabled: settings.find((s) => s.key === "attendance.geofence.enabled")?.value !== "false",
-      latitude: getNum("attendance.geofence.latitude", 0),
-      longitude: getNum("attendance.geofence.longitude", 0),
-      radiusMeters: getNum("attendance.geofence.radius.meters", 200),
-    };
+    // Geofence is only enabled when the setting is explicitly "true"
+    const enabledRaw = settings.find((s) => s.key === "attendance.geofence.enabled")?.value;
+    const enabled = enabledRaw === "true";
+    const latitude = getNum("attendance.geofence.latitude");
+    const longitude = getNum("attendance.geofence.longitude");
+    const radiusMeters = getNum("attendance.geofence.radius.meters") ?? 200;
+    // configured = all three values are present and non-zero
+    const configured = latitude !== null && longitude !== null && latitude !== 0 && longitude !== 0;
+    return { enabled, latitude, longitude, radiusMeters, configured };
   }, [attendanceSettings, settingsError]);
 
   const initiateAction = async (type: "IN" | "OUT") => {
@@ -117,18 +127,34 @@ export default function StaffSelfCheckIn() {
       const { latitude, longitude } = pos.coords;
       setUserPos({ lat: latitude, lng: longitude });
 
-      if (geo.enabled && geo.latitude && geo.longitude) {
+      if (geo.enabled) {
+        if (!geo.configured || geo.latitude === null || geo.longitude === null) {
+          // Geofence is turned ON by admin but school coordinates are not set yet.
+          // Fail closed — block clock-in until admin configures coordinates.
+          toast.error("Geofence is enabled but school location is not configured. Please contact your administrator.");
+          setStatus("Geofence not configured");
+          return;
+        }
+
         const dist = haversineMeters(latitude, longitude, geo.latitude, geo.longitude);
         setDistanceToSchool(dist);
+
         if (dist > geo.radiusMeters) {
-          toast.error(`You are ${Math.round(dist)}m away from school. Allowed radius is ${geo.radiusMeters}m.`);
-          setStatus("Out of bounds");
+          toast.error(
+            `You are ${Math.round(dist)}m away from school. Allowed radius is ${geo.radiusMeters}m. Move closer to the school premises to clock ${type === "IN" ? "in" : "out"}.`
+          );
+          setStatus("Out of geofence bounds");
           return;
         }
       } else {
-        setDistanceToSchool(null);
+        // Geofence disabled — still capture distance for display if possible
+        if (geo.configured && geo.latitude !== null && geo.longitude !== null) {
+          setDistanceToSchool(haversineMeters(latitude, longitude, geo.latitude, geo.longitude));
+        } else {
+          setDistanceToSchool(null);
+        }
       }
-      
+
       if (type === "OUT" && shiftMapping?.shiftEndTime) {
         const currentTime = new Date().toTimeString().slice(0, 8);
         if (currentTime < shiftMapping.shiftEndTime) {
@@ -143,12 +169,12 @@ export default function StaffSelfCheckIn() {
       } else {
         setEarlyMinutesEst(null);
       }
-      
+
       setConfirmOpen(true);
       setStatus("Ready to confirm");
     } catch (e: any) {
       setStatus("GPS failed");
-      toast.error(e.message || "Failed to get location");
+      toast.error(e.message || "Failed to get location. Please enable location services and try again.");
     }
   };
 
@@ -206,7 +232,7 @@ export default function StaffSelfCheckIn() {
     },
   });
 
-  if (recordLoading) return <div className="rounded-2xl border border-border bg-card p-6 min-h-[300px] flex items-center justify-center text-sm text-muted-foreground">Loading attendance status...</div>;
+  if (recordLoading || shiftMappingLoading) return <div className="rounded-2xl border border-border bg-card p-6 min-h-[300px] flex items-center justify-center text-sm text-muted-foreground">Loading attendance status...</div>;
 
   const isCheckedIn = !!todayRecord?.timeIn;
   const isCheckedOut = !!todayRecord?.timeOut;
@@ -253,6 +279,18 @@ export default function StaffSelfCheckIn() {
                 <span className="text-sm">Check-In Disabled</span>
                 <span className="text-xs font-normal opacity-80">You are currently out on an approved leave today.</span>
               </div>
+            ) : !isShiftMapped ? (
+              <div className="w-full bg-slate-50 text-slate-700 py-4 px-3 rounded-xl flex flex-col items-center justify-center border border-slate-200/60 font-medium shadow-sm text-center">
+                <AlertTriangle className="mb-2 text-slate-500" size={24} />
+                <span className="text-sm">Shift Not Mapped</span>
+                <span className="text-xs font-normal opacity-80">You are not mapped to a shift yet. Please contact your administrator.</span>
+              </div>
+            ) : isOffDay ? (
+              <div className="w-full bg-slate-50 text-slate-700 py-4 px-3 rounded-xl flex flex-col items-center justify-center border border-slate-200/60 font-medium shadow-sm text-center">
+                <CalendarOff className="mb-2 text-slate-500" size={24} />
+                <span className="text-sm">Off Day</span>
+                <span className="text-xs font-normal opacity-80">Today is a non-working day according to your shift schedule.</span>
+              </div>
             ) : isHoliday ? (
               <div className="w-full bg-amber-50 text-amber-700 py-4 px-3 rounded-xl flex flex-col items-center justify-center border border-amber-100/50 font-medium shadow-sm text-center">
                 <Lock className="mb-2 text-amber-500" size={24} />
@@ -297,13 +335,13 @@ export default function StaffSelfCheckIn() {
             {userPos && (
               <MapContainer 
                 center={[userPos.lat, userPos.lng]} 
-                zoom={geo.enabled && geo.latitude ? 16 : 14} 
+                zoom={geo.enabled && geo.configured ? 16 : 14} 
                 zoomControl={false}
                 style={{ height: "100%", width: "100%", zIndex: 10 }}
               >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <Marker position={[userPos.lat, userPos.lng]} />
-                {geo.enabled && geo.latitude !== 0 && (
+                {geo.configured && geo.latitude !== null && geo.longitude !== null && (
                   <>
                     <Circle 
                       center={[geo.latitude, geo.longitude]} 

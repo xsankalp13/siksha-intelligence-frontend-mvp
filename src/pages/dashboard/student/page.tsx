@@ -6,24 +6,32 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useStudentOverview, overviewKeys } from "@/features/student/dashboard/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { 
-  KpiRibbonWidget, 
-  DailyRoutineTimelineWidget, 
-  PendingTasksWidget, 
-  PerformanceChartWidget, 
-  NoticeBoardWidget 
+import {
+  KpiRibbonWidget,
+  DailyRoutineTimelineWidget,
+  PendingTasksWidget,
+  PerformanceChartWidget,
+  NoticeBoardWidget
 } from "@/features/student/dashboard/components/DashboardWidgets";
+import {
+  InteractiveQuickAccessBento,
+  AttendanceInsightWidget,
+  ExamCountdownWidget,
+  LeaveStatusWidget,
+  StreakBadgeWidget,
+  TeacherConnectWidget,
+} from "@/features/student/dashboard/components/DashboardWidgets2";
 import { DashboardBentoSkeleton } from "@/features/student/dashboard/components/DashboardSkeletons";
 import { ShikshaAIChatWidget } from "@/features/student/dashboard/components/ShikshaAIChatWidget";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  show: { opacity: 1, transition: { staggerChildren: 0.07 } }
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 280, damping: 22 } }
 };
 
 function ServiceUnreachableState() {
@@ -65,12 +73,13 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 pb-12 pt-4 px-2 sm:px-4">
-      {/* Top Utility Bar */}
+
+      {/* ── Top Utility Bar ─────────────────────────────────────────── */}
       <div className="flex justify-end items-center">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleManualRefresh} 
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleManualRefresh}
           disabled={isFetching || isLoading}
           className="text-muted-foreground hover:text-foreground shadow-sm bg-background"
         >
@@ -82,33 +91,55 @@ export default function StudentDashboardPage() {
       {isLoading && !data ? (
         <DashboardBentoSkeleton />
       ) : (
-        <motion.div 
+        <motion.div
           className="space-y-6"
           variants={containerVariants}
           initial="hidden"
           animate="show"
         >
-          {/* ROW 1: Ribbon */}
+          {/* ── ROW 1: KPI Ribbon (Profile + Attendance + Fees) ─────── */}
           <motion.div variants={itemVariants}>
             <KpiRibbonWidget profile={data?.profile} kpis={data?.kpis} />
           </motion.div>
 
-          {/* ROW 2: execution & Deadlines */}
+          {/* ── ROW 2: Quick Access Bento ────────────────────────────── */}
+          <motion.div variants={itemVariants}>
+            <ErrorBoundary fallback={<ServiceUnreachableState />}>
+              <InteractiveQuickAccessBento />
+            </ErrorBoundary>
+          </motion.div>
+
+          {/* ── ROW 3: Today's Schedule + Exam Countdown ─────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <motion.div variants={itemVariants} className="lg:col-span-8 h-full">
               <ErrorBoundary fallback={<ServiceUnreachableState />}>
                 <DailyRoutineTimelineWidget schedule={data?.todaySchedule} />
               </ErrorBoundary>
             </motion.div>
-            
+
             <motion.div variants={itemVariants} className="lg:col-span-4 h-full">
+              <ErrorBoundary fallback={<ServiceUnreachableState />}>
+                <ExamCountdownWidget assignments={data?.pendingAssignments} />
+              </ErrorBoundary>
+            </motion.div>
+          </div>
+
+          {/* ── ROW 4: Attendance Insights + Pending Tasks ───────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <motion.div variants={itemVariants} className="lg:col-span-5 h-full">
+              <ErrorBoundary fallback={<ServiceUnreachableState />}>
+                <AttendanceInsightWidget kpis={data?.kpis} schedule={data?.todaySchedule} />
+              </ErrorBoundary>
+            </motion.div>
+
+            <motion.div variants={itemVariants} className="lg:col-span-7 h-full">
               <ErrorBoundary fallback={<ServiceUnreachableState />}>
                 <PendingTasksWidget assignments={data?.pendingAssignments} />
               </ErrorBoundary>
             </motion.div>
           </div>
 
-          {/* ROW 3: Analytics & Communications */}
+          {/* ── ROW 5: Performance Chart + Notice Board ──────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <motion.div variants={itemVariants} className="lg:col-span-7 h-full">
               <ErrorBoundary fallback={<ServiceUnreachableState />}>
@@ -122,10 +153,35 @@ export default function StudentDashboardPage() {
               </ErrorBoundary>
             </motion.div>
           </div>
+
+          {/* ── ROW 6: Leave Tracker + Streak Badges ────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <motion.div variants={itemVariants} className="lg:col-span-5 h-full">
+              <ErrorBoundary fallback={<ServiceUnreachableState />}>
+                <LeaveStatusWidget />
+              </ErrorBoundary>
+            </motion.div>
+
+            <motion.div variants={itemVariants} className="lg:col-span-7 h-full">
+              <ErrorBoundary fallback={<ServiceUnreachableState />}>
+                <StreakBadgeWidget kpis={data?.kpis} />
+              </ErrorBoundary>
+            </motion.div>
+          </div>
+
+          {/* ── ROW 7: Teacher Connect ───────────────────────────────── */}
+          {data?.todaySchedule && data.todaySchedule.length > 0 && (
+            <motion.div variants={itemVariants}>
+              <ErrorBoundary fallback={<ServiceUnreachableState />}>
+                <TeacherConnectWidget schedule={data?.todaySchedule} />
+              </ErrorBoundary>
+            </motion.div>
+          )}
+
         </motion.div>
       )}
 
-      {/* Floating Interactive Widget */}
+      {/* Floating AI Chat Widget */}
       <ShikshaAIChatWidget />
     </div>
   );

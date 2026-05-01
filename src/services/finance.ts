@@ -226,4 +226,87 @@ export const financeService = {
       `/auth/finance/dashboard/dashboard/summary/for-student/${studentId}`
     );
   },
+
+  // ── Scholarships ─────────────────────────────────────────────────
+  getScholarshipTypes() {
+    return api.get("/auth/finance/scholarships/types");
+  },
+  createScholarshipType(data: any) {
+    return api.post("/auth/finance/scholarships/types", data);
+  },
+  getScholarshipAssignments() {
+    return api.get("/auth/finance/scholarships/assignments");
+  },
+  assignScholarship(data: any) {
+    return api.post("/auth/finance/scholarships/assignments", data);
+  },
+  revokeScholarshipAssignment(id: number) {
+    return api.put(`/auth/finance/scholarships/assignments/${id}/revoke`);
+  },
+
+  // ── Installment Plans ────────────────────────────────────────────
+  getInstallmentPlans() {
+    return api.get("/auth/finance/installments/plans");
+  },
+  createInstallmentPlan(data: any) {
+    return api.post("/auth/finance/installments/plans", data);
+  },
+  getInstallmentAssignments() {
+    return api.get("/auth/finance/installments/assignments");
+  },
+  assignInstallmentPlan(data: any) {
+    return api.post("/auth/finance/installments/assignments", data);
+  },
+
+  // ── Refunds ──────────────────────────────────────────────────────
+  getRefunds() {
+    return api.get("/auth/finance/refunds");
+  },
+  requestRefund(data: any) {
+    return api.post("/auth/finance/refunds", data);
+  },
+  updateRefundStatus(id: number, status: string) {
+    return api.put(`/auth/finance/refunds/${id}/status`, null, { params: { status } });
+  },
+
+  // ── Reminders ────────────────────────────────────────────────────
+  getReminderTemplates() {
+    return api.get("/auth/finance/reminders/templates");
+  },
+  createReminderTemplate(data: any) {
+    return api.post("/auth/finance/reminders/templates", data);
+  },
+  toggleReminderTemplate(id: number) {
+    return api.put(`/auth/finance/reminders/templates/${id}/toggle`);
+  },
+  getReminderLogs() {
+    return api.get("/auth/finance/reminders/logs");
+  },
+  triggerBulkReminders() {
+    return api.post("/auth/finance/reminders/trigger-bulk");
+  },
+
+  // ── Financial Statements (Phase 5) ───────────────────────────────
+  getTrialBalance(asOfDate: string) {
+    return api.get("/auth/finance/statements/trial-balance", { params: { asOfDate } });
+  },
+  getProfitAndLoss(startDate: string, endDate: string) {
+    return api.get("/auth/finance/statements/profit-and-loss", { params: { startDate, endDate } });
+  },
+  getBalanceSheet(asOfDate: string) {
+    return api.get("/auth/finance/statements/balance-sheet", { params: { asOfDate } });
+  },
+
+  // ── Miscellaneous Receipts (Phase 5) ──────────────────────────────
+  getMiscReceipts() {
+    return api.get("/auth/finance/misc-receipts");
+  },
+  createMiscReceipt(data: any) {
+    return api.post("/auth/finance/misc-receipts", data);
+  },
+
+  // ── Finance Audit Logs (Phase 5) ──────────────────────────────────
+  getFinanceAuditLogs() {
+    return api.get("/auth/finance/audit-logs");
+  },
 };

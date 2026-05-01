@@ -41,6 +41,14 @@ export const useGetSeatGrid = (roomUuid: string, examScheduleId: number) =>
     enabled: !!roomUuid && !!examScheduleId,
   });
 
+export const useGetBulkSeatGrids = (roomUuids: string[], examScheduleId: number) =>
+  useQuery({
+    queryKey: ["seatAllocation", "bulkGrid", examScheduleId, roomUuids.sort().join(",")],
+    queryFn: async () =>
+      (await seatAllocationService.getBulkSeatGrids(roomUuids, examScheduleId)).data,
+    enabled: roomUuids.length > 0 && !!examScheduleId,
+  });
+
 // ── Mutations ───────────────────────────────────────────────────────
 
 export const useAllocateSingleSeat = () => {

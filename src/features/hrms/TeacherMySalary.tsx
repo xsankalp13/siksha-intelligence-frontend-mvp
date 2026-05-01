@@ -3,7 +3,7 @@ import axios from "axios";
 import { AlertTriangle, Banknote, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import {} from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { hrmsService } from "@/services/hrms";
 import type { ComputedSalaryBreakdownDTO } from "@/services/types/hrms";
@@ -65,25 +65,29 @@ export default function TeacherMySalary() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="rounded-xl border border-border bg-gradient-to-r from-emerald-900/10 to-emerald-500/5 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Salary Template</p>
-            <p className="text-lg font-bold">{data.templateName || "Custom"}</p>
-            <div className="mt-1 flex gap-2">
-              {data.gradeCode && <Badge variant="outline">{data.gradeCode}</Badge>}
-              {data.employeeId && <Badge variant="secondary">EMP: {data.employeeId}</Badge>}
-              {data.hasOverrides && (
-                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                  Has Overrides
-                </Badge>
-              )}
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-2xl shadow-inner">
+              💰
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">My Salary Structure</h2>
+              <p className="text-sm text-white/70">
+                Template: <span className="font-semibold">{data.templateName || "Custom"}</span>
+              </p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {data.gradeCode && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium">{data.gradeCode}</span>}
+                {data.employeeId && <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium">EMP: {data.employeeId}</span>}
+                {data.hasOverrides && <span className="rounded-full bg-amber-400/30 px-2 py-0.5 text-xs font-medium text-amber-100">Has Overrides</span>}
+              </div>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xs text-muted-foreground">Net Pay</p>
-            <p className="text-2xl font-bold text-emerald-600">{fmt(Number(data.netPay))}</p>
+            <p className="text-xs text-white/70">Net Pay</p>
+            <p className="text-3xl font-bold tabular-nums">{fmt(Number(data.netPay))}</p>
           </div>
         </div>
       </div>

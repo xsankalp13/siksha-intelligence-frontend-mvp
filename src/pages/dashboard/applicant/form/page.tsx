@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { api as axios } from "@/lib/axios";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+
 import { Progress } from "@/components/ui/progress";
 import { Loader2, CheckCircle2, Circle } from "lucide-react";
 import StudentBasicDetailsForm from "./steps/StudentBasicDetailsForm";

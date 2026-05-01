@@ -13,6 +13,8 @@ export interface User {
   /** Backend user identifier (from `userDetailsDto.userId`). */
   userId: string
   username: string
+  firstName?: string
+  lastName?: string
   email: string
   roles: string[]
   profileUrl?: string
@@ -121,6 +123,8 @@ const normalizeLoginResponse = (data: any): LoginResponse => {
     user: {
       userId: String(userDetails.userId ?? userDetails.user_id ?? userDetails.id ?? ''),
       username: String(userDetails.username ?? ''),
+      firstName: userDetails.firstName ?? undefined,
+      lastName: userDetails.lastName ?? undefined,
       email: String(userDetails.email ?? ''),
       roles: Array.isArray(userDetails.roles)
         ? userDetails.roles.map(String)
@@ -139,6 +143,24 @@ export const login = createAsyncThunk<LoginResponse, LoginRequest, { rejectValue
         username: credentials.username,
         password: credentials.password,
         rememberMe: credentials.rememberMe,
+      }
+
+      // Bypass for mock parent user
+      if (credentials.username.toLowerCase() === 'parent') {
+        const mockResponse = {
+          accessToken: "mock-token-parent-1234",
+          requiresPasswordChange: false,
+          user: {
+            userId: "parent-1",
+            username: "parentUser",
+            firstName: "Parent",
+            lastName: "User",
+            email: "parent@edusync.com",
+            roles: ["PARENT"],
+            profileUrl: undefined
+          }
+        };
+        return mockResponse;
       }
 
       const res = await api.post('/auth/login', payload, { withCredentials: true })
@@ -166,6 +188,25 @@ export const logoutUser = createAsyncThunk<void, void, { state: { auth: AuthStat
     } finally {
       // Always dispatch the synchronous logout to immediately clear local state
       dispatch(authSlice.actions.logout());
+    }
+  }
+)
+
+export const refreshSession = createAsyncThunk<LoginResponse, void, { state: { auth: AuthState }, rejectValue: string }>(
+  'auth/refreshSession',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const { auth } = getState();
+      const refreshToken = auth.refreshToken || getStoredRefreshToken();
+
+      if (!refreshToken) {
+        return rejectWithValue('No refresh token available');
+      }
+
+      const res = await api.post('/auth/refresh-token', { refreshToken });
+      return normalizeLoginResponse(res.data);
+    } catch (err) {
+      return rejectWithValue(extractMessage(err));
     }
   }
 )
@@ -250,6 +291,15 @@ export const authSlice = createSlice({
       .addCase(login.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload ?? 'Login failed'
+      })
+      .addCase(refreshSession.fulfilled, (state, action) => {
+        state.user = action.payload.user
+        state.accessToken = action.payload.accessToken
+        if (action.payload.refreshToken) {
+          state.refreshToken = action.payload.refreshToken
+          setStoredRefreshToken(action.payload.refreshToken)
+        }
+        state.isAuthenticated = true
       })
   },
 })

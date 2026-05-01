@@ -50,10 +50,13 @@ export function RoleBasedRoute({ children, allowedRoles }: RoleBasedRouteProps) 
       SUPER_ADMIN: '/dashboard/super-admin',
       SCHOOL_ADMIN: '/dashboard/admin',
       ADMIN: '/dashboard/admin',
+      EXAM_CONTROLLER: '/dashboard/exam-controller',
       TEACHER: '/dashboard/teacher',
       SECURITY_GUARD: '/dashboard/security-guard',
       STUDENT: '/dashboard/student',
       APPLICANT: '/dashboard/applicant',
+      PARENT: '/dashboard/parent',
+      GUARDIAN: '/dashboard/parent',
     }
 
     // Find first matching role's dashboard (normalize role before lookup)

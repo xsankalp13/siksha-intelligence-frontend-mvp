@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarX, ChevronLeft, ChevronRight, Clock, Sun } from "lucide-react";
-import { format, endOfMonth, getDaysInMonth, startOfMonth } from "date-fns";
+import { format, endOfMonth, getDaysInMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -151,27 +151,51 @@ export default function TeacherMyAttendance({ staffUuid }: { staffUuid?: string 
 
   return (
     <div className="space-y-6">
-      {/* Month Navigator */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={prevMonth}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <h3 className="text-base font-semibold">
-          {MONTH_NAMES[month - 1]} {year}
-        </h3>
-        <Button variant="ghost" size="icon" onClick={nextMonth}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+      {/* Hero Header — month navigator + stats */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-xl" />
+        <div className="relative">
+          {/* Month nav row */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-xl shadow-inner">
+                🗓️
+              </div>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight">My Attendance</h2>
+                <p className="text-xs text-white/70">Monthly attendance &amp; schedule view</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 bg-white/15 rounded-xl px-2 py-1">
+              <Button variant="ghost" size="icon" onClick={prevMonth} className="h-7 w-7 text-white hover:bg-white/20 rounded-lg">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-semibold min-w-[130px] text-center">
+                {MONTH_NAMES[month - 1]} {year}
+              </span>
+              <Button variant="ghost" size="icon" onClick={nextMonth} className="h-7 w-7 text-white hover:bg-white/20 rounded-lg">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-        <StatMini label="Recorded" value={stats.totalDays} loading={isLoading} />
-        <StatMini label="Present" value={stats.presentDays} loading={isLoading} color="text-emerald-600" />
-        <StatMini label="Late" value={stats.lateDays} loading={isLoading} color="text-amber-500" />
-        <StatMini label="Absent" value={stats.absentDays} loading={isLoading} color="text-red-600" />
-        <StatMini label="Leave" value={stats.leaveDays} loading={isLoading} color="text-violet-600" />
-        <StatMini label="Score" value={`${stats.attendancePercentage.toFixed(1)}%`} loading={isLoading} color="text-primary" />
+          {/* Stats strip */}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {[
+              { label: "Recorded", value: stats.totalDays, color: "text-white" },
+              { label: "Present",  value: stats.presentDays, color: "text-emerald-200" },
+              { label: "Late",     value: stats.lateDays,    color: "text-amber-200" },
+              { label: "Absent",   value: stats.absentDays,  color: "text-rose-200" },
+              { label: "Leave",    value: stats.leaveDays,   color: "text-violet-200" },
+              { label: "Score",    value: `${stats.attendancePercentage.toFixed(1)}%`, color: "text-sky-200" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-xl bg-white/10 border border-white/15 p-2 text-center backdrop-blur-sm">
+                <p className="text-[10px] text-white/70 font-medium">{label}</p>
+                <p className={`text-lg font-bold tabular-nums ${color}`}>{isLoading ? "…" : value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 items-start">
@@ -403,13 +427,3 @@ export default function TeacherMyAttendance({ staffUuid }: { staffUuid?: string 
   );
 }
 
-function StatMini({ label, value, loading, color }: { label: string; value: number | string; loading: boolean; color?: string; }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-3 shadow-sm flex flex-col items-center justify-center h-full">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-      <p className={cn("text-2xl font-bold tracking-tight", color ?? "text-foreground")}>
-        {loading ? <span className="animate-pulse">…</span> : value}
-      </p>
-    </div>
-  );
-}

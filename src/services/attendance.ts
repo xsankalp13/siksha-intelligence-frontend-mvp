@@ -14,6 +14,7 @@ import type {
   AttendanceCompletionDTO,
   StudentAttendanceCompletionDTO,
   StaffDailyStatsResponseDTO,
+  MarkAllResponseDTO,
 } from "./types/attendance";
 import type { StaffSummaryDTO } from "./admin";
 
@@ -165,6 +166,20 @@ export const attendanceService = {
   getUnmarkedStaff(date: string, category?: string) {
     return api.get<StaffSummaryDTO[]>("/auth/ams/staff/unmarked", {
       params: { date, category },
+    });
+  },
+
+  /** POST /auth/ams/staff/mark-all-present?date=&testMode= */
+  markAllPresent(date: string, testMode = false) {
+    return api.post<MarkAllResponseDTO>("/auth/ams/staff/mark-all-present", null, {
+      params: { date, testMode },
+    });
+  },
+
+  /** POST /auth/ams/staff/mark-all-absent?date=&testMode= */
+  markAllAbsent(date: string, testMode = false) {
+    return api.post<MarkAllResponseDTO>("/auth/ams/staff/mark-all-absent", null, {
+      params: { date, testMode },
     });
   },
 

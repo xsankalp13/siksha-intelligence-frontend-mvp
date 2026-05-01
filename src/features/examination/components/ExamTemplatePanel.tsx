@@ -10,7 +10,8 @@ import {
   FileText,
   Layers,
   Lock,
-  GripVertical
+  GripVertical,
+  Settings2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ import type {
   ExamTemplateRequestDTO,
   ExamTemplateResponseDTO,
   TemplateSectionDTO,
+  TemplateQuestionRequestDTO
 } from "@/services/types/examTemplate";
 import { toast } from "sonner";
 import {
@@ -70,6 +72,8 @@ const emptySection: TemplateSectionDTO = {
   marksPerQuestion: 1,
   isObjective: true,
   isSubjective: false,
+  sectionType: "NORMAL",
+  internalChoiceEnabled: false,
 };
 
 const SortableSectionRow = ({
@@ -85,6 +89,7 @@ const SortableSectionRow = ({
   removeSection: (index: number) => void;
   canRemove: boolean;
 }) => {
+  const [expanded, setExpanded] = useState(false);
   const {
     attributes,
     listeners,
@@ -102,58 +107,145 @@ const SortableSectionRow = ({
     <div
       ref={setNodeRef}
       style={style}
-      className="grid grid-cols-[auto_2fr_1fr_1fr_auto_auto_auto] gap-2 items-center bg-muted/20 p-2 rounded-lg border border-border/50"
+      className="flex flex-col gap-2 bg-muted/20 p-2 rounded-lg border border-border/50"
     >
-      <div {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
-        <GripVertical className="w-4 h-4" />
-      </div>
-      <Input
-        value={section.sectionName}
-        onChange={(e) => updateSection(index, "sectionName", e.target.value)}
-        placeholder="Section A"
-        className="h-8 text-sm"
-      />
-      <Input
-        type="number"
-        min={1}
-        value={section.questionCount || ""}
-        onChange={(e) => updateSection(index, "questionCount", parseInt(e.target.value) || 0)}
-        placeholder="Q Count"
-        className="h-8 text-sm"
-      />
-      <Input
-        type="number"
-        min={1}
-        value={section.marksPerQuestion || ""}
-        onChange={(e) => updateSection(index, "marksPerQuestion", parseFloat(e.target.value) || 0)}
-        placeholder="Marks/Q"
-        className="h-8 text-sm"
-      />
-      <div className="flex items-center gap-1.5 justify-center" title="Objective">
-        <Switch
-          checked={section.isObjective ?? false}
-          onCheckedChange={(checked) => updateSection(index, "isObjective", checked)}
-          className="scale-75"
+      <div className="grid grid-cols-[auto_2fr_1fr_1fr_auto_auto_auto_auto] gap-2 items-center">
+        <div {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
+          <GripVertical className="w-4 h-4" />
+        </div>
+        <Input
+          value={section.sectionName}
+          onChange={(e) => updateSection(index, "sectionName", e.target.value)}
+          placeholder="Section A"
+          className="h-8 text-sm"
         />
-        <span className="text-[10px] text-muted-foreground">OBJ</span>
-      </div>
-      <div className="flex items-center gap-1.5 justify-center" title="Subjective">
-        <Switch
-          checked={section.isSubjective ?? false}
-          onCheckedChange={(checked) => updateSection(index, "isSubjective", checked)}
-          className="scale-75"
+        <Input
+          type="number"
+          min={1}
+          value={section.questionCount || ""}
+          onChange={(e) => updateSection(index, "questionCount", parseInt(e.target.value) || 0)}
+          placeholder="Q Count"
+          className="h-8 text-sm"
         />
-        <span className="text-[10px] text-muted-foreground">SUB</span>
+        <Input
+          type="number"
+          min={1}
+          value={section.marksPerQuestion || ""}
+          onChange={(e) => updateSection(index, "marksPerQuestion", parseFloat(e.target.value) || 0)}
+          placeholder="Marks/Q"
+          className="h-8 text-sm"
+        />
+        <div className="flex items-center gap-1.5 justify-center" title="Objective">
+          <Switch
+            checked={section.isObjective ?? false}
+            onCheckedChange={(checked) => updateSection(index, "isObjective", checked)}
+            className="scale-75"
+          />
+          <span className="text-[10px] text-muted-foreground">OBJ</span>
+        </div>
+        <div className="flex items-center gap-1.5 justify-center" title="Subjective">
+          <Switch
+            checked={section.isSubjective ?? false}
+            onCheckedChange={(checked) => updateSection(index, "isSubjective", checked)}
+            className="scale-75"
+          />
+          <span className="text-[10px] text-muted-foreground">SUB</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 transition-colors ${expanded ? "bg-muted text-primary" : "text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setExpanded(!expanded)}
+          title="Advanced Settings"
+        >
+          <Settings2 className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => removeSection(index)}
+          disabled={!canRemove}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 w-8 p-0 text-destructive"
-        onClick={() => removeSection(index)}
-        disabled={!canRemove}
-      >
-        <Trash2 className="w-3.5 h-3.5" />
-      </Button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-muted/60 rounded-md border border-border/40 mt-1">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">Section Type</label>
+                <select
+                  value={section.sectionType || "NORMAL"}
+                  onChange={(e) => updateSection(index, "sectionType", e.target.value)}
+                  className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="NORMAL">NORMAL</option>
+                  <option value="OPTIONAL">OPTIONAL</option>
+                </select>
+              </div>
+
+              {section.sectionType === "OPTIONAL" && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold uppercase text-primary tracking-wider">Attempt count <span className="text-[9px] lowercase opacity-70">(max {section.questionCount || 0})</span></label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={section.questionCount || 1}
+                    value={section.attemptQuestions || ""}
+                    onChange={(e) => {
+                      let val = parseInt(e.target.value) || 0;
+                      if (val > (section.questionCount || 0)) val = section.questionCount || 0;
+                      updateSection(index, "attemptQuestions", val);
+                    }}
+                    placeholder="e.g. 3"
+                    className="h-8"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5 flex flex-col justify-center">
+                <label className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-0.5">Internal Choice</label>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={section.internalChoiceEnabled ?? false}
+                    onCheckedChange={(checked) => {
+                      updateSection(index, "internalChoiceEnabled", checked);
+                      if (checked && !section.optionsPerQuestion) {
+                        updateSection(index, "optionsPerQuestion", 2);
+                      }
+                    }}
+                    className="scale-75 origin-left"
+                  />
+                  <span className="text-xs font-medium">{section.internalChoiceEnabled ? "Enabled" : "Disabled"}</span>
+                </div>
+              </div>
+
+              {section.internalChoiceEnabled && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold uppercase text-primary tracking-wider">Options per Q</label>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={5}
+                    value={section.optionsPerQuestion || 2}
+                    onChange={(e) => updateSection(index, "optionsPerQuestion", parseInt(e.target.value) || 2)}
+                    className="h-8"
+                  />
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -203,10 +295,10 @@ export default function ExamTemplatePanel() {
     setEditingTemplate(template);
     setName(template.name);
     setSections(template.sections.map((s, idx) => ({
-      sectionName: s.sectionName,
+      ...s,
+      questionCount: s.totalQuestions || s.questionCount || 0,
+      optionsPerQuestion: s.optionsPerQuestion || (s.internalChoiceEnabled ? 2 : undefined),
       sectionOrder: s.sectionOrder || idx + 1,
-      questionCount: s.questionCount,
-      marksPerQuestion: s.marksPerQuestion,
       isObjective: s.isObjective ?? true,
       isSubjective: s.isSubjective ?? false,
     })));
@@ -243,7 +335,45 @@ export default function ExamTemplatePanel() {
 
     const data: ExamTemplateRequestDTO = {
       name: name.trim(),
-      sections: sections.map((s, idx) => ({ ...s, sectionOrder: idx + 1 }))
+      sections: sections.map((s, idx) => {
+        const tq = s.questionCount || 0;
+        const isInternal = s.internalChoiceEnabled ?? false;
+        const marks = s.marksPerQuestion || 1;
+        const optsCount = s.optionsPerQuestion || 2;
+        const typeEnum = isInternal ? ("INTERNAL_CHOICE" as const) : ("NORMAL" as const);
+
+        const optionLabels = isInternal
+            ? Array.from({ length: optsCount }).map((_, i) => String.fromCharCode(65 + i))
+            : [];
+
+        const questions: TemplateQuestionRequestDTO[] = Array.from({ length: tq }).map((_, i) => ({
+            questionNo: i + 1,
+            marks: marks,
+            type: typeEnum,
+            options: optionLabels
+        }));
+
+        let attempts = s.attemptQuestions;
+        if (s.sectionType !== "OPTIONAL" || !attempts) {
+            attempts = tq;
+        }
+
+        const sectionData: TemplateSectionDTO = {
+          sectionName: s.sectionName,
+          sectionOrder: idx + 1,
+          sectionType: (s.sectionType || "NORMAL") as "NORMAL" | "OPTIONAL",
+          questionCount: tq,
+          totalQuestions: tq,
+          attemptQuestions: attempts,
+          marksPerQuestion: marks,
+          isObjective: s.isObjective ?? false,
+          isSubjective: s.isSubjective ?? false,
+          internalChoiceEnabled: isInternal,
+          questions: questions
+        };
+
+        return sectionData;
+      })
     };
 
     if (editingTemplate) {
@@ -437,13 +567,31 @@ export default function ExamTemplatePanel() {
                           </div>
                           <div className="space-y-1.5">
                             {[...template.sections].sort((a, b) => (a.sectionOrder ?? 0) - (b.sectionOrder ?? 0)).map((s) => (
-                              <div key={s.id || s.sectionName} className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 items-center bg-muted/30 px-3 py-2 text-sm rounded-lg">
-                                <span className="font-medium text-foreground">{s.sectionName}</span>
-                                <span>{s.questionCount}</span>
-                                <span>{s.marksPerQuestion}</span>
-                                <span>
-                                  <Badge variant="outline" className="text-[10px] font-normal">{getSectionTypeLabel(s)}</Badge>
-                                </span>
+                              <div key={s.id || s.sectionName} className="flex flex-col gap-1.5 bg-muted/30 px-3 py-2.5 text-sm rounded-lg border border-border/40">
+                                <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 items-center">
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-foreground">{s.sectionName}</span>
+                                    {(s.sectionType === "OPTIONAL" || s.internalChoiceEnabled) && (
+                                      <div className="flex flex-wrap gap-1.5 mt-1">
+                                        {s.sectionType === "OPTIONAL" && (
+                                          <span className="text-[9px] uppercase tracking-wider text-muted-foreground bg-background px-1.5 py-0.5 rounded border border-border/50">
+                                            Attempt {s.attemptQuestions}/{s.questionCount || s.totalQuestions}
+                                          </span>
+                                        )}
+                                        {s.internalChoiceEnabled && (
+                                          <span className="text-[9px] uppercase tracking-wider font-semibold text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                            Internal Choice ({s.optionsPerQuestion} opts)
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span>{s.questionCount || s.totalQuestions}</span>
+                                  <span>{s.marksPerQuestion}</span>
+                                  <span>
+                                    <Badge variant="outline" className="text-[10px] font-normal">{getSectionTypeLabel(s)}</Badge>
+                                  </span>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -522,6 +670,56 @@ export default function ExamTemplatePanel() {
               >
                 <Plus className="w-3 h-3" /> Add Section
               </Button>
+            </div>
+
+            {/* Visual Blueprint Preview */}
+            <div className="border border-border/50 rounded-xl bg-card overflow-hidden mt-2">
+              <div className="bg-muted/40 p-2.5 px-4 border-b border-border/50">
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Visual Blueprint Preview</h4>
+              </div>
+              <div className="p-4 max-h-[250px] overflow-y-auto space-y-5 bg-grid-slate-100 dark:bg-grid-slate-900">
+                {sections.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">Add a section to see the blueprint preview.</p>
+                )}
+                {sections.map((sec, sIdx) => {
+                  const isOptional = sec.sectionType === "OPTIONAL";
+                  return (
+                    <div key={sIdx} className="space-y-2.5">
+                      <div className="flex flex-col gap-0.5">
+                        <h5 className="text-[13px] font-semibold text-foreground">
+                          Section {String.fromCharCode(65 + sIdx)} {sec.sectionName ? `(${sec.sectionName})` : ""}
+                        </h5>
+                        {isOptional && sec.attemptQuestions && (
+                          <span className="text-[10px] text-muted-foreground italic">
+                            Attempt any {sec.attemptQuestions} out of {sec.questionCount || 0}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pl-2">
+                        {Array.from({ length: Math.min(sec.questionCount || 0, 100) }).map((_, qIdx) => (
+                          <div key={qIdx} className="text-[11px] text-muted-foreground flex gap-1.5 items-start">
+                            <span className="font-semibold text-foreground w-6 shrink-0">Q{qIdx + 1}.</span>
+                            {sec.internalChoiceEnabled ? (
+                              <div className="flex flex-col gap-1 border-l-2 border-border/60 pl-2">
+                                <span className="text-[9px] uppercase font-bold tracking-wider text-amber-600 dark:text-amber-500">Attempt Any One</span>
+                                {Array.from({ length: sec.optionsPerQuestion || 2 }).map((_, oIdx) => (
+                                  <span key={oIdx} className="whitespace-nowrap">({String.fromCharCode(97 + oIdx)}) <span className="opacity-30">________</span></span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="opacity-30">________</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {(sec.questionCount || 0) > 100 && (
+                        <p className="text-[10px] text-muted-foreground italic pl-2">+ {(sec.questionCount || 0) - 100} more questions</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
