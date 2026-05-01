@@ -1,7 +1,12 @@
 import axios from 'axios';
 import type { AutoGenerateRequest, AutoGenerateResponse, BulkGenerateRequest, BulkGenerateResponse } from '../types';
 
-const LLM_SERVER_URL = 'http://localhost:5000';
+/**
+ * Base URL for the Shiksha AI server.
+ * Set VITE_AI_SERVER_URL in your .env file to point to the hosted AI server.
+ * Defaults to http://localhost:8001 (local dev).
+ */
+const AI_SERVER_URL = import.meta.env.VITE_AI_SERVER_URL ?? 'http://localhost:8001';
 
 /**
  * Call the LLM server to generate an optimized timetable.
@@ -9,7 +14,7 @@ const LLM_SERVER_URL = 'http://localhost:5000';
 export async function generateTimetable(request: AutoGenerateRequest): Promise<AutoGenerateResponse> {
     try {
         const response = await axios.post<AutoGenerateResponse>(
-            `${LLM_SERVER_URL}/generate-timetable`,
+            `${AI_SERVER_URL}/v1/timetable/generate`,
             request,
             {
                 headers: {
@@ -44,7 +49,7 @@ export async function generateTimetable(request: AutoGenerateRequest): Promise<A
 export async function generateTimetableBulk(request: BulkGenerateRequest): Promise<BulkGenerateResponse> {
     try {
         const response = await axios.post<BulkGenerateResponse>(
-            `${LLM_SERVER_URL}/generate-timetable-bulk`,
+            `${AI_SERVER_URL}/v1/timetable/generate-bulk`,
             request,
             {
                 headers: { 'Content-Type': 'application/json' },
