@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Users, User, Search, Link2, Pencil, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Plus, Users, User, Search, Link2, Pencil, AlertCircle, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -27,6 +27,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +85,9 @@ export function StudentFeeAssignmentTab({
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMap, setEditingMap] = useState<StudentFeeMapResponseDTO | null>(null);
+  const [selectedMapIds, setSelectedMapIds] = useState<Set<number>>(new Set());
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [mapIdsToDelete, setMapIdsToDelete] = useState<number[]>([]);
 
   // Student search state
   const [studentSearch, setStudentSearch] = useState("");
@@ -177,30 +191,78 @@ export function StudentFeeAssignmentTab({
         toast.error("No students found in this class");
         return;
       }
+
       setBulkProgress({ current: 0, total: classStudents.length, running: true });
-      let success = 0, failed = 0;
-      for (const student of classStudents) {
-        try {
-          await financeService.createStudentFeeMap({
-            studentId: student.studentId,
-            structureId: values.structureId,
-            effectiveDate: values.effectiveDate,
-            notes: values.notes,
-          });
-          success++;
-        } catch {
-          failed++;
-        }
-        setBulkProgress((p) => ({ ...p, current: p.current + 1 }));
-      }
-      setBulkProgress({ current: 0, total: 0, running: false });
-      toast.success(`Bulk assignment done — ${success} succeeded, ${failed} failed`);
+
+      const bulkPayload = classStudents.map((student) => ({
+        studentId: student.studentId,
+        structureId: values.structureId,
+        effectiveDate: values.effectiveDate,
+        notes: values.notes,
+      }));
+
+      await financeService.createBulkStudentFeeMaps(bulkPayload);
+
+      setBulkProgress({ current: classStudents.length, total: classStudents.length, running: false });
+      toast.success(`Successfully assigned fee structure to ${classStudents.length} students`);
       setIsDialogOpen(false);
       onRefresh();
-    } catch {
+    } catch (err: unknown) {
       setBulkProgress({ current: 0, total: 0, running: false });
-      toast.error("Failed to fetch class students");
+      const e = err as { response?: { data?: { message?: string } } };
+      toast.error(e.response?.data?.message || "Failed to perform bulk assignment");
     }
+  };
+
+  // ── Delete Handlers ──
+  const onDeleteSingle = (mapId: number) => {
+    setMapIdsToDelete([mapId]);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const onDeleteBulk = () => {
+    const ids = Array.from(selectedMapIds);
+    if (ids.length === 0) return;
+    setMapIdsToDelete(ids);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const onConfirmDelete = async () => {
+    try {
+      if (mapIdsToDelete.length === 1) {
+        await financeService.deleteStudentFeeMap(mapIdsToDelete[0]);
+        toast.success("Assignment deleted");
+        
+        const next = new Set(selectedMapIds);
+        next.delete(mapIdsToDelete[0]);
+        setSelectedMapIds(next);
+      } else {
+        await financeService.deleteBulkStudentFeeMaps(mapIdsToDelete);
+        toast.success(`${mapIdsToDelete.length} assignments deleted`);
+        setSelectedMapIds(new Set());
+      }
+      onRefresh();
+    } catch {
+      toast.error("Failed to delete assignment(s)");
+    } finally {
+      setIsDeleteConfirmOpen(false);
+      setMapIdsToDelete([]);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedMapIds.size === studentFeeMaps.length) {
+      setSelectedMapIds(new Set());
+    } else {
+      setSelectedMapIds(new Set(studentFeeMaps.map((m) => m.mapId)));
+    }
+  };
+
+  const toggleSelectOne = (id: number) => {
+    const next = new Set(selectedMapIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedMapIds(next);
   };
 
   const activeStructures = structures.filter((s) => s.active);
@@ -219,6 +281,11 @@ export function StudentFeeAssignmentTab({
           </p>
         </div>
         <div className="flex gap-2">
+          {selectedMapIds.size > 0 && (
+            <Button variant="destructive" onClick={onDeleteBulk} className="gap-2">
+              <Trash2 className="h-4 w-4" /> Delete ({selectedMapIds.size})
+            </Button>
+          )}
           <Button variant="outline" onClick={() => openCreate("bulk")} className="gap-2">
             <Users className="h-4 w-4" /> Assign by Class
           </Button>
@@ -238,7 +305,13 @@ export function StudentFeeAssignmentTab({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Student ID</TableHead>
+                <TableHead className="w-[40px]">
+                  <Checkbox 
+                    checked={studentFeeMaps.length > 0 && selectedMapIds.size === studentFeeMaps.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+                <TableHead>Student</TableHead>
                 <TableHead>Fee Structure</TableHead>
                 <TableHead>Effective Date</TableHead>
                 <TableHead>Notes</TableHead>
@@ -263,8 +336,19 @@ export function StudentFeeAssignmentTab({
                 </TableRow>
               ) : (
                 studentFeeMaps.map((map) => (
-                  <TableRow key={map.mapId} className="hover:bg-muted/40">
-                    <TableCell className="font-mono text-sm">#{map.studentId}</TableCell>
+                  <TableRow key={map.mapId} className={`hover:bg-muted/40 ${selectedMapIds.has(map.mapId) ? 'bg-muted/60' : ''}`}>
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedMapIds.has(map.mapId)}
+                        onCheckedChange={() => toggleSelectOne(map.mapId)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">{map.studentName || "Unknown Student"}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">ID: {map.studentId}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="font-normal">
                         {getStructureName(map.structureId, structures)}
@@ -277,9 +361,14 @@ export function StudentFeeAssignmentTab({
                       {map.notes || "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(map)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(map)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => onDeleteSingle(map.mapId)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -363,9 +452,12 @@ export function StudentFeeAssignmentTab({
                     )}
 
                     {editingMap && (
-                      <div className="px-3 py-2 bg-muted/50 rounded-lg text-sm">
-                        <span className="text-muted-foreground">Student ID: </span>
-                        <span className="font-mono font-medium">#{editingMap.studentId}</span>
+                      <div className="px-3 py-2 bg-muted/50 rounded-lg text-sm flex justify-between items-center">
+                        <div>
+                          <span className="text-muted-foreground">Student: </span>
+                          <span className="font-medium">{editingMap.studentName || "Unknown"}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-mono">ID: {editingMap.studentId}</span>
                       </div>
                     )}
 
@@ -555,6 +647,33 @@ export function StudentFeeAssignmentTab({
           </AnimatePresence>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Confirm Deletion
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {mapIdsToDelete.length === 1 
+                ? "Are you sure you want to delete this fee assignment? This action cannot be undone."
+                : `Are you sure you want to delete ${mapIdsToDelete.length} fee assignments? This action cannot be undone.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={onConfirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

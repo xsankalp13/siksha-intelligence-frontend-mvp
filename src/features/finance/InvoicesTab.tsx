@@ -411,7 +411,7 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
             <TableHeader>
               <TableRow>
                 <TableHead>Invoice #</TableHead>
-                <TableHead>Student ID</TableHead>
+                <TableHead>Student</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Due Date</TableHead>
@@ -434,7 +434,12 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
                 paginatedInvoices.map((inv) => (
                   <TableRow key={inv.invoiceId} className="cursor-pointer hover:bg-muted/50" onClick={() => openInvoiceDetails(inv)}>
                     <TableCell className="font-medium">#{inv.invoiceNumber}</TableCell>
-                    <TableCell>{inv.studentId}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">{inv.studentName || "Unknown Student"}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">ID: {inv.studentId}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>{formatINR(inv.totalAmount)}</TableCell>
                     <TableCell>
                       <InvoiceStatusBadge status={inv.status} />
@@ -560,8 +565,8 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
                 <span className="font-medium text-foreground">#{selectedInvoice?.invoiceNumber}</span>
               </div>
               <div className="flex justify-between">
-                <span>Student ID:</span>
-                <span className="font-medium text-foreground">{selectedInvoice?.studentId}</span>
+                <span>Student:</span>
+                <span className="font-medium text-foreground">{selectedInvoice?.studentName || "ID: " + selectedInvoice?.studentId}</span>
               </div>
             </div>
           </div>
@@ -587,8 +592,8 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
                   <p className="font-medium">#{selectedInvoice.invoiceNumber}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Student ID</p>
-                  <p className="font-medium">{selectedInvoice.studentId}</p>
+                  <p className="text-muted-foreground">Student</p>
+                  <p className="font-medium">{selectedInvoice.studentName || "ID: " + selectedInvoice.studentId}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Total Amount</p>
