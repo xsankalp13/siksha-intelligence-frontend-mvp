@@ -89,6 +89,7 @@ const TeacherLectureLogsPage = lazy(() => import('@/pages/dashboard/teacher/lect
 const TeacherDisciplinePage = lazy(() => import('@/pages/dashboard/teacher/discipline/page'))
 const TeacherEvaluationPage = lazy(() => import('@/pages/dashboard/teacher/evaluation/page'))
 const TeacherSelfAttendancePage = lazy(() => import('@/pages/dashboard/teacher/self-attendance/page'))
+const TeacherProxyPage = lazy(() => import('@/pages/dashboard/teacher/proxy/page'))
 
 const InvigilatorRoomsPage = lazy(() => import('@/pages/dashboard/invigilator/attendance/page'))
 const RoomAttendancePage = lazy(() => import('@/pages/dashboard/invigilator/attendance/[roomId]/page'))
@@ -279,13 +280,13 @@ export default function App() {
             <Route path="reports" element={withRouteSuspense(<StatutoryReports />)} />
             <Route path="settings" element={withRouteSuspense(<StatutorySettings />)} />
             <Route path="staff/:staffRef" element={withRouteSuspense(<Staff360ProfilePage />)} />
+            <Route path="proxy" element={withRouteSuspense(<AdminProxyDashboardPage />)} />
             <Route path="*" element={<Navigate to="dashboard" replace />} />
           </Route>
           <Route path="id-cards" element={withRouteSuspense(<IdCardsPage />)} />
           <Route path="users/:type/:id" element={withRouteSuspense(<UserDetailsPage />)} />
           <Route path="visitor-logs" element={withRouteSuspense(<AdminVisitorLogsPage />)} />
           <Route path="pickup-logs" element={withRouteSuspense(<AdminPickupLogsPage />)} />
-          <Route path="proxy" element={withRouteSuspense(<AdminProxyDashboardPage />)} />
           <Route path="admission" element={withRouteSuspense(<AdminAdmissionDashboard />)} />
           <Route path="discipline" element={withRouteSuspense(<AdminDisciplinePage />)} />
           {/* Catch-all for unknown admin sub-routes */}
@@ -332,6 +333,7 @@ export default function App() {
           <Route path="lecture-logs" element={withRouteSuspense(<TeacherLectureLogsPage />)} />
           <Route path="evaluation" element={withRouteSuspense(<TeacherEvaluationPage />)} />
           <Route path="discipline" element={withRouteSuspense(<TeacherDisciplinePage />)} />
+          <Route path="proxy" element={withRouteSuspense(<TeacherProxyPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/teacher" replace />} />
         </Route>
 

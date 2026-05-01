@@ -5,7 +5,7 @@ import {
   CalendarDays, BookOpen, CheckSquare, BarChart3, Wallet, Users, CreditCard,
   ArrowUpCircle, ShieldCheck, FolderOpen, UserPlus, LogOut, Target,
   GraduationCap, DollarSign, Receipt, Timer, FileBarChart2, Settings,
-  AlignLeft, Scale, AlarmClock,
+  AlignLeft, Scale, AlarmClock, ArrowLeftRight,
 } from "lucide-react";
 
 const BASE = "/dashboard/admin/hrms";
@@ -100,6 +100,12 @@ const NAV_GROUPS: { group: string; items: NavItemDef[] }[] = [
     items: [
       { label: "Reports", icon: FileBarChart2, path: `${BASE}/reports` },
       { label: "Statutory Setup", icon: Settings, path: `${BASE}/settings` },
+    ],
+  },
+  {
+    group: "Proxy",
+    items: [
+      { label: "Proxy Allocation", icon: ArrowLeftRight, path: `${BASE}/proxy` },
     ],
   },
 ];
