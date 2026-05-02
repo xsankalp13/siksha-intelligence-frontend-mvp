@@ -119,6 +119,8 @@ export type StaffType =
   | "LIBRARIAN"
   | "PRINCIPAL"
   | "SECURITY_GUARD"
+  | "FINANCE_ADMIN"
+  | "AUDITOR"
   | "ADMINISTRATIVE_STAFF"
   | "SUPPORT_STAFF"
   | "SCHOOL_ADMIN"

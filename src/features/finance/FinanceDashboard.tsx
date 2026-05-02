@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { AdminDashboardSummaryDTO, InvoiceResponseDTO, PaymentResponseDTO } from "@/services/types/finance";
 import { formatINR, formatINRCompact, computeCollectionRate, groupByMonth } from "../finance/utils/financeUtils";
 import { format, formatDistanceToNow } from "date-fns";
