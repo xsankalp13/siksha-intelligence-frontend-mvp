@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import {
   AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  LineChart, Line,
 } from "recharts";
 import {
   ShieldCheck, TrendingUp, BookMarked, PiggyBank,
