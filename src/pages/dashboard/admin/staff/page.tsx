@@ -41,13 +41,15 @@ import { BulkPhotoUploadDialog } from "@/features/uis/id-card/BulkPhotoUploadDia
 import { idCardService, triggerBlobDownload } from "@/services/idCard";
 
 // ── Types ───────────────────────────────────────────────────────────
-type StaffType = "TEACHER" | "PRINCIPAL" | "LIBRARIAN" | "SECURITY_GUARD";
+type StaffType = "TEACHER" | "PRINCIPAL" | "LIBRARIAN" | "SECURITY_GUARD" | "FINANCE_ADMIN" | "AUDITOR";
 
 const STAFF_TYPE_OPTIONS: { value: StaffType; label: string }[] = [
   { value: "TEACHER", label: "Teacher" },
   { value: "PRINCIPAL", label: "Principal" },
   { value: "LIBRARIAN", label: "Librarian" },
   { value: "SECURITY_GUARD", label: "Security Guard" },
+  { value: "FINANCE_ADMIN", label: "Finance Admin" },
+  { value: "AUDITOR", label: "Auditor" },
 ];
 
 // ── Zod Schema ──────────────────────────────────────────────────────
@@ -66,7 +68,7 @@ const staffSchema = z.object({
   hireDate: z.string().min(1, "Required"),
   // designationId only used when editing; passed through to update call
   designationId: z.string().optional(),
-  staffType: z.enum(["TEACHER", "PRINCIPAL", "LIBRARIAN", "SECURITY_GUARD"]),
+  staffType: z.enum(["TEACHER", "PRINCIPAL", "LIBRARIAN", "SECURITY_GUARD", "FINANCE_ADMIN", "AUDITOR"]),
   gender: z.string().optional(),
   dateOfBirth: z.string().optional(),
   officeLocation: z.string().optional(),
@@ -107,6 +109,8 @@ export default function StaffPage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedStaffType, setSelectedStaffType] = useState<StaffType>("TEACHER");
   const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
+
+  const isFinanceOrAuditor = selectedStaffType === "FINANCE_ADMIN" || selectedStaffType === "AUDITOR";
 
   // ── Username auto-generation state ────────────────────────────────
   const [generatingUsername, setGeneratingUsername] = useState(false);
@@ -384,6 +388,40 @@ export default function StaffPage() {
           staffType: data.staffType,
           designationId: selectedDesig?.designationId,
           category: selectedDesig?.category,
+        });
+      } else if (data.staffType === "FINANCE_ADMIN") {
+        await adminService.createFinanceAdmin({
+          username: effectiveUsername,
+          email: data.email,
+          initialPassword: data.initialPassword || undefined,
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
+          jobTitle: data.jobTitle,
+          hireDate: data.hireDate,
+          officeLocation: data.officeLocation,
+          gender: data.gender as never,
+          dateOfBirth: data.dateOfBirth,
+          staffType: data.staffType,
+          category: data.category as any,
+          department: data.department as any,
+        });
+      } else if (data.staffType === "AUDITOR") {
+        await adminService.createAuditor({
+          username: effectiveUsername,
+          email: data.email,
+          initialPassword: data.initialPassword || undefined,
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
+          jobTitle: data.jobTitle,
+          hireDate: data.hireDate,
+          officeLocation: data.officeLocation,
+          gender: data.gender as never,
+          dateOfBirth: data.dateOfBirth,
+          staffType: data.staffType,
+          category: data.category as any,
+          department: data.department as any,
         });
       }
       toast.success("Staff member hired successfully");
@@ -720,8 +758,16 @@ export default function StaffPage() {
                   <Select
                     value={selectedStaffType}
                     onValueChange={(val) => {
-                      setSelectedStaffType(val as StaffType);
-                      form.setValue("staffType", val as StaffType);
+                      const type = val as StaffType;
+                      setSelectedStaffType(type);
+                      form.setValue("staffType", type);
+                      
+                      if (type === "FINANCE_ADMIN" || type === "AUDITOR") {
+                        form.setValue("category", "NON_TEACHING_ADMIN");
+                        form.setValue("department", "FINANCE");
+                        form.setValue("jobTitle", type === "FINANCE_ADMIN" ? "Finance Admin" : "Auditor");
+                        form.setValue("designationCode", "");
+                      }
                     }}
                   >
                     <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
@@ -733,8 +779,12 @@ export default function StaffPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Category *</Label>
-                  <Select value={form.watch("category")} onValueChange={(val) => form.setValue("category", val as any)}>
+                  <Label className={isFinanceOrAuditor ? "opacity-50" : ""}>Category *</Label>
+                  <Select 
+                    disabled={isFinanceOrAuditor}
+                    value={form.watch("category")} 
+                    onValueChange={(val) => form.setValue("category", val as any)}
+                  >
                     <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="TEACHING">Teaching</SelectItem>
@@ -747,8 +797,12 @@ export default function StaffPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Department *</Label>
-                  <Select value={form.watch("department")} onValueChange={(val) => form.setValue("department", val as any)}>
+                  <Label className={isFinanceOrAuditor ? "opacity-50" : ""}>Department *</Label>
+                  <Select 
+                    disabled={isFinanceOrAuditor}
+                    value={form.watch("department")} 
+                    onValueChange={(val) => form.setValue("department", val as any)}
+                  >
                     <SelectTrigger><SelectValue placeholder="Select dept" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ACADEMICS">Academics</SelectItem>
@@ -772,9 +826,13 @@ export default function StaffPage() {
             {!editingStaff && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Designation *</Label>
-                  <Select value={form.watch("designationCode")} onValueChange={(val) => form.setValue("designationCode", val)}>
-                    <SelectTrigger><SelectValue placeholder="Select Designation" /></SelectTrigger>
+                  <Label className={isFinanceOrAuditor ? "opacity-50" : ""}>Designation *</Label>
+                  <Select 
+                    disabled={isFinanceOrAuditor}
+                    value={form.watch("designationCode")} 
+                    onValueChange={(val) => form.setValue("designationCode", val)}
+                  >
+                    <SelectTrigger><SelectValue placeholder={isFinanceOrAuditor ? "N/A" : "Select Designation"} /></SelectTrigger>
                     <SelectContent>
                       {designations.map(d => (
                         <SelectItem key={d.uuid} value={d.designationCode}>
@@ -792,8 +850,12 @@ export default function StaffPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Job Title *</Label>
-                  <Input {...form.register("jobTitle")} placeholder="e.g. Senior Math Teacher" />
+                  <Label className={isFinanceOrAuditor ? "opacity-50" : ""}>Job Title *</Label>
+                  <Input 
+                    {...form.register("jobTitle")} 
+                    disabled={isFinanceOrAuditor}
+                    placeholder="e.g. Senior Math Teacher" 
+                  />
                   {form.formState.errors.jobTitle && (
                     <p className="text-xs text-destructive">{form.formState.errors.jobTitle.message}</p>
                   )}

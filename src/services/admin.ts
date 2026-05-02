@@ -140,6 +140,16 @@ export const adminService = {
     return api.post<string>("/auth/admin/users/staff/security-guard", data);
   },
 
+  /** POST /auth/admin/users/staff/finance-admin */
+  createFinanceAdmin(data: any) {
+    return api.post<string>("/auth/admin/users/staff/finance-admin", data);
+  },
+
+  /** POST /auth/admin/users/staff/auditor */
+  createAuditor(data: any) {
+    return api.post<string>("/auth/admin/users/staff/auditor", data);
+  },
+
   /** GET /auth/hrms/designations */
   listDesignations() {
     return api.get<any[]>("/auth/hrms/designations");

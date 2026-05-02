@@ -43,6 +43,8 @@ const roleToPathMap: Record<string, string> = {
   STUDENT: '/dashboard/student',
   GUARDIAN: '/dashboard/parent',
   PARENT: '/dashboard/parent',
+  FINANCE_ADMIN: '/dashboard/admin/finance',
+  AUDITOR: '/dashboard/admin/finance',
 }
 
 const getDashboardPath = (roles: string[] | null | undefined): string => {

@@ -109,9 +109,11 @@ function UtilArc({ pct }: { pct: number }) {
 function BudgetDetailPanel({
   budgetId,
   onRefresh,
+  isReadOnly = false,
 }: {
   budgetId: number;
   onRefresh: () => void;
+  isReadOnly?: boolean;
 }) {
   const [detail, setDetail] = useState<BudgetResponseDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -223,36 +225,38 @@ function BudgetDetailPanel({
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-2 pt-2 border-t border-border/30">
-        {detail.status === "DRAFT" && (
-          <Button size="sm" onClick={() => doAction(() => budgetService.submit(detail.id), "Budget submitted for review.")} disabled={acting}>
-            <Send className="h-3.5 w-3.5 mr-1.5" /> Submit for Review
-          </Button>
-        )}
-        {detail.status === "REVISION_REQUESTED" && (
-          <Button size="sm" onClick={() => doAction(() => budgetService.submit(detail.id), "Budget resubmitted.")} disabled={acting}>
-            <Send className="h-3.5 w-3.5 mr-1.5" /> Resubmit
-          </Button>
-        )}
-        {detail.status === "SUBMITTED" && (
-          <>
-            <Button size="sm" onClick={() => { setReviewApprove(true); setReviewNotes(""); setReviewDialogOpen(true); }} disabled={acting}>
-              <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Approve
+      {!isReadOnly && (
+        <div className="flex flex-wrap gap-2 pt-2 border-t border-border/30">
+          {detail.status === "DRAFT" && (
+            <Button size="sm" onClick={() => doAction(() => budgetService.submit(detail.id), "Budget submitted for review.")} disabled={acting}>
+              <Send className="h-3.5 w-3.5 mr-1.5" /> Submit for Review
             </Button>
-            <Button size="sm" variant="outline" onClick={() => { setReviewApprove(false); setReviewNotes(""); setReviewDialogOpen(true); }} disabled={acting}>
-              <XCircle className="h-3.5 w-3.5 mr-1.5 text-rose-500" /> Reject
+          )}
+          {detail.status === "REVISION_REQUESTED" && (
+            <Button size="sm" onClick={() => doAction(() => budgetService.submit(detail.id), "Budget resubmitted.")} disabled={acting}>
+              <Send className="h-3.5 w-3.5 mr-1.5" /> Resubmit
             </Button>
-            <Button size="sm" variant="outline" onClick={() => { setReviewApprove(false); setReviewNotes(""); setReviewDialogOpen(true); }} disabled={acting}>
-              <RotateCcw className="h-3.5 w-3.5 mr-1.5 text-amber-500" /> Request Revision
+          )}
+          {detail.status === "SUBMITTED" && (
+            <>
+              <Button size="sm" onClick={() => { setReviewApprove(true); setReviewNotes(""); setReviewDialogOpen(true); }} disabled={acting}>
+                <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Approve
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setReviewApprove(false); setReviewNotes(""); setReviewDialogOpen(true); }} disabled={acting}>
+                <XCircle className="h-3.5 w-3.5 mr-1.5 text-rose-500" /> Reject
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setReviewApprove(false); setReviewNotes(""); setReviewDialogOpen(true); }} disabled={acting}>
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5 text-amber-500" /> Request Revision
+              </Button>
+            </>
+          )}
+          {detail.status === "APPROVED" && (
+            <Button size="sm" variant="outline" onClick={() => doAction(() => budgetService.close(detail.id), "Budget closed.")} disabled={acting}>
+              <Archive className="h-3.5 w-3.5 mr-1.5" /> Close Budget
             </Button>
-          </>
-        )}
-        {detail.status === "APPROVED" && (
-          <Button size="sm" variant="outline" onClick={() => doAction(() => budgetService.close(detail.id), "Budget closed.")} disabled={acting}>
-            <Archive className="h-3.5 w-3.5 mr-1.5" /> Close Budget
-          </Button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Review Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
@@ -473,10 +477,12 @@ function BudgetCard({
   budget,
   onClick,
   onDelete,
+  isReadOnly = false,
 }: {
   budget: BudgetSummaryDTO;
   onClick: () => void;
   onDelete: (b: BudgetSummaryDTO) => void;
+  isReadOnly?: boolean;
 }) {
   const capped = Math.min(budget.utilisationPct, 100);
   const barColor = budget.utilisationPct > 100 ? "bg-rose-500" :
@@ -498,7 +504,7 @@ function BudgetCard({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={budget.status} />
-          {budget.status === "DRAFT" && (
+          {!isReadOnly && budget.status === "DRAFT" && (
             <Button
               variant="ghost" size="icon" className="h-6 w-6 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => { e.stopPropagation(); onDelete(budget); }}
@@ -552,7 +558,7 @@ function BudgetCard({
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export function BudgetManager() {
+export function BudgetManager({ isReadOnly = false }: { isReadOnly?: boolean }) {
   const [budgets, setBudgets] = useState<BudgetSummaryDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -619,10 +625,12 @@ export function BudgetManager() {
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            New Budget
-          </Button>
+          {!isReadOnly && (
+            <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Budget
+            </Button>
+          )}
         </div>
       </div>
 
@@ -694,6 +702,7 @@ export function BudgetManager() {
                   budget={budget}
                   onClick={() => setSelectedId(selectedId === budget.id ? null : budget.id)}
                   onDelete={handleDelete}
+                  isReadOnly={isReadOnly}
                 />
               ))}
             </div>
@@ -723,6 +732,7 @@ export function BudgetManager() {
                   <BudgetDetailPanel
                     budgetId={selectedId}
                     onRefresh={load}
+                    isReadOnly={isReadOnly}
                   />
                 </CardContent>
               </Card>

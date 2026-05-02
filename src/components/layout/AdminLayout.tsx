@@ -4,14 +4,29 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { cn } from "@/lib/utils";
 import { ADMIN_NAV_ITEMS } from "@/config/navigation";
+import { useAppSelector } from "@/store/hooks";
+import { useFinanceRole } from "@/hooks/useFinanceRole";
 
 export default function AdminLayout() {
   const [collapsed, setCollapsed] = useState(true);
+  const { isFinanceAdmin, isAuditor } = useFinanceRole();
+  const userRoles = useAppSelector(s => s.auth.user?.roles) || [];
+  
+  // Check if they are ONLY finance-related (don't have full admin roles)
+  const isFullAdmin = userRoles.some(r => 
+    ["ROLE_SUPER_ADMIN", "ROLE_SCHOOL_ADMIN", "ROLE_ADMIN"].includes(r.toUpperCase())
+  );
+
+  const navItems = (isFinanceAdmin || isAuditor) && !isFullAdmin
+    ? ADMIN_NAV_ITEMS.filter(item => 
+        item.label === "Dashboard" || item.label === "Finance"
+      )
+    : ADMIN_NAV_ITEMS;
 
   return (
     <div className="min-h-screen bg-background">
       <div className="print:hidden">
-        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} navItems={ADMIN_NAV_ITEMS} />
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} navItems={navItems} />
       </div>
 
       <div

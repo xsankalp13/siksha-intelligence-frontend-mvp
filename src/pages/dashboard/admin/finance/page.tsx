@@ -249,8 +249,8 @@ export default function AdminFinancePage() {
           )}
 
           {/* ── Shared modules (both roles) ── */}
-          {activeTab === "gl"         && <GeneralLedger />}
-          {activeTab === "budgets"    && <BudgetManager />}
+          {activeTab === "gl"         && <GeneralLedger isReadOnly={isAuditor} />}
+          {activeTab === "budgets"    && <BudgetManager isReadOnly={isAuditor} />}
           {activeTab === "reports"    && (
             <ReportsCenter invoices={invoices} payments={payments} summary={summary} loading={loading} />
           )}
