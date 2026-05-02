@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { Plus, Download, Receipt, DownloadCloud, CheckCircle2, Clock, AlertTriangle, X, FileText, MoreHorizontal, Ban, TimerReset, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { Plus, Download, Receipt, DownloadCloud, CheckCircle2, Clock, AlertTriangle, X, FileText, MoreHorizontal, Ban, TimerReset, ChevronLeft, ChevronRight, Filter, History, LayoutList, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 import { financeService } from "@/services/finance";
-import type { InvoiceResponseDTO } from "@/services/types/finance";
+import type { InvoiceResponseDTO, PaymentResponseDTO } from "@/services/types/finance";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,7 +64,10 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceResponseDTO | null>(null);
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [invoicePayments, setInvoicePayments] = useState<PaymentResponseDTO[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [paymentRef, setPaymentRef] = useState("");
   const [generateStudentId, setGenerateStudentId] = useState("");
@@ -177,6 +180,21 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
     }
   };
 
+  const handleDownloadPaymentReceipt = async (paymentId: number) => {
+    try {
+      const response = await financeService.getPaymentReceipt(paymentId);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `payment_receipt_${paymentId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error("Failed to download transaction receipt");
+    }
+  };
+
   const handleCancelInvoice = async (invoiceId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
@@ -269,7 +287,7 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
         amountPaid: paymentAmount,
         paymentMethod: paymentMethod as any,
         transactionId: paymentRef,
-        paymentDate: new Date().toISOString().split("T")[0],
+        paymentDate: new Date().toISOString(),
       });
       toast.success(`Payment of ${formatINR(paymentAmount)} recorded for Invoice #${selectedInvoice.invoiceNumber}`);
       setIsPaymentDialogOpen(false);
@@ -285,6 +303,25 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
 
   const openInvoiceDetails = (inv: InvoiceResponseDTO) => {
     setSelectedInvoice(inv);
+    setIsViewDialogOpen(true);
+  };
+
+  useEffect(() => {
+    if (selectedInvoice && isViewDialogOpen) {
+      fetchInvoicePayments(selectedInvoice.invoiceId);
+    }
+  }, [selectedInvoice, isViewDialogOpen]);
+
+  const fetchInvoicePayments = async (invoiceId: number) => {
+    setLoadingPayments(true);
+    try {
+      const res = await financeService.getPaymentsByInvoiceId(invoiceId);
+      setInvoicePayments(res.data);
+    } catch (e) {
+      console.error("Failed to fetch payments", e);
+    } finally {
+      setLoadingPayments(false);
+    }
   };
 
   const openPaymentDialog = (inv: InvoiceResponseDTO, e: React.MouseEvent) => {
@@ -411,8 +448,10 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
             <TableHeader>
               <TableRow>
                 <TableHead>Invoice #</TableHead>
-                <TableHead>Student ID</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Student</TableHead>
+                <TableHead>Total Amount</TableHead>
+                <TableHead>Paid</TableHead>
+                <TableHead>Balance</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Due Date</TableHead>
                 <TableHead className="text-right">Action</TableHead>
@@ -434,8 +473,29 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
                 paginatedInvoices.map((inv) => (
                   <TableRow key={inv.invoiceId} className="cursor-pointer hover:bg-muted/50" onClick={() => openInvoiceDetails(inv)}>
                     <TableCell className="font-medium">#{inv.invoiceNumber}</TableCell>
-                    <TableCell>{inv.studentId}</TableCell>
-                    <TableCell>{formatINR(inv.totalAmount)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">{inv.studentName || "Unknown Student"}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">ID: {inv.studentId}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="font-bold">{formatINR(inv.totalAmount)}</span>
+                        <div className="w-20 h-1 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-emerald-500 transition-all duration-500" 
+                            style={{ width: `${Math.min(100, ((inv.paidAmount || 0) / inv.totalAmount) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-emerald-600 font-semibold">{formatINR(inv.paidAmount || 0)}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-rose-600 font-bold">{formatINR(inv.totalAmount - (inv.paidAmount || 0))}</span>
+                    </TableCell>
                     <TableCell>
                       <InvoiceStatusBadge status={inv.status} />
                     </TableCell>
@@ -448,8 +508,12 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openInvoiceDetails(inv)} className="gap-2">
+                            <Eye className="h-4 w-4" /> View Details
+                          </DropdownMenuItem>
                           {inv.status === "PENDING" && (
                             <>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePayOnline(inv); }} className="gap-2 text-blue-600 font-medium">
                                 <DownloadCloud className="h-4 w-4" /> Pay Online (Razorpay)
                               </DropdownMenuItem>
@@ -458,7 +522,7 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
                               </DropdownMenuItem>
                             </>
                           )}
-                          {inv.status === "PAID" && (
+                          {(inv.status === "PAID" || (inv.status === "PENDING" && (inv.paidAmount ?? 0) > 0)) && (
                             <DropdownMenuItem onClick={() => handleDownloadReceipt(inv.invoiceId)} className="gap-2">
                               <DownloadCloud className="h-4 w-4" /> Download Receipt
                             </DropdownMenuItem>
@@ -529,8 +593,18 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
                 type="number"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                className="font-semibold text-lg"
+                className={`font-semibold text-lg ${
+                  selectedInvoice && paymentAmount > (selectedInvoice.totalAmount - (selectedInvoice.paidAmount || 0)) 
+                  ? "border-destructive text-destructive focus-visible:ring-destructive" 
+                  : ""
+                }`}
               />
+              {selectedInvoice && paymentAmount > (selectedInvoice.totalAmount - (selectedInvoice.paidAmount || 0)) && (
+                <p className="text-[10px] font-bold text-destructive mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Cannot exceed remaining balance of {formatINR(selectedInvoice.totalAmount - (selectedInvoice.paidAmount || 0))}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Payment Method</label>
@@ -560,68 +634,152 @@ export function InvoicesTab({ invoices, loading, onRefresh }: InvoicesTabProps) 
                 <span className="font-medium text-foreground">#{selectedInvoice?.invoiceNumber}</span>
               </div>
               <div className="flex justify-between">
-                <span>Student ID:</span>
-                <span className="font-medium text-foreground">{selectedInvoice?.studentId}</span>
+                <span>Student:</span>
+                <span className="font-medium text-foreground">{selectedInvoice?.studentName || "ID: " + selectedInvoice?.studentId}</span>
               </div>
             </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleRecordPayment} disabled={isGenerating || paymentAmount <= 0} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button 
+              onClick={handleRecordPayment} 
+              disabled={
+                isGenerating || 
+                paymentAmount <= 0 || 
+                (selectedInvoice ? paymentAmount > (selectedInvoice.totalAmount - (selectedInvoice.paidAmount || 0)) : false)
+              } 
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
               {isGenerating ? "Processing..." : "Record Payment"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedInvoice && !isPaymentDialogOpen} onOpenChange={(open) => !open && setSelectedInvoice(null)}>
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Invoice Details</DialogTitle>
           </DialogHeader>
           {selectedInvoice && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs bg-muted/30 p-4 rounded-xl border border-border/50">
                 <div>
-                  <p className="text-muted-foreground">Invoice Number</p>
-                  <p className="font-medium">#{selectedInvoice.invoiceNumber}</p>
+                  <p className="text-muted-foreground mb-0.5">Invoice Number</p>
+                  <p className="font-bold text-sm">#{selectedInvoice.invoiceNumber}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Student ID</p>
-                  <p className="font-medium">{selectedInvoice.studentId}</p>
+                  <p className="text-muted-foreground mb-0.5">Student</p>
+                  <p className="font-bold text-sm truncate">{selectedInvoice.studentName || "ID: " + selectedInvoice.studentId}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Total Amount</p>
-                  <p className="font-medium">{formatINR(selectedInvoice.totalAmount)}</p>
+                  <p className="text-muted-foreground mb-0.5">Total Amount</p>
+                  <p className="font-bold text-sm">{formatINR(selectedInvoice.totalAmount)}</p>
                 </div>
-                <div>
-                  <p className="text-muted-foreground">Status</p>
+                <div className="flex flex-col items-start gap-1">
+                  <p className="text-muted-foreground mb-0.5">Status</p>
                   <InvoiceStatusBadge status={selectedInvoice.status} />
                 </div>
               </div>
 
-              <div>
-                <h4 className="font-semibold mb-2 text-sm border-b pb-1">Line Items</h4>
-                <div className="space-y-2">
-                  {selectedInvoice.lineItems?.map((item) => (
-                    <div key={item.lineItemId} className="flex justify-between text-sm">
-                      <span>{item.description}</span>
-                      <span>{formatINR(item.amount)}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Side: Line Items */}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                    <LayoutList className="h-4 w-4" /> Bill Breakdown
+                  </h4>
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+                    {selectedInvoice.lineItems?.map((item) => (
+                      <div key={item.lineItemId} className="flex justify-between items-center text-[13px] p-2 rounded-lg bg-muted/20 border border-transparent hover:border-border/40 transition-colors">
+                        <span className="text-muted-foreground">{item.description}</span>
+                        <span className="font-semibold">{formatINR(item.amount)}</span>
+                      </div>
+                    ))}
+                    {(!selectedInvoice.lineItems || selectedInvoice.lineItems.length === 0) && (
+                      <div className="text-sm text-muted-foreground italic py-4 text-center border rounded-lg">No line items detailed.</div>
+                    )}
+                  </div>
+                  <div className="pt-2 border-t flex justify-between font-bold text-sm px-2">
+                    <span>Total Billable</span>
+                    <span>{formatINR(selectedInvoice.totalAmount)}</span>
+                  </div>
+                </div>
+
+                {/* Right Side: Payment History Timeline */}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+                    <History className="h-4 w-4" /> Payment Timeline
+                  </h4>
+                  <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                    {loadingPayments ? (
+                      <div className="text-center py-10 text-xs text-muted-foreground flex flex-col items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                        Fetching payments...
+                      </div>
+                    ) : invoicePayments.length === 0 ? (
+                      <div className="text-center py-10 border-2 border-dashed rounded-xl text-xs text-muted-foreground bg-muted/10">
+                        <Receipt className="h-6 w-6 mx-auto mb-2 opacity-20" />
+                        No payments received yet.
+                      </div>
+                    ) : (
+                      <div className="relative space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-muted/50">
+                        {invoicePayments.map((p) => (
+                          <div key={p.paymentId} className="relative pl-7 group">
+                            <div className="absolute left-0 top-1.5 w-4 h-4 rounded-full border-2 border-background bg-emerald-500 shadow-sm" />
+                            <div className="flex justify-between items-start p-2.5 rounded-xl border bg-card/50 hover:border-emerald-200 hover:shadow-sm transition-all duration-200">
+                              <div className="space-y-0.5">
+                                <div className="text-[13px] font-bold text-emerald-600">{formatINR(p.amountPaid)}</div>
+                                <div className="text-[10px] text-muted-foreground font-medium flex items-center gap-1.5">
+                                  <span className="capitalize px-1.5 py-0.5 bg-muted rounded">{p.paymentMethod.toLowerCase()}</span>
+                                  <span>{format(new Date(p.paymentDate), "MMM dd, HH:mm")}</span>
+                                </div>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-emerald-600 rounded-full"
+                                onClick={() => handleDownloadPaymentReceipt(p.paymentId)}
+                                title="Download Transaction Receipt"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="pt-2 border-t space-y-1 px-2">
+                    <div className="flex justify-between text-[11px] text-muted-foreground font-medium">
+                      <span>Received:</span>
+                      <span className="text-emerald-600">{formatINR(selectedInvoice.paidAmount || 0)}</span>
                     </div>
-                  ))}
-                  {(!selectedInvoice.lineItems || selectedInvoice.lineItems.length === 0) && (
-                    <div className="text-sm text-muted-foreground italic">No line items detailed (Check backend mapping).</div>
-                  )}
+                    <div className="flex justify-between text-xs font-bold">
+                      <span>Outstanding:</span>
+                      <span className="text-rose-600">{formatINR(selectedInvoice.totalAmount - (selectedInvoice.paidAmount || 0))}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t">
-                {selectedInvoice.status === "PAID" && (
-                  <Button variant="outline" onClick={() => handleDownloadReceipt(selectedInvoice.invoiceId)}>
-                    <Download className="mr-2 h-4 w-4" /> Receipt
+                <Button variant="outline" className="h-9 text-xs" onClick={() => setIsViewDialogOpen(false)}>Close</Button>
+                {selectedInvoice.status !== 'PAID' && selectedInvoice.status !== 'CANCELLED' && (
+                  <Button 
+                    className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/10"
+                    onClick={() => {
+                      setIsViewDialogOpen(false);
+                      openPaymentDialog(selectedInvoice, { stopPropagation: () => {} } as any);
+                    }}
+                  >
+                    Collect Payment
                   </Button>
                 )}
-                <Button variant="secondary" onClick={() => setSelectedInvoice(null)}>Close</Button>
+                {selectedInvoice.status === "PAID" && (
+                  <Button className="h-9 text-xs gap-2" onClick={() => handleDownloadReceipt(selectedInvoice.invoiceId)}>
+                    <DownloadCloud className="h-3.5 w-3.5" /> Full Invoice Receipt
+                  </Button>
+                )}
               </div>
             </div>
           )}

@@ -115,8 +115,8 @@ function MiscReceiptForm({ open, onClose, onSaved, accounts }: { open: boolean, 
   });
   const [saving, setSaving] = useState(false);
 
-  const incomeAccounts = accounts.filter(a => a.type === 'REVENUE');
-  const assetAccounts = accounts.filter(a => a.type === 'ASSET');
+  const incomeAccounts = accounts.filter(a => a.accountType === 'INCOME');
+  const assetAccounts = accounts.filter(a => a.accountType === 'ASSET');
 
   const f = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
 

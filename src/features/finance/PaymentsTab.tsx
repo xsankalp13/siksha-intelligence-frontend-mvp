@@ -54,7 +54,8 @@ export function PaymentsTab({ loading: parentLoading }: PaymentsTabProps) {
 
   const filtered = payments.filter(p => 
     p.transactionId?.toLowerCase().includes(search.toLowerCase()) ||
-    p.studentId.toString().includes(search)
+    p.studentId.toString().includes(search) ||
+    p.studentName?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -67,7 +68,7 @@ export function PaymentsTab({ loading: parentLoading }: PaymentsTabProps) {
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search TXN ID or Student ID..." 
+            placeholder="Search Name, TXN or ID..." 
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -81,7 +82,7 @@ export function PaymentsTab({ loading: parentLoading }: PaymentsTabProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Receipt / Date</TableHead>
-                <TableHead>Student ID</TableHead>
+                <TableHead>Student</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>TXN / Ref #</TableHead>
                 <TableHead>Amount Paid</TableHead>
@@ -109,7 +110,12 @@ export function PaymentsTab({ loading: parentLoading }: PaymentsTabProps) {
                         {format(new Date(p.paymentDate), "MMM dd, yyyy")}
                       </div>
                     </TableCell>
-                    <TableCell className="font-semibold text-primary">STU-{p.studentId}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">{p.studentName || "Unknown Student"}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">ID: {p.studentId}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <PaymentMethodIcon method={p.paymentMethod} />

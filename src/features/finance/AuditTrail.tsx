@@ -42,23 +42,36 @@ export function AuditTrail() {
           <div className="p-16 text-center text-sm text-muted-foreground">No audit logs found.</div>
         ) : (
           <div className="text-sm">
-            <div className="grid grid-cols-12 gap-2 bg-muted/40 p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            <div className="grid grid-cols-12 gap-4 bg-muted/30 p-4 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/50">
               <span className="col-span-2">Timestamp</span>
               <span className="col-span-2">User</span>
-              <span className="col-span-3">Action Type</span>
-              <span className="col-span-1">Entity</span>
+              <span className="col-span-2">Action</span>
+              <span className="col-span-2">Resource</span>
               <span className="col-span-4">Description</span>
             </div>
-            <div className="divide-y divide-border/20">
+            <div className="divide-y divide-border/10">
               {logs.map(log => (
-                <div key={log.id} className="grid grid-cols-12 gap-2 p-3 hover:bg-muted/10 items-center text-xs">
-                  <span className="col-span-2 text-muted-foreground">{format(new Date(log.actionTimestamp), 'dd MMM yy, HH:mm:ss')}</span>
-                  <span className="col-span-2 font-mono">{log.performedBy}</span>
-                  <span className="col-span-3">
-                    <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary tracking-tight">{log.actionType}</Badge>
-                  </span>
-                  <span className="col-span-1 text-muted-foreground">{log.entityName} #{log.entityId}</span>
-                  <span className="col-span-4">{log.description}</span>
+                <div key={log.id} className="grid grid-cols-12 gap-4 p-4 hover:bg-muted/5 transition-colors items-center text-[13px]">
+                  <div className="col-span-2 flex flex-col">
+                    <span className="font-medium text-foreground">{format(new Date(log.actionTimestamp), 'dd MMM yyyy')}</span>
+                    <span className="text-[11px] text-muted-foreground">{format(new Date(log.actionTimestamp), 'HH:mm:ss')}</span>
+                  </div>
+                  <div className="col-span-2 font-semibold text-foreground flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-primary/40" />
+                    {log.performedBy}
+                  </div>
+                  <div className="col-span-2">
+                    <Badge variant="secondary" className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/50 uppercase tracking-tighter">
+                      {log.actionType.replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+                  <div className="col-span-2 flex flex-col">
+                    <span className="font-medium text-foreground truncate">{log.entityName}</span>
+                    <span className="text-[11px] text-muted-foreground font-mono">ID: #{log.entityId}</span>
+                  </div>
+                  <div className="col-span-4 text-muted-foreground leading-relaxed italic">
+                    "{log.description}"
+                  </div>
                 </div>
               ))}
             </div>

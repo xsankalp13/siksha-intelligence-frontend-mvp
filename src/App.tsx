@@ -224,7 +224,7 @@ export default function App() {
           path="/dashboard/admin"
           element={
             <ProtectedRoute>
-              <RoleBasedRoute allowedRoles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN']}>
+              <RoleBasedRoute allowedRoles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'AUDITOR']}>
                 <AdminLayout />
               </RoleBasedRoute>
             </ProtectedRoute>

@@ -74,6 +74,7 @@ export interface StudentFeeMapUpdateDTO {
 export interface StudentFeeMapResponseDTO {
   mapId: number;
   studentId: number;
+  studentName?: string;
   structureId: number;
   effectiveDate: string;
   notes?: string;
@@ -91,6 +92,7 @@ export interface InvoiceLineItemResponseDTO {
 export interface InvoiceResponseDTO {
   invoiceId: number;
   studentId: number;
+  studentName?: string;
   invoiceNumber: string;
   issueDate: string;
   dueDate: string;
@@ -117,6 +119,7 @@ export interface PaymentResponseDTO {
   paymentId: number;
   invoiceId: number;
   studentId: number;
+  studentName?: string;
   transactionId?: string;
   paymentDate: string;
   amountPaid: number;

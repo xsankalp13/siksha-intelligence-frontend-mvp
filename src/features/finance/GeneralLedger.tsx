@@ -46,9 +46,11 @@ function StatusBadge({ status }: { status: JournalEntryStatus }) {
 function JournalEntryRow({
   entry,
   onReverse,
+  isReadOnly = false,
 }: {
   entry: JournalEntryResponseDTO;
   onReverse: (entry: JournalEntryResponseDTO) => void;
+  isReadOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -76,7 +78,7 @@ function JournalEntryRow({
         <div className="shrink-0">
           <StatusBadge status={entry.status} />
         </div>
-        {entry.status === "POSTED" && (
+        {!isReadOnly && entry.status === "POSTED" && (
           <Button
             variant="ghost" size="icon"
             className="h-6 w-6 text-rose-500 shrink-0"
@@ -393,7 +395,7 @@ function TrialBalanceView() {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function GeneralLedger() {
+export function GeneralLedger({ isReadOnly = false }: { isReadOnly?: boolean }) {
   const [entries, setEntries] = useState<JournalEntryResponseDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [postingAccounts, setPostingAccounts] = useState<AccountResponseDTO[]>([]);
@@ -415,7 +417,7 @@ export function GeneralLedger() {
           to: toDate || undefined,
           size: 50,
         }),
-        coaService.getPostingAccounts(),
+        !isReadOnly ? coaService.getPostingAccounts() : Promise.resolve({ data: [] }),
       ]);
       setEntries(entriesRes.data.content ?? []);
       setPostingAccounts(accountsRes.data);
@@ -456,10 +458,12 @@ export function GeneralLedger() {
             Double-entry journal entries — the core accounting engine.
           </p>
         </div>
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-3.5 w-3.5 mr-1.5" />
-          New Manual Entry
-        </Button>
+        {!isReadOnly && (
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            New Manual Entry
+          </Button>
+        )}
       </div>
 
       {/* KPI Strip */}
@@ -524,7 +528,12 @@ export function GeneralLedger() {
           ) : (
             <div className="space-y-2">
               {entries.map((entry) => (
-                <JournalEntryRow key={entry.id} entry={entry} onReverse={handleReverse} />
+                <JournalEntryRow 
+                  key={entry.id} 
+                  entry={entry} 
+                  onReverse={handleReverse} 
+                  isReadOnly={isReadOnly} 
+                />
               ))}
             </div>
           )}

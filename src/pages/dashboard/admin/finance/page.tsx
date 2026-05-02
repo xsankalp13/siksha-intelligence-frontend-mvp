@@ -3,9 +3,10 @@ import {
   RefreshCw, LayoutDashboard, FileText, Blocks, Settings2, Link2,
   GraduationCap, CalendarRange, CreditCard, RotateCcw, Bell, Timer, BarChart3,
   BookOpen, BookMarked, PiggyBank, Building2, ShoppingCart, Receipt,
-  Layers, Landmark, Award, FileSpreadsheet, ShieldAlert, BadgeIndianRupee,
+  Layers, Landmark, Award, FileSpreadsheet, ShieldAlert, BadgeIndianRupee, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useFinanceRole } from "@/hooks/useFinanceRole";
 
 import { financeService } from "@/services/finance";
 import type {
@@ -21,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { FinanceDashboard } from "@/features/finance/FinanceDashboard";
+import { AuditorDashboard } from "@/features/finance/AuditorDashboard";
 import { FeeStructuresTab } from "@/features/finance/FeeStructuresTab";
 import { FeeTypesTab } from "@/features/finance/FeeTypesTab";
 import { StudentFeeAssignmentTab } from "@/features/finance/StudentFeeAssignmentTab";
@@ -55,6 +57,7 @@ const tabLoadingFallback = (
 );
 
 export default function AdminFinancePage() {
+  const { isAuditor } = useFinanceRole();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [loading, setLoading] = useState(true);
 
@@ -123,135 +126,170 @@ export default function AdminFinancePage() {
 
   return (
     <div className="flex -m-6 h-[calc(100vh-4rem)]">
-      {/* Finance Sub-Sidebar */}
+      {/* ── Finance Sub-Sidebar ── */}
       <aside className="w-[220px] shrink-0 border-r border-border bg-card/50 flex flex-col overflow-y-auto">
         <div className="px-4 py-3 border-b border-border shrink-0 flex justify-between items-center">
           <div>
             <h2 className="text-sm font-semibold text-foreground">Finance</h2>
-            <p className="text-xs text-muted-foreground">Financial Operations</p>
+            <p className="text-xs text-muted-foreground">
+              {isAuditor ? "Audit & Compliance" : "Financial Operations"}
+            </p>
           </div>
-          <Button onClick={fetchData} variant="ghost" size="icon" className="h-6 w-6">
-            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-          </Button>
+          {!isAuditor && (
+            <Button onClick={fetchData} variant="ghost" size="icon" className="h-6 w-6">
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          )}
         </div>
+
+        {/* Auditor badge */}
+        {isAuditor && (
+          <div className="mx-3 mt-2 mb-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <ShieldCheck className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Read-Only Auditor</span>
+          </div>
+        )}
+
         <nav className="flex-1 py-2 overflow-y-auto">
+          {/* Overview — visible to everyone */}
           <NavSection title="Overview">
             <NavItem value="dashboard" label="Dashboard" icon={LayoutDashboard} />
           </NavSection>
 
-          <NavSection title="Core Accounting">
-            <NavItem value="coa" label="Chart of Accounts" icon={BookOpen} />
-            <NavItem value="gl" label="General Ledger" icon={BookMarked} />
-          </NavSection>
+          {/* ── Auditor-only restricted nav ── */}
+          {isAuditor && (
+            <>
+              <NavSection title="Accounting (Read-Only)">
+                <NavItem value="gl" label="General Ledger" icon={BookMarked} />
+              </NavSection>
+              <NavSection title="Planning (Read-Only)">
+                <NavItem value="budgets" label="Budget Management" icon={PiggyBank} />
+              </NavSection>
+              <NavSection title="Reports & Audit">
+                <NavItem value="reports"    label="Reports"              icon={BarChart3}       />
+                <NavItem value="statements" label="Financial Statements" icon={FileSpreadsheet} />
+                <NavItem value="audit-logs" label="Audit Trail"          icon={ShieldAlert}    />
+              </NavSection>
+            </>
+          )}
 
-          <NavSection title="Planning">
-            <NavItem value="budgets" label="Budget Management" icon={PiggyBank} />
-          </NavSection>
+          {/* ── Finance Admin / Admin full nav ── */}
+          {!isAuditor && (
+            <>
+              <NavSection title="Core Accounting">
+                <NavItem value="coa" label="Chart of Accounts" icon={BookOpen} />
+                <NavItem value="gl"  label="General Ledger"    icon={BookMarked} />
+              </NavSection>
 
-          <NavSection title="Procurement">
-            <NavItem value="vendors" label="Vendor Directory" icon={Building2} />
-            <NavItem value="purchase-orders" label="Purchase Orders" icon={ShoppingCart} />
-            <NavItem value="vendor-bills" label="Vendor Bills (AP)" icon={Receipt} />
-          </NavSection>
+              <NavSection title="Planning">
+                <NavItem value="budgets" label="Budget Management" icon={PiggyBank} />
+              </NavSection>
 
-          <NavSection title="Assets & Treasury">
-            <NavItem value="assets" label="Asset Register" icon={Layers} />
-            <NavItem value="bank-recon" label="Bank Reconciliation" icon={Landmark} />
-            <NavItem value="grants" label="Grant Management" icon={Award} />
-          </NavSection>
+              <NavSection title="Procurement">
+                <NavItem value="vendors"         label="Vendor Directory"  icon={Building2}   />
+                <NavItem value="purchase-orders" label="Purchase Orders"   icon={ShoppingCart} />
+                <NavItem value="vendor-bills"    label="Vendor Bills (AP)" icon={Receipt}      />
+              </NavSection>
 
-          <NavSection title="Fee Management">
-            <NavItem value="structures" label="Fee Structures" icon={Blocks} />
-            <NavItem value="types" label="Fee Types" icon={Settings2} />
-            <NavItem value="assignments" label="Fee Assignments" icon={Link2} />
-            <NavItem value="invoices" label="Invoices" icon={FileText} />
-          </NavSection>
+              <NavSection title="Assets & Treasury">
+                <NavItem value="assets"     label="Asset Register"      icon={Layers}  />
+                <NavItem value="bank-recon" label="Bank Reconciliation" icon={Landmark} />
+                <NavItem value="grants"     label="Grant Management"    icon={Award}   />
+              </NavSection>
 
-          <NavSection title="Concessions & Plans">
-            <NavItem value="scholarships" label="Scholarships" icon={GraduationCap} />
-            <NavItem value="installments" label="Installments" icon={CalendarRange} />
-          </NavSection>
+              <NavSection title="Fee Management">
+                <NavItem value="structures"  label="Fee Structures"  icon={Blocks}   />
+                <NavItem value="types"       label="Fee Types"       icon={Settings2} />
+                <NavItem value="assignments" label="Fee Assignments" icon={Link2}    />
+                <NavItem value="invoices"    label="Invoices"        icon={FileText} />
+              </NavSection>
 
-          <NavSection title="Operations">
-            <NavItem value="misc-receipts" label="Misc Receipts" icon={BadgeIndianRupee} />
-            <NavItem value="payments" label="Payments" icon={CreditCard} />
-            <NavItem value="refunds" label="Refunds" icon={RotateCcw} />
-            <NavItem value="reminders" label="Reminders" icon={Bell} />
-            <NavItem value="late-fees" label="Late Fees" icon={Timer} />
-          </NavSection>
+              <NavSection title="Concessions & Plans">
+                <NavItem value="scholarships" label="Scholarships" icon={GraduationCap} />
+                <NavItem value="installments" label="Installments" icon={CalendarRange} />
+              </NavSection>
 
-          <NavSection title="Reports & Audit">
-            <NavItem value="reports" label="Reports" icon={BarChart3} />
-            <NavItem value="statements" label="Financial Statements" icon={FileSpreadsheet} />
-            <NavItem value="audit-logs" label="Audit Trail" icon={ShieldAlert} />
-          </NavSection>
+              <NavSection title="Operations">
+                <NavItem value="misc-receipts" label="Misc Receipts" icon={BadgeIndianRupee} />
+                <NavItem value="payments"      label="Payments"      icon={CreditCard}       />
+                <NavItem value="refunds"       label="Refunds"       icon={RotateCcw}        />
+                <NavItem value="reminders"     label="Reminders"     icon={Bell}             />
+                <NavItem value="late-fees"     label="Late Fees"     icon={Timer}            />
+              </NavSection>
+
+              <NavSection title="Reports & Audit">
+                <NavItem value="reports"    label="Reports"              icon={BarChart3}       />
+                <NavItem value="statements" label="Financial Statements" icon={FileSpreadsheet} />
+                <NavItem value="audit-logs" label="Audit Trail"          icon={ShieldAlert}    />
+              </NavSection>
+            </>
+          )}
         </nav>
       </aside>
 
-      {/* Main Content Area */}
+      {/* ── Main Content Area ── */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight">Financial Operations</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isAuditor ? "Audit & Compliance" : "Financial Operations"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Manage fees, invoices, payments, scholarships, and financial reporting.
+            {isAuditor
+              ? "Read-only access to financial ledger, budgets, and compliance reports."
+              : "Manage fees, invoices, payments, scholarships, and financial reporting."}
           </p>
         </div>
 
         <div>
-          {activeTab === "coa" && <ChartOfAccounts />}
+          {/* ── Dashboard (role-conditional) ── */}
+          {activeTab === "dashboard" && (
+            isAuditor
+              ? <AuditorDashboard summary={summary} invoices={invoices} payments={payments} loading={loading} />
+              : <FinanceDashboard  summary={summary} invoices={invoices} payments={payments} loading={loading} />
+          )}
 
-          {activeTab === "gl" && <GeneralLedger />}
-
-          {activeTab === "budgets" && <BudgetManager />}
-
-          {activeTab === "vendors" && <VendorDirectory />}
-          {activeTab === "purchase-orders" && <PurchaseOrders />}
-          {activeTab === "vendor-bills" && <VendorBills />}
-
-          {activeTab === "assets" && <AssetRegister />}
-          {activeTab === "bank-recon" && <BankReconciliation />}
-          {activeTab === "grants" && <GrantManager />}
-          {activeTab === "misc-receipts" && <MiscellaneousReceipts />}
-
+          {/* ── Shared modules (both roles) ── */}
+          {activeTab === "gl"         && <GeneralLedger isReadOnly={isAuditor} />}
+          {activeTab === "budgets"    && <BudgetManager isReadOnly={isAuditor} />}
+          {activeTab === "reports"    && (
+            <ReportsCenter invoices={invoices} payments={payments} summary={summary} loading={loading} />
+          )}
           {activeTab === "statements" && <FinancialStatements />}
           {activeTab === "audit-logs" && <AuditTrail />}
 
-          {activeTab === "dashboard" && (
-            <FinanceDashboard summary={summary} invoices={invoices} payments={payments} loading={loading} />
-          )}
+          {/* ── Finance Admin / Admin only modules ── */}
+          {!isAuditor && (
+            <>
+              {activeTab === "coa"            && <ChartOfAccounts />}
+              {activeTab === "vendors"        && <VendorDirectory />}
+              {activeTab === "purchase-orders"&& <PurchaseOrders />}
+              {activeTab === "vendor-bills"   && <VendorBills />}
+              {activeTab === "assets"         && <AssetRegister />}
+              {activeTab === "bank-recon"     && <BankReconciliation />}
+              {activeTab === "grants"         && <GrantManager />}
+              {activeTab === "misc-receipts"  && <MiscellaneousReceipts />}
+              {activeTab === "scholarships"   && <ScholarshipManager />}
+              {activeTab === "installments"   && <InstallmentPlans />}
+              {activeTab === "payments"       && <PaymentsTab loading={loading} />}
+              {activeTab === "refunds"        && <RefundManager />}
+              {activeTab === "reminders"      && <FeeReminderCenter />}
+              {activeTab === "late-fees"      && <LateFeeRulesTab loading={loading} />}
 
-          {activeTab === "structures" && (
-            <FeeStructuresTab structures={structures} feeTypes={feeTypes} loading={loading} onRefresh={fetchData} />
-          )}
-
-          {activeTab === "types" && (
-            <FeeTypesTab feeTypes={feeTypes} loading={loading} onRefresh={fetchData} />
-          )}
-
-          {activeTab === "assignments" && (
-            <StudentFeeAssignmentTab structures={structures} studentFeeMaps={studentFeeMaps} loading={loading} onRefresh={fetchData} />
-          )}
-
-          {activeTab === "invoices" && (
-            <Suspense fallback={tabLoadingFallback}>
-              <InvoicesTab invoices={invoices} loading={loading} onRefresh={fetchData} />
-            </Suspense>
-          )}
-
-          {activeTab === "scholarships" && <ScholarshipManager />}
-
-          {activeTab === "installments" && <InstallmentPlans />}
-
-          {activeTab === "payments" && <PaymentsTab loading={loading} />}
-
-          {activeTab === "refunds" && <RefundManager />}
-
-          {activeTab === "reminders" && <FeeReminderCenter />}
-
-          {activeTab === "late-fees" && <LateFeeRulesTab loading={loading} />}
-
-          {activeTab === "reports" && (
-            <ReportsCenter invoices={invoices} payments={payments} summary={summary} loading={loading} />
+              {activeTab === "structures" && (
+                <FeeStructuresTab structures={structures} feeTypes={feeTypes} loading={loading} onRefresh={fetchData} />
+              )}
+              {activeTab === "types" && (
+                <FeeTypesTab feeTypes={feeTypes} loading={loading} onRefresh={fetchData} />
+              )}
+              {activeTab === "assignments" && (
+                <StudentFeeAssignmentTab structures={structures} studentFeeMaps={studentFeeMaps} loading={loading} onRefresh={fetchData} />
+              )}
+              {activeTab === "invoices" && (
+                <Suspense fallback={tabLoadingFallback}>
+                  <InvoicesTab invoices={invoices} loading={loading} onRefresh={fetchData} />
+                </Suspense>
+              )}
+            </>
           )}
         </div>
       </div>

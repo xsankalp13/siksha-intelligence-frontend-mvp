@@ -88,6 +88,11 @@ export const financeService = {
     return api.post<StudentFeeMapResponseDTO>("/auth/finance/student-maps", data);
   },
 
+  /** POST /auth/finance/student-maps/bulk */
+  createBulkStudentFeeMaps(data: StudentFeeMapCreateDTO[]) {
+    return api.post<StudentFeeMapResponseDTO[]>("/auth/finance/student-maps/bulk", data);
+  },
+
   /** GET /auth/finance/student-maps/:mapId */
   getStudentFeeMapById(mapId: number) {
     return api.get<StudentFeeMapResponseDTO>(`/auth/finance/student-maps/${mapId}`);
@@ -96,6 +101,16 @@ export const financeService = {
   /** PUT /auth/finance/student-maps/:mapId */
   updateStudentFeeMap(mapId: number, data: StudentFeeMapUpdateDTO) {
     return api.put<StudentFeeMapResponseDTO>(`/auth/finance/student-maps/${mapId}`, data);
+  },
+
+  /** DELETE /auth/finance/student-maps/:mapId */
+  deleteStudentFeeMap(mapId: number) {
+    return api.delete(`/auth/finance/student-maps/${mapId}`);
+  },
+
+  /** DELETE /auth/finance/student-maps/bulk */
+  deleteBulkStudentFeeMaps(mapIds: number[]) {
+    return api.delete("/auth/finance/student-maps/bulk", { data: mapIds });
   },
 
   // ── Invoices ─────────────────────────────────────────────────────
@@ -158,6 +173,16 @@ export const financeService = {
   /** POST /auth/finance/payments/record-offline */
   recordOfflinePayment(data: RecordOfflinePaymentDTO) {
     return api.post<PaymentResponseDTO>("/auth/finance/payments/record-offline", data);
+  },
+
+  getPaymentsByInvoiceId(invoiceId: number) {
+    return api.get<PaymentResponseDTO[]>(`/auth/finance/payments/invoice/${invoiceId}`);
+  },
+
+  getPaymentReceipt(paymentId: number) {
+    return api.get<Blob>(`/auth/finance/payments/${paymentId}/receipt`, {
+      responseType: "blob",
+    });
   },
 
   // ── Late Fee Rules ───────────────────────────────────────────────
@@ -242,6 +267,15 @@ export const financeService = {
   },
   revokeScholarshipAssignment(id: number) {
     return api.put(`/auth/finance/scholarships/assignments/${id}/revoke`);
+  },
+  activateScholarshipAssignment(id: number) {
+    return api.put(`/auth/finance/scholarships/assignments/${id}/activate`);
+  },
+  deleteScholarshipAssignment(id: number) {
+    return api.delete(`/auth/finance/scholarships/assignments/${id}`);
+  },
+  deleteBulkScholarshipAssignments(ids: number[]) {
+    return api.delete("/auth/finance/scholarships/assignments/bulk", { data: ids });
   },
 
   // ── Installment Plans ────────────────────────────────────────────

@@ -57,6 +57,8 @@ export function RoleBasedRoute({ children, allowedRoles }: RoleBasedRouteProps) 
       APPLICANT: '/dashboard/applicant',
       PARENT: '/dashboard/parent',
       GUARDIAN: '/dashboard/parent',
+      FINANCE_ADMIN: '/dashboard/admin/finance',
+      AUDITOR: '/dashboard/admin/finance',
     }
 
     // Find first matching role's dashboard (normalize role before lookup)

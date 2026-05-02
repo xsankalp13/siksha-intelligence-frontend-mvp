@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   GraduationCap, Plus, Search, CheckCircle2,
-  XCircle, Clock, IndianRupee, Users, Award, Percent,} from "lucide-react";
+  XCircle, Clock, IndianRupee, Users, Award, Percent, Trash2, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { adminService, type StudentSummaryDTO } from "@/services/admin";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +13,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 import { financeService } from "@/services/finance";
 import { formatINR, formatINRCompact } from "../finance/utils/financeUtils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type ScholarshipType = any;
 type ScholarshipAssignment = any;
@@ -48,6 +60,15 @@ export function ScholarshipManager() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [idsToDelete, setIdsToDelete] = useState<number[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  // Student search state
+  const [studentSearch, setStudentSearch] = useState("");
+  const [foundStudents, setFoundStudents] = useState<StudentSummaryDTO[]>([]);
+  const [studentLoading, setStudentLoading] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<StudentSummaryDTO | null>(null);
 
   // new type form state
   const [form, setForm] = useState({
@@ -57,7 +78,7 @@ export function ScholarshipManager() {
 
   // new assignment form state
   const [assignForm, setAssignForm] = useState({
-    studentId: "", studentName: "", scholarshipId: "", reason: "",
+    scholarshipId: "", reason: "",
   });
 
   useEffect(() => {
@@ -79,6 +100,25 @@ export function ScholarshipManager() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!studentSearch.trim()) {
+      setFoundStudents([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setStudentLoading(true);
+      try {
+        const res = await adminService.listStudents({ search: studentSearch, size: 5 });
+        setFoundStudents(res.data.content);
+      } catch (err) {
+        setFoundStudents([]);
+      } finally {
+        setStudentLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [studentSearch]);
 
   const totalDiscountIssued = types.reduce((a, t) => a + t.totalDiscountIssued, 0);
   const totalActiveRecipients = types.reduce((a, t) => a + t.activeCount, 0);
@@ -117,21 +157,23 @@ export function ScholarshipManager() {
   };
 
   const handleAssign = async () => {
-    if (!assignForm.studentId || !assignForm.studentName || !assignForm.scholarshipId || !assignForm.reason) {
+    if (!selectedStudent || !assignForm.scholarshipId || !assignForm.reason) {
       toast.error("Please fill all required fields");
       return;
     }
     try {
       const data = {
-        studentId: Number(assignForm.studentId),
-        studentName: assignForm.studentName,
+        studentId: selectedStudent.studentId,
+        studentName: `${selectedStudent.firstName} ${selectedStudent.lastName}`,
         scholarshipId: Number(assignForm.scholarshipId),
         reason: assignForm.reason
       };
       await financeService.assignScholarship(data);
-      toast.success(`Scholarship assigned to ${assignForm.studentName}`);
+      toast.success(`Scholarship assigned to ${data.studentName}`);
       setIsAssignDialogOpen(false);
-      setAssignForm({ studentId: "", studentName: "", scholarshipId: "", reason: "" });
+      setAssignForm({ scholarshipId: "", reason: "" });
+      setSelectedStudent(null);
+      setStudentSearch("");
       fetchData();
     } catch (err) {
       toast.error("Failed to assign scholarship");
@@ -146,6 +188,68 @@ export function ScholarshipManager() {
     } catch (err) {
       toast.error("Failed to revoke scholarship");
     }
+  };
+
+  const handleActivate = async (id: number, name: string) => {
+    try {
+      await financeService.activateScholarshipAssignment(id);
+      toast.success(`Scholarship reactivated for ${name}`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to activate scholarship");
+    }
+  };
+
+  const handleDeleteSingle = (id: number) => {
+    setIdsToDelete([id]);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteBulk = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setIdsToDelete(ids);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      if (idsToDelete.length === 1) {
+        await financeService.deleteScholarshipAssignment(idsToDelete[0]);
+      } else {
+        await financeService.deleteBulkScholarshipAssignments(idsToDelete);
+      }
+      
+      toast.success(idsToDelete.length === 1 ? "Assignment deleted" : `${idsToDelete.length} assignments deleted`);
+      
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        idsToDelete.forEach(id => next.delete(id));
+        return next;
+      });
+      setIdsToDelete([]);
+      setIsDeleteConfirmOpen(false);
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to delete assignment(s)");
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredAssignments.length && filteredAssignments.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredAssignments.map(a => a.id)));
+    }
+  };
+
+  const toggleSelectOne = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   return (
@@ -240,6 +344,11 @@ export function ScholarshipManager() {
               <p className="text-xs text-muted-foreground">{filteredAssignments.length} assignments found</p>
             </div>
             <div className="flex gap-2 flex-wrap">
+              {selectedIds.size > 0 && (
+                <Button variant="destructive" size="sm" onClick={handleDeleteBulk} className="gap-2 h-9">
+                  <Trash2 className="h-3.5 w-3.5" /> Delete ({selectedIds.size})
+                </Button>
+              )}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input placeholder="Search student..." className="pl-8 h-9 w-52 text-xs" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -263,6 +372,12 @@ export function ScholarshipManager() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox 
+                      checked={filteredAssignments.length > 0 && selectedIds.size === filteredAssignments.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Scholarship</TableHead>
                   <TableHead>Discount</TableHead>
@@ -275,16 +390,22 @@ export function ScholarshipManager() {
               <TableBody>
                 {filteredAssignments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                       <GraduationCap className="mx-auto h-8 w-8 mb-2 opacity-20" />
                       No assignments found.
                     </TableCell>
                   </TableRow>
                 ) : filteredAssignments.map((a) => {
-                  const cfg = STATUS_CONFIG[a.status];
+                  const cfg = STATUS_CONFIG[a.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.REVOKED;
                   const StatusIcon = cfg.icon;
                   return (
-                    <TableRow key={a.id} className="hover:bg-muted/30">
+                    <TableRow key={a.id} className={`hover:bg-muted/30 ${selectedIds.has(a.id) ? 'bg-muted/50' : ''}`}>
+                      <TableCell>
+                        <Checkbox 
+                          checked={selectedIds.has(a.id)}
+                          onCheckedChange={() => toggleSelectOne(a.id)}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="font-semibold text-sm">#{a.studentId}</div>
                         <div className="text-xs text-muted-foreground">{a.studentName}</div>
@@ -307,12 +428,23 @@ export function ScholarshipManager() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {a.status === "ACTIVE" && (
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-rose-600 hover:text-rose-700"
-                            onClick={() => handleRevoke(a.id, a.studentName)}>
-                            Revoke
+                        <div className="flex justify-end gap-1">
+                          {a.status === "ACTIVE" ? (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                              onClick={() => handleRevoke(a.id, a.studentName)}>
+                              <XCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => handleActivate(a.id, a.studentName)}>
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => handleDeleteSingle(a.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -378,16 +510,63 @@ export function ScholarshipManager() {
             <DialogTitle>Assign Scholarship to Student</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold">Student ID *</label>
-                <Input placeholder="e.g. 1001" value={assignForm.studentId} onChange={(e) => setAssignForm({ ...assignForm, studentId: e.target.value })} />
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Search Student *</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Type student name..."
+                  className="pl-9"
+                  value={studentSearch}
+                  onChange={(e) => {
+                    setStudentSearch(e.target.value);
+                    if (selectedStudent) setSelectedStudent(null);
+                  }}
+                />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold">Student Name *</label>
-                <Input placeholder="Full name" value={assignForm.studentName} onChange={(e) => setAssignForm({ ...assignForm, studentName: e.target.value })} />
-              </div>
+              
+              {studentLoading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Searching...
+                </div>
+              )}
+
+              {foundStudents.length > 0 && !selectedStudent && (
+                <div className="mt-1 border rounded-md shadow-sm bg-card divide-y max-h-[160px] overflow-y-auto">
+                  {foundStudents.map((s) => (
+                    <div
+                      key={s.studentId}
+                      className="p-2 hover:bg-muted cursor-pointer flex justify-between items-center text-sm"
+                      onClick={() => {
+                        setSelectedStudent(s);
+                        setStudentSearch(`${s.firstName} ${s.lastName}`);
+                        setFoundStudents([]);
+                      }}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium">{s.firstName} {s.lastName}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono">ID: {s.studentId}</span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">{s.enrollmentNumber}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {selectedStudent && (
+                <div className="mt-2 flex items-center gap-3 p-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-foreground">{selectedStudent.firstName} {selectedStudent.lastName}</p>
+                    <p className="text-[10px] text-muted-foreground">Enrollment: {selectedStudent.enrollmentNumber}</p>
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="space-y-1.5">
               <label className="text-sm font-semibold">Scholarship *</label>
               <Select value={assignForm.scholarshipId} onValueChange={(v) => setAssignForm({ ...assignForm, scholarshipId: v })}>
@@ -412,6 +591,27 @@ export function ScholarshipManager() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete Confirmation ────────────────────────────────────────────── */}
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-rose-600">
+              <Trash2 className="h-5 w-5" />
+              Confirm Deletion
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {idsToDelete.length === 1 ? "this scholarship assignment" : `${idsToDelete.length} scholarship assignments`}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-rose-600 hover:bg-rose-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </motion.div>
   );

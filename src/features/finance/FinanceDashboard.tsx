@@ -11,9 +11,10 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { AdminDashboardSummaryDTO, InvoiceResponseDTO, PaymentResponseDTO } from "@/services/types/finance";
 import { formatINR, formatINRCompact, computeCollectionRate, groupByMonth } from "../finance/utils/financeUtils";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 
 interface FinanceDashboardProps {
   summary: AdminDashboardSummaryDTO | null;
@@ -121,7 +122,9 @@ export function FinanceDashboard({ summary, invoices, payments, loading }: Finan
   // ── Computed Analytics ──────────────────────────────────────────────────────
 
   const totalBilled = useMemo(() =>
-    invoices.reduce((acc, inv) => acc + Number(inv.totalAmount), 0), [invoices]
+    invoices
+      .filter((inv) => inv.status !== "CANCELLED")
+      .reduce((acc, inv) => acc + Number(inv.totalAmount), 0), [invoices]
   );
 
   const collectionRate = useMemo(() =>
@@ -135,7 +138,7 @@ export function FinanceDashboard({ summary, invoices, payments, loading }: Finan
 
     return Object.entries(invoicesByMonth).map(([month, invs]) => ({
       month,
-      billed: invs.reduce((a, i) => a + Number(i.totalAmount), 0),
+      billed: invs.filter((i) => i.status !== "CANCELLED").reduce((a, i) => a + Number(i.totalAmount), 0),
       collected: (paymentsByMonth[month] ?? []).reduce((a: number, p: any) => a + Number(p.amountPaid), 0),
     }));
   }, [invoices, payments]);
@@ -427,13 +430,14 @@ export function FinanceDashboard({ summary, invoices, payments, loading }: Finan
                     transition={{ delay: i * 0.04 }}
                     className="flex items-center gap-3 p-3 rounded-xl border border-border/40 bg-background/40 hover:bg-muted/30 transition-colors"
                   >
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${inv.status === "OVERDUE" ? "bg-rose-500/10 text-rose-600" : "bg-amber-500/10 text-amber-600"
-                      }`}>
-                      {i + 1}
-                    </div>
+                    <Avatar className="h-9 w-9 border border-border/50 shrink-0">
+                      <AvatarFallback className="bg-primary/5 text-primary text-[10px] font-bold">
+                        {(inv.studentName || "ST").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-foreground">STU-{inv.studentId}</p>
-                      <p className="text-[10px] text-muted-foreground font-medium">#{inv.invoiceNumber}</p>
+                      <p className="text-sm font-bold text-foreground truncate">{inv.studentName || `Student ${inv.studentId}`}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">STU-{inv.studentId} • #{inv.invoiceNumber}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-black text-foreground">{formatINR(Number(inv.totalAmount))}</p>
@@ -479,15 +483,21 @@ export function FinanceDashboard({ summary, invoices, payments, loading }: Finan
                   initial={{ opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.05 }}
-                  className="flex items-center gap-3 p-3.5 rounded-xl border border-border/40 bg-background/50 hover:bg-muted/30 transition-all group"
+                  className="flex items-center gap-3 p-3 rounded-xl border border-border/40 bg-background/50 hover:bg-muted/30 transition-all group"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-                    <IndianRupee className="w-4 h-4 text-emerald-600" />
-                  </div>
+                  <Avatar className="h-9 w-9 border border-border/50 shrink-0">
+                    <AvatarFallback className="bg-emerald-500/5 text-emerald-600 text-[10px] font-bold">
+                      {(p.studentName || "ST").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-black text-foreground">STU-{p.studentId}</p>
+                    <p className="text-xs font-black text-foreground truncate">{p.studentName || `Student ${p.studentId}`}</p>
                     <p className="text-[10px] text-muted-foreground font-medium">
-                      {p.paymentDate ? format(new Date(p.paymentDate), "dd MMM, HH:mm") : "—"}
+                      {p.paymentDate ? (
+                        <span title={format(new Date(p.paymentDate), "dd MMM yyyy, HH:mm")}>
+                          {formatDistanceToNow(new Date(p.paymentDate), { addSuffix: true })}
+                        </span>
+                      ) : "—"}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
