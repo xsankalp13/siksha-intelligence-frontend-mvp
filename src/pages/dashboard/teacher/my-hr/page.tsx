@@ -6,8 +6,13 @@ import TeacherMySalary from "@/features/hrms/TeacherMySalary";
 import TeacherMyLoans from "@/features/hrms/TeacherMyLoans";
 import TeacherMyExpenses from "@/features/hrms/TeacherMyExpenses";
 import TeacherMyOvertime from "@/features/hrms/TeacherMyOvertime";
+import TeacherProxyDuties from "@/features/teacher/components/TeacherProxyDuties";
+import { useTeacherSchedule } from "@/features/teacher/queries/useTeacherQueries";
 
 export default function TeacherMyHrPage() {
+  const { data: schedule } = useTeacherSchedule();
+  const staffUuid = schedule?.staffUuid ?? "";
+
   return (
     <div className="space-y-6">
       <div>
@@ -18,7 +23,7 @@ export default function TeacherMyHrPage() {
       </div>
 
       <Tabs defaultValue="leaves" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 md:w-full lg:grid-cols-7">
+        <TabsList className="grid w-full grid-cols-4 md:w-full lg:grid-cols-8">
           <TabsTrigger value="leaves">My Leaves</TabsTrigger>
           <TabsTrigger value="attendance">My Attendance</TabsTrigger>
           <TabsTrigger value="payslips">My Payslips</TabsTrigger>
@@ -26,6 +31,7 @@ export default function TeacherMyHrPage() {
           <TabsTrigger value="loans">My Loans</TabsTrigger>
           <TabsTrigger value="expenses">My Expenses</TabsTrigger>
           <TabsTrigger value="overtime">My Overtime</TabsTrigger>
+          <TabsTrigger value="proxy">Proxy Duties</TabsTrigger>
         </TabsList>
 
         <TabsContent value="leaves" className="mt-4">
@@ -54,6 +60,14 @@ export default function TeacherMyHrPage() {
 
         <TabsContent value="overtime" className="mt-4">
           <TeacherMyOvertime />
+        </TabsContent>
+
+        <TabsContent value="proxy" className="mt-4">
+          {staffUuid ? (
+            <TeacherProxyDuties staffUuid={staffUuid} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading proxy data…</p>
+          )}
         </TabsContent>
       </Tabs>
     </div>

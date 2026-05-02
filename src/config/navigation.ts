@@ -63,7 +63,11 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "Examinations", path: "/dashboard/admin/examinations", icon: ClipboardCheck },
 
   { label: "Rooms", path: "/dashboard/admin/rooms", icon: DoorOpen },
-  { label: "HRMS", path: "/dashboard/admin/hrms", icon: Briefcase },
+  {
+    label: "HRMS",
+    path: "/dashboard/admin/hrms",
+    icon: Briefcase,
+  },
   { label: "Finance", path: "/dashboard/admin/finance", icon: Receipt },
 
   { label: "Transport", path: "/dashboard/admin/transport", icon: Bus },
@@ -227,6 +231,7 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
     label: "My HR",
     path: "/dashboard/teacher/my-hr",
     icon: Briefcase,
+
   },
   {
     label: "Evaluation",

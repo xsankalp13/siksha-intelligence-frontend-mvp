@@ -192,7 +192,16 @@ export function ClassTeacherMappingPanel() {
           }
         }}
         section={selectedSection}
-        teachers={teachers}
+        teachers={teachers.filter((teacher) => {
+          // Allow the teacher currently assigned to THIS section
+          if (selectedSection?.classTeacherUuid === teacher.uuid) return true;
+          // Exclude teachers already assigned as classteacher in any other section
+          return !mappings.some(
+            (row) =>
+              row.classTeacherUuid === teacher.uuid &&
+              row.sectionId !== selectedSection?.sectionId
+          );
+        })}
         isSaving={assignMutation.isPending}
         onAssign={handleAssign}
       />

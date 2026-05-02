@@ -114,8 +114,8 @@ export function validateCsvData(
     if (!validateEmail(email)) return `Row ${rowNum}: Invalid email format '${email || ""}'.`;
 
     const dob = row[headerIndices["dateOfBirth"]];
-    if (validateString(dob) && !validateDate(dob)) {
-      return `Row ${rowNum}: Invalid dateOfBirth '${dob}'. Expected format: yyyy-MM-dd.`;
+    if (!validateDate(dob)) {
+      return `Row ${rowNum}: Invalid or missing dateOfBirth '${dob || ""}'. Expected format: yyyy-MM-dd (e.g. 1990-05-15).`;
     }
 
     const gender = row[headerIndices["gender"]];
@@ -135,8 +135,8 @@ export function validateCsvData(
       }
 
       const enrollmentDate = row[headerIndices["enrollmentDate"]];
-      if (validateString(enrollmentDate) && !validateDate(enrollmentDate)) {
-        return `Row ${rowNum}: Invalid enrollmentDate '${enrollmentDate}'. Expected format: yyyy-MM-dd.`;
+      if (!validateDate(enrollmentDate)) {
+        return `Row ${rowNum}: Invalid or missing enrollmentDate '${enrollmentDate || ""}'. Expected format: yyyy-MM-dd (e.g. 2023-06-15).`;
       }
 
       const className = row[headerIndices["className"]];
@@ -150,8 +150,8 @@ export function validateCsvData(
       if (!validateString(employeeId)) return `Row ${rowNum}: employeeId cannot be empty.`;
 
       const joiningDate = row[headerIndices["joiningDate"]];
-      if (validateString(joiningDate) && !validateDate(joiningDate)) {
-        return `Row ${rowNum}: Invalid joiningDate '${joiningDate}'. Expected format: yyyy-MM-dd.`;
+      if (!validateDate(joiningDate)) {
+        return `Row ${rowNum}: Invalid or missing joiningDate '${joiningDate || ""}'. Expected format: yyyy-MM-dd (e.g. 2023-01-01).`;
       }
 
       const staffType = row[headerIndices["staffType"]];

@@ -2,7 +2,7 @@
  * AiConfigTab — Super Admin AI Configuration
  * 
  * Renders inside the Configuration page's Tabs component as a new "AI" tab.
- * Connects to the Python AI service at :8001 to read/update the active model.
+ * Connects to the Python AI service (URL set via VITE_AI_SERVER_URL env variable).
  */
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
@@ -47,7 +47,7 @@ interface AIConfigResponse {
 
 // ── API Client ────────────────────────────────────────────────────────────────
 
-const AI_SERVICE_URL = 'http://localhost:8001'
+const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVER_URL ?? 'http://localhost:8001'
 
 const aiConfigApi = {
   get: (): Promise<AIConfigResponse> =>
@@ -191,7 +191,10 @@ export default function AiConfigTab() {
         <Bot className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
         <p className="font-semibold text-destructive">AI Service Unreachable</p>
         <p className="text-sm text-muted-foreground mt-1">
-          Make sure the Python AI service is running on <code className="font-mono text-xs bg-muted px-1 rounded">localhost:8001</code>
+          Make sure the Shiksha AI service is reachable at{' '}
+          <code className="font-mono text-xs bg-muted px-1 rounded">
+            {import.meta.env.VITE_AI_SERVER_URL ?? 'http://localhost:8001'}
+          </code>
         </p>
       </div>
     )

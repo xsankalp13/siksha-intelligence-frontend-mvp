@@ -73,7 +73,7 @@ export function TimeslotManagement() {
         const dayIdx = DAYS_LIST.indexOf(selectedDay) + 1; // 1-indexed
         return timeslots
             .filter(ts => ts.dayOfWeek === dayIdx)
-            .filter(ts => ts.slotLabel.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            .filter(ts => (ts.slotLabel?.toLowerCase() ?? '').includes(searchQuery.toLowerCase()) || 
                          ts.startTime.includes(searchQuery))
             .sort((a, b) => a.startTime.localeCompare(b.startTime));
     }, [timeslots, selectedDay, searchQuery]);

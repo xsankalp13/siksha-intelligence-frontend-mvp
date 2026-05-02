@@ -44,7 +44,7 @@ export function ShikshaAIChatWidget() {
 
     try {
       const token = getApiAccessToken();
-      const baseUrl = import.meta.env.VITE_AI_BASE_URL || "http://localhost:8001";
+      const baseUrl = import.meta.env.VITE_AI_SERVER_URL ?? "http://localhost:8001";
       
       const res = await fetch(`${baseUrl}/v1/chat`, {
         method: "POST",

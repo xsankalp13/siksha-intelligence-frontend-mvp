@@ -45,6 +45,7 @@ export default function Sidebar({ collapsed, onToggle, navItems }: SidebarProps)
           const isActive = item.end
             ? location.pathname === item.path
             : location.pathname.startsWith(item.path);
+
           return (
             <NavLink
               key={item.path}
