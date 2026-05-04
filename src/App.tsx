@@ -90,6 +90,7 @@ const TeacherDisciplinePage = lazy(() => import('@/pages/dashboard/teacher/disci
 const TeacherEvaluationPage = lazy(() => import('@/pages/dashboard/teacher/evaluation/page'))
 const TeacherSelfAttendancePage = lazy(() => import('@/pages/dashboard/teacher/self-attendance/page'))
 const TeacherProxyPage = lazy(() => import('@/pages/dashboard/teacher/proxy/page'))
+const TeacherCommunicationPage = lazy(() => import('@/pages/dashboard/teacher/communication/page'))
 
 const InvigilatorRoomsPage = lazy(() => import('@/pages/dashboard/invigilator/attendance/page'))
 const RoomAttendancePage = lazy(() => import('@/pages/dashboard/invigilator/attendance/[roomId]/page'))
@@ -183,7 +184,7 @@ export default function App() {
         {/* 403 Access Denied page */}
         <Route
           path="/403"
-          element={withRouteSuspense(<AccessDeniedPage />)} 
+          element={withRouteSuspense(<AccessDeniedPage />)}
         />
 
         {/* Protected routes: require authentication */}
@@ -334,6 +335,7 @@ export default function App() {
           <Route path="evaluation" element={withRouteSuspense(<TeacherEvaluationPage />)} />
           <Route path="discipline" element={withRouteSuspense(<TeacherDisciplinePage />)} />
           <Route path="proxy" element={withRouteSuspense(<TeacherProxyPage />)} />
+          <Route path="communication" element={withRouteSuspense(<TeacherCommunicationPage />)} />
           <Route path="*" element={<Navigate to="/dashboard/teacher" replace />} />
         </Route>
 

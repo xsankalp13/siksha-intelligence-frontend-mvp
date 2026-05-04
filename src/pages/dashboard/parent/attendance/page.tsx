@@ -1,14 +1,49 @@
 import { Calendar as CalendarIcon, CheckCircle2, XCircle, AlertTriangle, Clock, TrendingUp } from "lucide-react";
-import { useChildAttendance } from "@/features/parent/queries/useParentQueries";
+import { useChildAttendance, useApplyForLeave } from "@/features/parent/queries/useParentQueries";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useChildStore } from "@/features/parent/stores/useChildStore";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function AttendancePage() {
   const { selectedChildId } = useChildStore();
   const { data: attendance, isLoading, isError } = useChildAttendance();
+  const { mutate: applyForLeave, isPending } = useApplyForLeave();
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [leaveData, setLeaveData] = useState({
+    leaveType: "SICK",
+    fromDate: "",
+    toDate: "",
+    reason: "",
+  });
+
+  const handleApplyLeave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedChildId) return;
+
+    applyForLeave(
+      { childId: selectedChildId, payload: leaveData },
+      {
+        onSuccess: () => {
+          toast.success("Leave application submitted successfully!");
+          setIsOpen(false);
+          setLeaveData({ leaveType: "SICK", fromDate: "", toDate: "", reason: "" });
+        },
+        onError: (err: any) => {
+          toast.error(err.response?.data?.message || "Failed to submit leave application.");
+        }
+      }
+    );
+  };
 
   if (!selectedChildId) {
     return <div className="p-6 text-center text-muted-foreground">Please select a child to view attendance records.</div>;
@@ -42,7 +77,68 @@ export default function AttendancePage() {
           </h1>
           <p className="text-muted-foreground mt-1">Real-time attendance tracking and leave management.</p>
         </div>
-        <Button>Apply for Leave</Button>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogTrigger asChild>
+            <Button>Apply for Leave</Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Apply for Leave</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleApplyLeave} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Leave Type</Label>
+                <Select
+                  value={leaveData.leaveType}
+                  onValueChange={(val) => setLeaveData({ ...leaveData, leaveType: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SICK">Sick Leave</SelectItem>
+                    <SelectItem value="CASUAL">Casual Leave</SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>From Date</Label>
+                  <Input 
+                    type="date" 
+                    required 
+                    value={leaveData.fromDate}
+                    onChange={(e) => setLeaveData({ ...leaveData, fromDate: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>To Date</Label>
+                  <Input 
+                    type="date" 
+                    required 
+                    value={leaveData.toDate}
+                    onChange={(e) => setLeaveData({ ...leaveData, toDate: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Reason</Label>
+                <Textarea 
+                  placeholder="Please state the reason for the leave" 
+                  rows={4} 
+                  required 
+                  value={leaveData.reason}
+                  onChange={(e) => setLeaveData({ ...leaveData, reason: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isPending}>{isPending ? 'Submitting...' : 'Submit Application'}</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

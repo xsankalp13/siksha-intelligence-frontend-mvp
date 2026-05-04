@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { parentService } from '@/services/parentService';
 import { useChildStore } from '../stores/useChildStore';
 
@@ -99,5 +99,19 @@ export function useChildFees() {
     },
     enabled: !!selectedChildId,
     ...baseOptions,
+  });
+}
+
+export function useApplyForLeave() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ childId, payload }: { childId: string, payload: { leaveType: string; fromDate: string; toDate: string; reason: string; halfDay?: boolean } }) => {
+      const res = await parentService.applyForLeave(childId, payload);
+      return res.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: parentKeys.attendance(variables.childId) });
+      queryClient.invalidateQueries({ queryKey: parentKeys.dashboard(variables.childId) });
+    }
   });
 }
