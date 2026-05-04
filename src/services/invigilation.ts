@@ -17,6 +17,11 @@ export const invigilationService = {
     return api.post<InvigilationResponseDTO>("/auth/examination/invigilations", data);
   },
 
+  /** POST /auth/examination/invigilations/bulk-assign-pool */
+  bulkAssignPool(data: { examUuid: string; selectedRoomUuids: string[]; poolStaffUuids: string[] }) {
+    return api.post("/auth/examination/invigilations/bulk-assign-pool", data);
+  },
+
   /** GET /auth/examination/invigilations/exam/:examScheduleId — list invigilators for a schedule */
   getByExamSchedule(examScheduleId: number) {
     return api.get<InvigilationResponseDTO[]>(

@@ -5,6 +5,9 @@ import type {
   SeatAllocationResponseDTO,
   SingleSeatAllocationRequestDTO,
   BulkSeatAllocationRequestDTO,
+  GlobalSeatAllocationRequestDTO,
+  GlobalSeatAllocationResultDTO,
+  GlobalCapacityInfoDTO,
 } from "./types/seatAllocation";
 
 export const seatAllocationService = {
@@ -51,6 +54,27 @@ export const seatAllocationService = {
     );
   },
 
+  /** POST /auth/examination/seat-allocation/global-allocate — Global auto assign */
+  globalAllocate(data: GlobalSeatAllocationRequestDTO) {
+    return api.post<GlobalSeatAllocationResultDTO>(
+      `/auth/examination/seat-allocation/global-allocate`,
+      data
+    );
+  },
+
+  /** GET /auth/examination/seat-allocation/global-capacity-info — Global capacity */
+  getGlobalCapacityInfo(examUuid: string) {
+    return api.get<GlobalCapacityInfoDTO>(
+      `/auth/examination/seat-allocation/global-capacity-info`,
+      { params: { examUuid } }
+    );
+  },
+
+  /** GET /public/examination/seat-allocation/global-print/:examUuid — Get Global PDF URL */
+  getGlobalSeatingPlanPdfUrl(examUuid: string) {
+    return `${api.defaults.baseURL}/public/examination/seat-allocation/global-print/${examUuid}`;
+  },
+
   /** GET /auth/examination/seat-allocation/schedule/:id — Get all for schedule */
   getAllocationsForSchedule(examScheduleId: number) {
     return api.get<SeatAllocationResponseDTO[]>(
@@ -66,5 +90,15 @@ export const seatAllocationService = {
   /** DELETE /auth/examination/seat-allocation/bulk — Remove bulk seat allocations */
   bulkRemoveAllocations(ids: number[]) {
     return api.delete("/auth/examination/seat-allocation/bulk", { data: ids });
+  },
+
+  /** DELETE /auth/examination/seat-allocation/exam/:examUuid — Clear all for exam */
+  clearAllocationsByExam(examUuid: string) {
+    return api.delete(`/auth/examination/seat-allocation/exam/${examUuid}`);
+  },
+
+  /** DELETE /auth/examination/seat-allocation/schedule/:scheduleId — Clear for schedule */
+  clearAllocationsBySchedule(scheduleId: number) {
+    return api.delete(`/auth/examination/seat-allocation/schedule/${scheduleId}`);
   },
 };

@@ -421,10 +421,10 @@ export const examinationService = {
     });
   },
 
-  /** GET /admin/examination/seat-allocation/schedule/:examScheduleId/print */
+  /** GET /public/examination/seat-allocation/schedule/:examScheduleId/print */
   downloadSeatingPlanPdf(examScheduleId: number, format: "ROOM_WISE" | "ADMIN_TABLE" = "ROOM_WISE") {
     return api.get(
-      `/admin/examination/seat-allocation/schedule/${examScheduleId}/print`,
+      `/public/examination/seat-allocation/schedule/${examScheduleId}/print`,
       {
         params: { format },
         responseType: "blob",

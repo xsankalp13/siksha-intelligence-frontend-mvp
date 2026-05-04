@@ -78,7 +78,9 @@ export default defineConfig({
     },
   },
   server: {
+    https: {},
     host: true, // Listen on all local IPs
+    port: 5173,
     proxy: {
       // Proxies API calls to your Spring Boot backend
       '/api': {
@@ -88,7 +90,7 @@ export default defineConfig({
         configure: (proxy, _options) => {
           proxy.on('proxyReq', (proxyReq, _req, _res) => {
             // Rewrite origin so the Spring Boot Dev server accepts it
-            proxyReq.setHeader('Origin', 'http://localhost:5173');
+            proxyReq.setHeader('Origin', 'https://localhost:5173');
           });
         }
       },

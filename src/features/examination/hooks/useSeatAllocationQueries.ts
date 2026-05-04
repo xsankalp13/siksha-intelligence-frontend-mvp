@@ -3,6 +3,7 @@ import { seatAllocationService } from "@/services/seatAllocation";
 import type {
   SingleSeatAllocationRequestDTO,
   BulkSeatAllocationRequestDTO,
+  GlobalSeatAllocationRequestDTO,
 } from "@/services/types/seatAllocation";
 
 // ── Query Keys ──────────────────────────────────────────────────────
@@ -85,6 +86,17 @@ export const useAutoAllocateSeatsBulk = () => {
       qc.invalidateQueries({
         queryKey: keys.availableRooms(v.examScheduleId),
       });
+    },
+  });
+};
+
+export const useGlobalAllocateSeats = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: GlobalSeatAllocationRequestDTO) =>
+      seatAllocationService.globalAllocate(data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["seatAllocation"] });
     },
   });
 };

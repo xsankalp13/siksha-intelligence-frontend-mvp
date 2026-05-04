@@ -99,3 +99,31 @@ export interface BulkSeatAllocationRequestDTO {
   examScheduleId: number;
   roomId: string;
 }
+
+export interface GlobalSeatAllocationRequestDTO {
+  examUuid: string;
+  selectedRoomUuids?: string[];
+}
+
+export interface GlobalSeatAllocationResultDTO {
+  totalStudents: number;
+  totalSeated: number;
+  totalUnseated: number;
+  roomsUsed: number;
+  timeslotsProcessed: number;
+  skippedStudents: string[];
+  warnings: string[];
+}
+
+export interface GlobalCapacityInfoDTO {
+  maxStudentsInAnyTimeslot: number;
+  totalStudentsAcrossExam: number;
+  timeslotCount: number;
+  studentsPerTimeslot: Record<string, number>;
+}
+
+export interface PoolBulkAssignRequestDTO {
+  examUuid: string;
+  selectedRoomUuids: string[];
+  poolStaffUuids: string[];
+}

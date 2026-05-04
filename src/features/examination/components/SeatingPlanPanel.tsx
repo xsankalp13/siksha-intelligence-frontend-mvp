@@ -73,6 +73,8 @@ import type { ExamResponseDTO } from "@/services/types/examination";
 import type { SeatAllocationResponseDTO } from "@/services/types/seatAllocation";
 import { toast } from "sonner";
 import { examinationService } from "@/services/examination";
+import { seatAllocationService } from "@/services/seatAllocation";
+import { GlobalSeatingModal } from "./GlobalSeatingModal";
 
 // ── Position label mapping (UI only) ────────────────────────────────
 const POSITION_LABELS: Record<number, string> = { 0: "L", 1: "M", 2: "R" };
@@ -112,6 +114,7 @@ export default function SeatingPlanPanel() {
   // ── Auto-Fill state ─────────────────────────────────────────────
   const [autoFillOpen, setAutoFillOpen] = useState(false);
   const [autoFillRoomUuid, setAutoFillRoomUuid] = useState<string>("");
+  const [globalModalOpen, setGlobalModalOpen] = useState(false);
 
   // ── Queries ─────────────────────────────────────────────────────
   const { data: exams = [] } = useGetAllExams();
@@ -679,6 +682,29 @@ export default function SeatingPlanPanel() {
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedExamUuid && (
+            <>
+              <Button
+                onClick={() => setGlobalModalOpen(true)}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0 h-8 text-xs border-indigo-500/20 hover:bg-indigo-500/10 text-indigo-600 bg-card"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Global Generate
+              </Button>
+              <Button
+                onClick={() => window.open(seatAllocationService.getGlobalSeatingPlanPdfUrl(selectedExamUuid), "_blank")}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0 h-8 text-xs bg-card hover:bg-muted"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Global Plan
+              </Button>
+              <div className="w-px h-6 bg-border mx-1" />
+            </>
+          )}
           <Button
             onClick={handlePrintPdf}
             variant="outline"
@@ -1490,6 +1516,15 @@ export default function SeatingPlanPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* ── Global Seating Modal ───────────────────────────────────── */}
+      {selectedExamUuid && (
+        <GlobalSeatingModal
+          open={globalModalOpen}
+          onOpenChange={setGlobalModalOpen}
+          examUuid={selectedExamUuid}
+          scheduleId={selectedScheduleId || undefined}
+        />
+      )}
     </div>
   );
 }
