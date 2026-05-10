@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, Search, Edit, Send } from "lucide-react";
+import { MessageCircle, Search, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,6 @@ export default function TeacherCommunicationPage() {
   const { data: messages, isLoading: loadingMessages } = useConversation(selectedStudentId, selectedGuardianId);
   const { mutate: sendMessage, isPending: isSending } = useSendMessage();
   const { mutate: markAsRead } = useMarkAsRead();
-  const [lastMarkedId, setLastMarkedId] = useState<string | null>(null);
 
   const selectedStudent = students.find(s => s.studentId === selectedStudentId);
   const selectedGuardian = guardians?.find((g) => g.userId === selectedGuardianId);
@@ -94,7 +93,7 @@ export default function TeacherCommunicationPage() {
                 onClick={() => setSelectedStudentId(student.studentId!)}
                 className={`p-4 border-b hover:bg-muted/30 cursor-pointer transition-colors flex items-start gap-3 ${selectedStudentId === student.studentId ? 'bg-muted/50' : ''}`}
               >
-                <UserAvatar name={`${student.firstName} ${student.lastName}`} src={student.profileUrl} className="w-10 h-10 border border-primary/10" />
+                <UserAvatar name={`${student.firstName} ${student.lastName}`} className="w-10 h-10 border border-primary/10" />
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-0.5">
                     <h4 className="font-semibold text-sm truncate pr-2">{student.firstName} {student.lastName}</h4>
