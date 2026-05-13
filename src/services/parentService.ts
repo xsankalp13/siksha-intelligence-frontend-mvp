@@ -187,6 +187,17 @@ export const parentService = {
         }))
       }
     };
+  },
+
+  /** POST /guardian/dashboard/attendance/leave/{childId} */
+  async applyForLeave(childId: string, payload: { leaveType: string; fromDate: string; toDate: string; reason: string; halfDay?: boolean }) {
+    return await api.post(`/guardian/dashboard/attendance/leave/${childId}`, payload);
+  },
+
+  /** GET /guardian/dashboard/notifications */
+  async getNotifications() {
+    const res = await api.get('/guardian/dashboard/notifications');
+    return { data: res.data };
   }
 };
 
