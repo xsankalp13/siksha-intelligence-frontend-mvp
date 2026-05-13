@@ -77,6 +77,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: "ID Cards", path: "/dashboard/admin/id-cards", icon: CreditCard },
   { label: "Visitor Logs", path: "/dashboard/admin/visitor-logs", icon: ClipboardList },
   { label: "Pickup Logs", path: "/dashboard/admin/pickup-logs", icon: QrCode },
+  { label: "LMS Manager", path: "/dashboard/admin/lms", icon: BookOpen },
 ];
 
 export const APPLICANT_NAV_ITEMS: NavItem[] = [
@@ -165,6 +166,7 @@ export const STUDENT_NAV_ITEMS: NavItem[] = [
     path: "/dashboard/student/admit-cards",
     icon: FileCheck,
   },
+  { label: "LMS", path: "/dashboard/student/lms", icon: BookOpen },
 ];
 
 export const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [

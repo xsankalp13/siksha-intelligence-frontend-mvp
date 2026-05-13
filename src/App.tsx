@@ -183,7 +183,7 @@ export default function App() {
         {/* 403 Access Denied page */}
         <Route
           path="/403"
-          element={withRouteSuspense(<AccessDeniedPage />)} 
+          element={withRouteSuspense(<AccessDeniedPage />)}
         />
 
         {/* Protected routes: require authentication */}
